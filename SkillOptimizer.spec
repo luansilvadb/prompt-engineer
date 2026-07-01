@@ -2,7 +2,7 @@
 from PyInstaller.utils.hooks import collect_all
 from PyInstaller.utils.hooks import copy_metadata
 
-datas = [('frontend/dist', 'frontend/dist')]
+datas = [('frontend', 'frontend'), ('src/outputs/golden', 'src/outputs/golden')]
 binaries = []
 hiddenimports = []
 datas += copy_metadata('tiktoken')

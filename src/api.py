@@ -21,10 +21,13 @@ if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
 else:
     base_dir = Path(__file__).parent.parent
 
-frontend_dir = base_dir / 'frontend' / 'dist'
+frontend_dir = base_dir / 'frontend'
 
 if (frontend_dir / 'assets').exists():
     app.mount('/assets', StaticFiles(directory=str(frontend_dir / 'assets')), name='assets')
+
+if (frontend_dir / 'src').exists():
+    app.mount('/src', StaticFiles(directory=str(frontend_dir / 'src')), name='src')
 
 app.include_router(jobs.router)
 app.include_router(frontend.router)

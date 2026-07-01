@@ -171,6 +171,18 @@ class GoldenSet:
     def _load(self):
         path = self._store_path()
         if not path.exists():
+            import sys
+            if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+                frozen_path = Path(sys._MEIPASS) / 'src' / 'outputs' / 'golden' / 'golden_set.json'
+                if frozen_path.exists():
+                    try:
+                        import shutil
+                        shutil.copy2(frozen_path, path)
+                        print(f"[+] Golden set padrão restaurado localmente com sucesso em {path}")
+                    except Exception as e:
+                        path = frozen_path
+                        print(f"[!] Falha ao criar golden set localmente: {e}. Usando do executável diretamente.")
+        if not path.exists():
             print(f"[!] Golden set ausente em {path}. Portão operará em fail-open.")
             return
         try:

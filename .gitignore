@@ -39,7 +39,6 @@ venv.bak/
 # Frontend & Dependências JS
 # ==============================================================================
 node_modules/
-/frontend/dist/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

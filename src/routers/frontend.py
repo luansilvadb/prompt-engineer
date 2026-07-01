@@ -10,7 +10,7 @@ if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
 else:
     base_dir = Path(__file__).parent.parent.parent
 
-frontend_dir = base_dir / 'frontend' / 'dist'
+frontend_dir = base_dir / 'frontend'
 
 @router.get('/{catchall:path}')
 async def serve_spa(catchall: str):

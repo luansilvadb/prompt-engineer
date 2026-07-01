@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skill Optimizer - Monte Carlo Tree Search RL</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <!-- FontAwesome for Premium Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom Style -->
+    <link rel="stylesheet" href="/assets/index.css">
+</head>
+
+<body>
+
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo-area">
+                <div class="logo-icon"><i class="fa-solid fa-brain-circuit"></i></div>
+                <div class="logo-text">
+                    <h1>Skill Optimizer</h1>
+                    <span>Monte Carlo Tree Search & Self-Reflection RL</span>
+                </div>
+            </div>
+            <div class="header-actions" style="display: flex; gap: 16px; align-items: center;">
+                <div class="api-status">
+                    <span class="status-indicator idle" id="global-status-indicator"></span>
+                    <span id="global-status-text">Pronto</span>
+                </div>
+                <button type="button" class="btn-secondary" id="btn-train-judge"><i
+                        class="fa-solid fa-graduation-cap"></i> Treinar Juiz</button>
+                <button type="button" class="btn-secondary" id="btn-check-drift" title="Mede o juiz atual contra o golden set e dispara o circuit breaker se o hard-gate cair"><i
+                        class="fa-solid fa-shield-halved"></i> Verificar Drift</button>
+                <button type="button" class="btn-secondary" id="btn-open-history"><i
+                        class="fa-solid fa-clock-rotate-left"></i> Histórico</button>
+            </div>
+        </header>
+
+        <!-- Main Workspace -->
+        <main class="app-workspace">
+            <!-- Left Column: Configs & Inputs -->
+            <section class="workspace-sidebar">
+                <!-- Config Panel -->
+                <div class="panel glass">
+                    <div class="panel-header">
+                        <h2><i class="fa-solid fa-sliders"></i> Configuração do Agente</h2>
+                        <button type="button" class="btn-toggle" id="btn-toggle-config" aria-expanded="true"
+                            aria-controls="config-fields" aria-label="Recolher painel de configuração"
+                            title="Recolher painel de configuração"><i class="fa-solid fa-chevron-up"></i></button>
+                    </div>
+                    <div class="panel-body" id="config-fields">
+                        <div class="form-group">
+                            <label for="model-name">Modelo de IA <small>(LiteLLM Target)</small></label>
+                            <input type="text" id="model-name" placeholder="ex: minimax-m2.7, gemma-4" value="glm-5.2">
+                        </div>
+                        <div class="form-group">
+                            <label for="model-prefix">Prefixo do Provedor <small>(Opcional)</small></label>
+                            <input type="text" id="model-prefix" placeholder="ex: nvidia_nim" value="zhipu">
+                        </div>
+                        <div class="form-group">
+                            <label for="api-base">API Base URL <small>(Opcional)</small></label>
+                            <input type="text" id="api-base" placeholder="Se vazio, usa .env do backend">
+                        </div>
+                        <div class="form-group">
+                            <label for="api-key">Chave de API <small>(Opcional)</small></label>
+                            <div class="input-password-wrapper">
+                                <input type="password" id="api-key" placeholder="Se vazio, usa .env do backend">
+                                <button type="button" id="btn-toggle-key-visibility" aria-label="Mostrar chave de API"
+                                    title="Mostrar chave de API"><i class="fa-regular fa-eye"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Rules Panel -->
+                <div class="panel glass">
+                    <div class="panel-header">
+                        <h2><i class="fa-solid fa-gavel"></i> Diretrizes Adicionais</h2>
+                    </div>
+                    <div class="panel-body">
+                        <div class="rules-input-wrapper">
+                            <input type="text" id="new-rule-input"
+                                placeholder="Nova regra para a função de recompensa..."
+                                aria-label="Nova regra para a função de recompensa">
+                            <button type="button" class="btn-add-rule" id="btn-add-rule" aria-label="Adicionar diretriz"
+                                title="Adicionar diretriz"><i class="fa-solid fa-plus"></i></button>
+                        </div>
+                        <ul class="rules-list" id="rules-list">
+                            <!-- Dinâmico -->
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Original Skill Input -->
+                <div class="panel glass flex-grow">
+                    <div class="panel-header">
+                        <h2><i class="fa-solid fa-code"></i> Skill Original <small>(Markdown)</small></h2>
+                    </div>
+                    <div class="panel-body flex-column">
+                        <textarea id="original-skill-input" class="editor-textarea"
+                            placeholder="Cole aqui a sua instrução/skill original em Markdown..."
+                            aria-label="Skill original em formato Markdown"></textarea>
+                        <div class="action-bar">
+                            <button type="button" class="btn-primary" id="btn-start-opt">
+                                <i class="fa-solid fa-rocket animate-pulse"></i> Iniciar Otimização MCTS
+                            </button>
+                            <button type="button" class="btn-danger hidden" id="btn-stop-opt">
+                                <i class="fa-solid fa-circle-stop"></i> Parar Execução
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Column: Real-time Execution, Logs, MCTS Visualization & Output -->
+            <section class="workspace-content">
+                <!-- Exec logs and Progress -->
+                <div class="panel glass" id="progress-panel" style="display: none;">
+                    <div class="panel-header">
+                        <h2><i class="fa-solid fa-terminal"></i> Console de Execução</h2>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar-fill" id="progress-bar-fill"></div>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <div class="console-log" id="console-output"></div>
+                    </div>
+                </div>
+
+                <!-- MCTS Tree Visualization -->
+                <div class="panel glass" id="mcts-panel" style="display: none;">
+                    <div class="panel-header">
+                        <h2><i class="fa-solid fa-network-wired"></i> Árvore MCTS (Seleção UCT & Reflexões)</h2>
+                        <div class="mcts-stats">
+                            <span>Nós: <strong id="mcts-node-count">0</strong></span>
+                            <span>Melhor Nota: <strong id="mcts-best-score">0.0%</strong></span>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <div class="tree-container" id="tree-container">
+                            <button id="btn-recenter-tree" class="btn-recenter" title="Centralizar Visualização"
+                                aria-label="Centralizar Visualização">
+                                <i class="fa-solid fa-compress"></i>
+                            </button>
+                            <div id="tree-canvas"
+                                style="transform-origin: 0 50%; display: flex; gap: 20px; transition: transform 0.1s ease-out;">
+                                <!-- Renderizado Dinamicamente -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Welcome / Info view when idle -->
+                <div class="panel glass flex-grow welcome-panel" id="welcome-panel">
+                    <div class="welcome-content">
+                        <i class="fa-solid fa-diagram-project welcome-icon"></i>
+                        <h2>Otimizador RL Baseado em Monte Carlo Tree Search</h2>
+                        <p>Otimize suas skills e diretrizes de agentes de forma matemática utilizando Reinforcement
+                            Learning e reflexões guiadas por LLMs.</p>
+                        <div class="features-grid">
+                            <div class="feature-card">
+                                <i class="fa-solid fa-magnifying-glass-chart"></i>
+                                <h3>Seleção UCT</h3>
+                                <p>Explora e explota instruções candidatas com o algoritmo Upper Confidence Bound for
+                                    Trees.</p>
+                            </div>
+                            <div class="feature-card">
+                                <i class="fa-solid fa-rotate-left"></i>
+                                <h3>Autoreflexão Crítica</h3>
+                                <p>Usa auto-crítica detalhada a partir do feedback do juiz para projetar as próximas
+                                    iterações.</p>
+                            </div>
+                            <div class="feature-card">
+                                <i class="fa-solid fa-award"></i>
+                                <h3>Função de Recompensa</h3>
+                                <p>Calcula clareza, formatação e robustez, mitigando ambiguidades e lost-in-the-middle.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Optimization Results -->
+                <div class="panel glass flex-grow" id="result-panel" style="display: none;">
+                    <div class="panel-header">
+                        <h2><i class="fa-solid fa-square-poll-vertical"></i> Resultado Otimizado</h2>
+                        <div class="result-actions">
+                            <button type="button" class="btn-secondary" id="btn-copy-result"><i
+                                    class="fa-regular fa-copy"></i> Copiar Skill</button>
+                            <button type="button" class="btn-secondary" id="btn-view-diff"><i
+                                    class="fa-solid fa-code-compare"></i> Ver Diff</button>
+                        </div>
+                    </div>
+                    <div class="panel-body flex-column">
+                        <div class="result-tabs">
+                            <button type="button" class="tab-btn active" id="tab-btn-optimized">Skill Otimizada</button>
+                            <button type="button" class="tab-btn" id="tab-btn-diff">Comparador de Diferenças
+                                (Diff)</button>
+                        </div>
+                        <div class="tab-content" id="tab-content-optimized">
+                            <div class="markdown-preview" id="optimized-skill-output"></div>
+                        </div>
+                        <div class="tab-content hidden" id="tab-content-diff">
+                            <div class="diff-container" id="diff-output-container"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal for Node Detail -->
+    <div class="modal-overlay" id="node-modal">
+        <div class="modal glass node-modal-content">
+            <div class="modal-header">
+                <h3>Detalhes do Nó MCTS</h3>
+                <button type="button" class="btn-close-modal" id="btn-close-modal" aria-label="Fechar detalhes do nó"
+                    title="Fechar detalhes do nó"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-row">
+                    <span class="modal-label">ID do Nó:</span>
+                    <span class="modal-value monospace" id="modal-node-id">-</span>
+                </div>
+                <div class="modal-row">
+                    <span class="modal-label">Nota (Recompensa):</span>
+                    <span class="modal-value badge" id="modal-node-score">-</span>
+                </div>
+                <div class="modal-row">
+                    <span class="modal-label">Visitas:</span>
+                    <span class="modal-value" id="modal-node-visits">-</span>
+                </div>
+                <div class="modal-row flex-column">
+                    <span class="modal-label">Crítica Autoreflexiva / Feedback:</span>
+                    <pre class="modal-text-block" id="modal-node-critica">-</pre>
+                </div>
+                <div class="modal-row flex-column">
+                    <span class="modal-label">Skill Proposta:</span>
+                    <div class="code-block-wrapper">
+                        <button type="button" class="btn-copy-code" id="btn-copy-node-instruction" title="Copiar Skill"
+                            aria-label="Copiar Skill"><i class="fa-regular fa-copy"></i></button>
+                        <pre class="modal-text-block monospace" id="modal-node-instruction">-</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for History -->
+    <div class="modal-overlay" id="history-modal">
+        <div class="modal glass history-modal-content">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-clock-rotate-left"></i> Histórico de Execuções</h3>
+                <button type="button" class="btn-close-modal" id="btn-close-history" aria-label="Fechar histórico"
+                    title="Fechar histórico"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body" style="padding: 0;">
+                <div class="history-list-container">
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Modelo</th>
+                                <th>Status</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table-body">
+                            <!-- Renderizado via JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="history-pagination">
+                    <button type="button" class="btn-secondary" id="btn-history-prev" disabled><i
+                            class="fa-solid fa-chevron-left"></i> Anterior</button>
+                    <span id="history-page-info">Página 1</span>
+                    <button type="button" class="btn-secondary" id="btn-history-next">Próxima <i
+                            class="fa-solid fa-chevron-right"></i></button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script type="module" src="/src/index.js"></script>
+</body>
+
+</html>

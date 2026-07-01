@@ -1,0 +1,51 @@
+import { ViewModelBase } from './ViewModelBase.js';
+
+export class TreeViewModel extends ViewModelBase {
+    constructor() {
+        super();
+        this.mctsNodes = {};
+        this.bestScore = 0.0;
+    }
+
+    addNode(node) {
+        if (!node || !node.id) return;
+        
+        this.mctsNodes[node.id] = node;
+        
+        let newBestScore = 0.0;
+        Object.values(this.mctsNodes).forEach(n => {
+            if (n.score > newBestScore) {
+                newBestScore = n.score;
+            }
+        });
+
+        const isNewBest = newBestScore > this.bestScore;
+        this.bestScore = newBestScore;
+
+        this.dispatchEvent(new CustomEvent('nodeAdded', {
+            detail: {
+                node,
+                nodeCount: Object.keys(this.mctsNodes).length
+            }
+        }));
+
+        if (isNewBest || newBestScore === 0.0) {
+            this.dispatchEvent(new CustomEvent('bestScoreChanged', {
+                detail: {
+                    bestScore: this.bestScore
+                }
+            }));
+        }
+    }
+
+    clearTree() {
+        this.mctsNodes = {};
+        this.bestScore = 0.0;
+        this.dispatchEvent(new CustomEvent('treeCleared'));
+        this.dispatchEvent(new CustomEvent('bestScoreChanged', {
+            detail: {
+                bestScore: this.bestScore
+            }
+        }));
+    }
+}
