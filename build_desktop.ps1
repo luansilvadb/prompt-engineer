@@ -1,0 +1,1 @@
+pyinstaller --noconfirm --onedir --windowed --add-data "frontend/dist;frontend/dist" --collect-all litellm --collect-all dspy --collect-all tiktoken --copy-metadata tiktoken --collect-all tiktoken_ext --name "SkillOptimizer" desktop.py

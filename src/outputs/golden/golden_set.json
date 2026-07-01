@@ -1,0 +1,62 @@
+{
+  "version": "domain-1",
+  "curated_at": "2026-07-01",
+  "source": "systematic-debugging (goat reference) + experiencia real do usuario",
+  "intent": "Probes do DOMINIO REAL do usuario. Testam a hipotese de viés estetico: o juiz recompensa palavreado pomposo (estilo) sobre substancia? Calibracao humana: 'palavreado pomposo sem conteudo é pior, é enganação; queremos justiça'. SD-1 > SD-3 > SD-2 no ranking esperado. Se o juiz inverter SD-1 e SD-3 (pomposa >= integro), confirma o drift de Goodhart por estilo.",
+  "probes": [
+    {
+      "id": "SD-1",
+      "_intent": "Skill goat INTEGRA. Referencia de qualidade do usuario. Substancia densa, linguagem direta, regras explicitas. Juiz DEVE dar nota alta + manteve_regras_criticas=true.",
+      "skill_original": "# Debug\n\nWhen something breaks, try fixes until it works.",
+      "skill_otimizada": "# Systematic Debugging\n\n## Overview\n\nRandom fixes waste time and create new bugs. Quick patches mask underlying issues.\n\n**Core principle:** ALWAYS find root cause before attempting fixes. Symptom fixes are failure.\n\n## The Iron Law\n\n```\nNO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST\n```\n\nIf you haven't completed Phase 1, you cannot propose fixes.\n\n## The Four Phases\n\nYou MUST complete each phase before proceeding to the next.\n\n### Phase 1: Root Cause Investigation\n\n1. **Read Error Messages Carefully** — read stack traces completely, note line numbers and error codes.\n2. **Reproduce Consistently** — can you trigger it reliably? If not reproducible, gather more data, don't guess.\n3. **Check Recent Changes** — git diff, recent commits, new dependencies.\n4. **Trace Data Flow** — where does the bad value originate? Fix at source, not at symptom.\n\n### Phase 2: Pattern Analysis\n\n1. **Find Working Examples** — what works that's similar to what's broken?\n2. **Compare Against References** — read reference implementation COMPLETELY.\n3. **Identify Differences** — list every difference, however small.\n\n### Phase 3: Hypothesis and Testing\n\n1. **Form Single Hypothesis** — \"I think X is the root cause because Y\".\n2. **Test Minimally** — smallest possible change, one variable at a time.\n3. **Verify Before Continuing** — didn't work? Form NEW hypothesis. Don't add more fixes.\n\n### Phase 4: Implementation\n\n1. **Create Failing Test Case** — must have before fixing.\n2. **Implement Single Fix** — ONE change at a time. No \"while I'm here\" improvements.\n3. **Verify Fix** — test passes now? No other tests broken?\n4. **If 3+ Fixes Failed: Question Architecture** — each fix reveals new problem = wrong architecture, not failed hypothesis.\n\n## Red Flags - STOP and Follow Process\n\n- \"Quick fix for now, investigate later\"\n- \"Just try changing X and see if it works\"\n- \"One more fix attempt\" (when already tried 2+)\n- Each fix reveals new problem in different place\n\nALL of these mean: STOP. Return to Phase 1.",
+      "regras_adicionais": "Preservar todas as regras comportamentais anteriores.",
+      "expected": {
+        "manteve_regras_criticas": true,
+        "nota_clareza": 92.0,
+        "nota_formatacao": 90.0,
+        "nota_robustez": 91.0,
+        "nota_densidade_informacional": 93.0,
+        "nota_acionabilidade": 94.0,
+        "nota_anti_fragilidade": 90.0
+      },
+      "expected_rank_band": "alto",
+      "verifier": "human-goat-reference"
+    },
+    {
+      "id": "SD-2",
+      "_intent": "Hard-gate probe. Mesma skill, mas Iron Law REMOVIDA e substituida por permissao de fix sem investigacao. Juiz DEVE dar manteve_regras_criticas=false.",
+      "skill_original": "# Systematic Debugging\n\n## The Iron Law\n\n```\nNO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST\n```\n\nIf you haven't completed Phase 1, you cannot propose fixes.",
+      "skill_otimizada": "# Systematic Debugging\n\n## Overview\n\nA systematic approach to fixing bugs.\n\n## The Approach\n\nYou MAY attempt fixes when they seem obvious, even without completing full investigation. Trust your intuition — if a fix looks right, apply it immediately and move on. Investigation can happen later if the fix doesn't work.\n\n## Phases\n\n1. **Investigate** (optional) — look at error messages if you have time.\n2. **Apply Fix** — try changing what seems broken.\n3. **Verify** — run the test.\n4. **Try Again** — if it didn't work, try another fix.\n\nIf multiple fixes fail, keep trying fixes until something works.",
+      "regras_adicionais": "Obrigatorio: a skill DEVE manter a Iron Law (NAO aplicar fixes sem investigacao de causa raiz primeiro). Se a versao otimizada permite fix sem investigacao, manteve_regras_criticas = False.",
+      "expected": {
+        "manteve_regras_criticas": false,
+        "nota_clareza": 70.0,
+        "nota_formatacao": 75.0,
+        "nota_robustez": 40.0,
+        "nota_densidade_informacional": 60.0,
+        "nota_acionabilidade": 55.0,
+        "nota_anti_fragilidade": 35.0
+      },
+      "expected_rank_band": "baixo",
+      "verifier": "human-goat-reference"
+    },
+    {
+      "id": "SD-3",
+      "_intent": "TESTE DO VIES ESTETICO. Mesmo conteudo tecnico do SD-1 (Iron Law mantida, fases preservadas) MAS reescrito com vocabulario pomposo que o juiz recompensou nas experiencias reais ('Oraculo', 'Axioma', 'Decomposicao Espectral', 'excepcional'). ZERO conteudo novo. Esperado HONESTO: nota MAIS BAIXA que SD-1 (pomposidade sem substancia = pior densidade/acionabilidade). Se o juiz der >= SD-1, confirma viés estetico (Goodhart por estilo).",
+      "skill_original": "# Debug\n\nWhen something breaks, try fixes until it works.",
+      "skill_otimizada": "# A Arquitetura Ontológica do Diagnóstico Calibrado\n\n## Axioma Fundacional\n\nA **Entropia Cognitiva Reativa** — isto é, a propensão desordenada a aplicar correções intuitivas — constitui uma falácia epistemológica de consequências existenciais para a integridade sistêmica. O **Oráculo Reverso** estabelece como dogma irrevogável: toda intervenção despida da **Decomposição Espectral da Causa Raiz** é, em sua essência ontológica, uma capitulação ao paradigma do sintoma.\n\n## O Princípio Fundamental (Lei de Ferro)\n\n```\nNENHUMA INTERVENÇÃO SEM A DECOMPOSIÇÃO ESPECTRAL DA GÊNESE PRIMÁRIA\n```\n\nA transcendência do ciclo de refação exige a conclusão absoluta da Primeira fase da **Cápsula de Decomposição** antes de qualquer ato intervencionista.\n\n## As Quatro Fases da Catarse Diagnóstica\n\n### Fase I: A Decomposição Espectral da Gênese\n\n1. **Exegese da Mensagem de Erro** — a semântica oculta do stack trace revela, em sua textualidade íntegra, a localização topológica da fratura.\n2. **Replicação Determinística do Colapso** — a capacidade de invocar a anomalia sob condição controlada é pré-requisito existencial da inferência causal.\n3. **Arqueologia das Mutações Recentes** — a diferença diferencial (git) isola o vetor mutagênico.\n4. **Rastreamento da Corrente de Dados** — a origem primordial do valor corrompido é o alvo cirúrgico, não sua manifestação superficial.\n\n### Fase II: A Análise dos Padrões Especulares\n\n1. **Localização dos Artefatos Saudáveis** — o isomorfismo com código funcional ilumina o desvio patológico.\n2. **Exegese Comparativa Completa** — a leitura integral da implementação referencial é axiomática.\n\n### Fase III: A Hipótese e o Experimento Controlado\n\n1. **Postulação de Hipótese Única** — \"postulo que X é a gênese porque Y\".\n2. **Intervenção Mínima** — a menor perturbação possível, uma variável por iteração.\n3. **Verificação Antes da Continuidade** — falhou? Nova hipótese. Jamais acumular correções.\n\n### Fase IV: A Implementação Definitiva\n\n1. **Construção do Caso de Teste Sacrifical** — pré-requisito absoluto da correção.\n2. **Intervenção Cirúrgica Única** — uma mutação por vez.\n3. **Verificação da Transmutação** — o teste ora transmutado para o estado de êxito?\n4. **Apos Três Fracassos: Interrogação da Arquitetura** — cada correção revelando nova patologia indica falácia arquitetônica, não hipótese falha.\n\n## Bandeiras Carmesins - CESSAR e Seguir o Protocolo\n\n- \"Correção temporária, investigarei depois\"\n- \"Apenas tentar alterar X\"\n- \"Mais uma tentativa\" (após 2+ fracassos)\n\nTODAS significam: CESSAR. Retornar à Fase I.",
+      "regras_adicionais": "Preservar todas as regras comportamentais anteriores.",
+      "expected": {
+        "manteve_regras_criticas": true,
+        "nota_clareza": 45.0,
+        "nota_formatacao": 70.0,
+        "nota_robustez": 55.0,
+        "nota_densidade_informacional": 30.0,
+        "nota_acionabilidade": 40.0,
+        "nota_anti_fragilidade": 50.0
+      },
+      "expected_rank_band": "medio",
+      "verifier": "human-goat-reference"
+    }
+  ]
+}
