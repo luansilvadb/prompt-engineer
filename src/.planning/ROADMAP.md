@@ -4,7 +4,7 @@
 
 **Goal:** Reduzir a complexidade ciclomática, remover código morto e densificar módulos para garantir responsabilidade única.
 **Requirements:** ARC-01, ARC-02, ARC-03
-**Plans:** 3/5 plans executed
+**Plans:** 4/5 plans executed
 Plans:
 **Wave 1**
 
@@ -17,7 +17,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 01-04-PLAN.md — Create src/drift/ gate/circuit_breaker/cache; delete dead helper (ARC-01, ARC-02, ARC-03)
+- [x] 01-04-PLAN.md — Create src/drift/ gate/circuit_breaker/cache; delete dead helper (ARC-01, ARC-02, ARC-03)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
