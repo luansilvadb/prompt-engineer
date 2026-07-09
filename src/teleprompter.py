@@ -73,8 +73,8 @@ def compilar_avaliador(lm=None, min_reward: float = 0.8) -> str:
 
         output_dir = Path('src/outputs/models')
         output_dir.mkdir(parents=True, exist_ok=True)
-        out_path = output_dir / 'avaliador_otimizado.json'
-        candidate_path = output_dir / 'avaliador_otimizado.candidate.json'
+        out_path = output_dir / 'avaliador_modo_a_otimizado.json'
+        candidate_path = output_dir / 'avaliador_modo_a_otimizado.candidate.json'
 
         # Salvar candidato em arquivo temporário para medição isolada.
         compilado.save(str(candidate_path))
@@ -124,7 +124,7 @@ def compilar_avaliador(lm=None, min_reward: float = 0.8) -> str:
 
             # Aceito — snapshot do anterior, persistência, cache.
             if out_path.exists():
-                bak_path = output_dir / 'avaliador_otimizado.json.bak'
+                bak_path = output_dir / 'avaliador_modo_a_otimizado.json.bak'
                 out_path.replace(bak_path)
             candidate_path.replace(out_path)
             save_drift_cache(report_cand)
