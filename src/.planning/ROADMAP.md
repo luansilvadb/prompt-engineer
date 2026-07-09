@@ -4,12 +4,12 @@
 
 **Goal:** Reduzir a complexidade ciclomática, remover código morto e densificar módulos para garantir responsabilidade única.
 **Requirements:** ARC-01, ARC-02, ARC-03
-**Plans:** 1/5 plans executed
+**Plans:** 2/5 plans executed
 Plans:
 **Wave 1**
 
 - [x] 01-01-PLAN.md — Create src/drift/ foundation: exceptions.py + models.py (ARC-03)
-- [ ] 01-02-PLAN.md — Create src/mutation_strategies/ package: registry, bandit (ARC-02), api (ARC-03)
+- [x] 01-02-PLAN.md — Create src/mutation_strategies/ package: registry, bandit (ARC-02), api (ARC-03)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 

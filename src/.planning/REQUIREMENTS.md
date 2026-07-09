@@ -8,7 +8,7 @@
 ### Clean Code & Architecture (ARC)
 
 - [ ] **ARC-01**: Eliminar código morto (variáveis não utilizadas, funções órfãs, imports).
-- [ ] **ARC-02**: Reduzir a complexidade ciclomática de funções com múltiplos branches (if/else, nested loops).
+- [x] **ARC-02**: Reduzir a complexidade ciclomática de funções com múltiplos branches (if/else, nested loops).
 - [x] **ARC-03**: Densificar o projeto garantindo que cada arquivo e módulo tenha uma responsabilidade isolada e clara.
 
 ### Judge Behavior (JUD)
@@ -28,7 +28,7 @@
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | ARC-01 | Phase 1 | Pending |
-| ARC-02 | Phase 1 | Pending |
+| ARC-02 | Phase 1 | Complete |
 | ARC-03 | Phase 1 | Complete |
 | JUD-01 | Phase 2 | Pending |
 | JUD-02 | Phase 2 | Pending |
