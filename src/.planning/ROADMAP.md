@@ -36,11 +36,26 @@ Plans:
 **Plans:** 2/2 plans complete
 Plans:
 **Wave 1**
+
 - [x] 02-01-PLAN.md — Injeção de classes e adaptadores do Modo B (JUD-01)
+
 **Wave 2**
+
 - [x] 02-02-PLAN.md — Integrar o Modo B ("Caça-Defeitos") ao pipeline de avaliação
+
 **Success Criteria:**
 
 1. O juiz passa a identificar paradoxos e contradições estruturais nas skills testadas, refletindo em notas realistas.
 2. O sistema do `drift_monitor` absorve o novo comportamento do avaliador sem desativar a pipeline ou rejeitar todos os prompts válidos.
 3. A verificação local comprova que o juiz agora falha a skill do "Espelho Distorcido" devidamente.
+
+### Phase 3: Close gap: JUD-01, JUD-02  Fix optimizer.py to target Mode B and align teleprompter with medir_drift
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 2
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 3 to break down)
