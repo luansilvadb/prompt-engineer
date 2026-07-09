@@ -16,10 +16,12 @@ Otimização de prompts guiada por MCTS com um mecanismo de avaliação que efet
 - ✓ Otimizador de prompts baseado em MCTS.
 - ✓ Validação de resultados usando Golden Set para evitar o chamado "drift".
 - ✓ API FastAPI para disparar jobs e servir o frontend.
+- ✓ **Modo "Caça-Defeitos" do Juiz:** O juiz deve procurar por contradições e falhas na skill (avaliar o comportamento) *antes* de elogiar sua estética. (Validated in Phase 03)
 
 ### Active
 
-- [ ] **Modo "Caça-Defeitos" do Juiz:** O juiz deve procurar por contradições e falhas na skill (avaliar o comportamento) *antes* de elogiar sua estética.
+
+
 - [ ] **Redução de Complexidade Ciclomática:** Refatorar funções com múltiplos branches e caminhos aninhados em unidades menores.
 - [ ] **Remoção de Código Morto:** Eliminar variáveis, funções e imports que não agregam valor.
 - [ ] **Densificação do Projeto:** Arquivos e módulos devem ter escopo e responsabilidades bem delineadas.
@@ -42,8 +44,8 @@ A base de código atual funciona bem, mas acumulou complexidade e código morto 
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Implementar o Juiz em Modo B (Caça-Defeitos) | O modo A atual aprova ambiguidades e contradições comportamentais baseado na beleza do texto. | — Pending |
+| Implementar o Juiz em Modo B (Caça-Defeitos) | O modo A atual aprova ambiguidades e contradições comportamentais baseado na beleza do texto. | Validated in Phase 03 |
 | Refatoração Restrita aos Internals | Garantir que a API mantenha os mesmos contratos evita quebrar o ecossistema externo ou UIs que dependem dela. | — Pending |
 
 ---
-*Last updated: 2026-07-09 after initialization*
+*Last updated: 2026-07-09 after Phase 03 completion*
