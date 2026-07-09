@@ -4,7 +4,7 @@
 
 **Goal:** Reduzir a complexidade ciclomática, remover código morto e densificar módulos para garantir responsabilidade única.
 **Requirements:** ARC-01, ARC-02, ARC-03
-**Plans:** 2/5 plans executed
+**Plans:** 3/5 plans executed
 Plans:
 **Wave 1**
 
@@ -13,7 +13,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 01-03-PLAN.md — Create src/drift/ services: golden, runner, metrics with ARC-02 helper extractions (ARC-02, ARC-03)
+- [x] 01-03-PLAN.md — Create src/drift/ services: golden, runner, metrics with ARC-02 helper extractions (ARC-02, ARC-03)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
