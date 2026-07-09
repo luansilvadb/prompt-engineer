@@ -55,6 +55,9 @@ class Avaliacao(BaseModel):
             raise ValueError("A nota deve estar rigorosamente entre 0 e 100.")
         return v_float
 
+class AvaliacaoModoB(Avaliacao):
+    defeitos_encontrados: list[str] = Field(description="Lista de strings enumerando violações, paradoxos e ambiguidades detectadas.")
+
 class AvaliadorDeSkill(dspy.Signature):
     """
     Avalia se uma skill otimizada para agentes de IA é estruturalmente superior à original.
@@ -74,16 +77,44 @@ class AvaliadorDeSkill(dspy.Signature):
     nota_anti_fragilidade: str = dspy.OutputField(desc="Nota de 0 a 100 avaliando se a skill resiste a edge cases, inputs adversariais e contextos ambíguos.")
     feedback_detalhado: str = dspy.OutputField(desc="Explicação detalhada dos pontos fortes e fracos, justificando as notas.")
 
+class AvaliadorModoB(dspy.Signature):
+    """
+    Avalia se uma skill otimizada para agentes de IA é estruturalmente superior à original (Modo B - Caça-Defeitos).
+    Analisa as mesmas 6 dimensões, mas obrigatoriamente enumera contradições e defeitos primeiro.
+    """
+    skill_original: str = dspy.InputField()
+    skill_otimizada: str = dspy.InputField()
+    regras_adicionais: str = dspy.InputField(desc="Diretrizes, restrições ou métricas extras especificadas pelo usuário que devem ser estritamente seguidas.")
+    
+    manteve_regras_criticas: str = dspy.OutputField(desc="True se nenhuma regra comportamental vital (inclusive as regras adicionais) foi omitida. False caso contrário.")
+    defeitos_encontrados: str = dspy.OutputField(desc="Lista de violações, paradoxos e ambiguidades detectadas. Enumere cada defeito encontrado (use nova linha para cada).")
+    nota_clareza: str = dspy.OutputField(desc="Nota de 0 a 100 avaliando se a instrução é clara e direta.")
+    nota_formatacao: str = dspy.OutputField(desc="Nota de 0 a 100 avaliando o uso de markdown, listas e negritos.")
+    nota_robustez: str = dspy.OutputField(desc="Nota de 0 a 100 avaliando a imunidade a 'lost in the middle' e ambiguidades.")
+    nota_densidade_informacional: str = dspy.OutputField(desc="Nota de 0 a 100 avaliando a razão sinal/ruído — penaliza verbosidade vazia e repetição sem valor.")
+    nota_acionabilidade: str = dspy.OutputField(desc="Nota de 0 a 100 avaliando se as instruções são claras o suficiente para um agente de IA executar sem ambiguidade.")
+    nota_anti_fragilidade: str = dspy.OutputField(desc="Nota de 0 a 100 avaliando se a skill resiste a edge cases, inputs adversariais e contextos ambíguos.")
+    feedback_detalhado: str = dspy.OutputField(desc="Explicação detalhada dos pontos fortes e fracos, justificando as notas.")
+
 avaliador_module = dspy.Predict(AvaliadorDeSkill)
+avaliador_modo_b_module = dspy.Predict(AvaliadorModoB)
 
 def load_avaliador():
-    model_path = Path('src/outputs/models/avaliador_otimizado.json')
-    if model_path.exists():
+    model_path_a = Path('src/outputs/models/avaliador_modo_a_otimizado.json')
+    if model_path_a.exists():
         try:
-            avaliador_module.load(str(model_path))
-            print(f"[*] Avaliador otimizado (Few-Shot) carregado de {model_path}.")
+            avaliador_module.load(str(model_path_a))
+            print(f"[*] Avaliador otimizado Modo A carregado de {model_path_a}.")
         except Exception as e:
-            print(f"[!] Erro ao carregar avaliador otimizado: {e}")
+            print(f"[!] Erro ao carregar avaliador Modo A: {e}")
+            
+    model_path_b = Path('src/outputs/models/avaliador_modo_b_otimizado.json')
+    if model_path_b.exists():
+        try:
+            avaliador_modo_b_module.load(str(model_path_b))
+            print(f"[*] Avaliador otimizado Modo B carregado de {model_path_b}.")
+        except Exception as e:
+            print(f"[!] Erro ao carregar avaliador Modo B: {e}")
 
 def _invoke_judge(exemplo, predicao) -> Avaliacao:
     """Invoca o módulo juiz GLOBAL (avaliador_module). Mantido para compat."""
@@ -111,6 +142,44 @@ def _invoke_judge_with(module, exemplo, predicao) -> Avaliacao:
     
     return Avaliacao(
         manteve_regras_criticas=manteve_val,
+        nota_clareza=res.nota_clareza,
+        nota_formatacao=res.nota_formatacao,
+        nota_robustez=res.nota_robustez,
+        nota_densidade_informacional=res.nota_densidade_informacional,
+        nota_acionabilidade=res.nota_acionabilidade,
+        nota_anti_fragilidade=res.nota_anti_fragilidade,
+        feedback_detalhado=res.feedback_detalhado
+    )
+
+def _invoke_judge_modo_b_with(module, exemplo, predicao) -> AvaliacaoModoB:
+    """
+    Invoca um módulo juiz ESPECÍFICO do Modo B sobre (exemplo, predicao).
+    Retorna AvaliacaoModoB com a lista de defeitos estruturada.
+    """
+    regras = getattr(exemplo, 'regras_adicionais', '')
+    if not regras:
+        regras = 'Preservar todas as regras comportamentais anteriores.'
+
+    res = module(
+        skill_original=exemplo.skill_original,
+        skill_otimizada=predicao.skill_otimizada,
+        regras_adicionais=regras
+    )
+    
+    manteve_str = str(res.manteve_regras_criticas).strip().lower()
+    manteve_val = 'true' in manteve_str or 'sim' in manteve_str or 'yes' in manteve_str or manteve_str == '1'
+    
+    defeitos_raw = getattr(res, 'defeitos_encontrados', '')
+    if isinstance(defeitos_raw, str):
+        defeitos_list = [d.strip("- *").strip() for d in defeitos_raw.split('\n') if d.strip("- *").strip()]
+    elif isinstance(defeitos_raw, list):
+        defeitos_list = [str(d) for d in defeitos_raw]
+    else:
+        defeitos_list = []
+    
+    return AvaliacaoModoB(
+        manteve_regras_criticas=manteve_val,
+        defeitos_encontrados=defeitos_list,
         nota_clareza=res.nota_clareza,
         nota_formatacao=res.nota_formatacao,
         nota_robustez=res.nota_robustez,
