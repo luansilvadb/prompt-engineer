@@ -4,7 +4,7 @@
 
 **Goal:** Reduzir a complexidade ciclomática, remover código morto e densificar módulos para garantir responsabilidade única.
 **Requirements:** ARC-01, ARC-02, ARC-03
-**Plans:** 4/5 plans executed
+**Plans:** 5/5 plans complete
 Plans:
 **Wave 1**
 
@@ -21,7 +21,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 01-05-PLAN.md — Convert drift_monitor.py + mutations.py to shims, ARC-01 dead-code sweep, integration verification (ARC-01, ARC-03)
+- [x] 01-05-PLAN.md — Convert drift_monitor.py + mutations.py to shims, ARC-01 dead-code sweep, integration verification (ARC-01, ARC-03)
 
 **Success Criteria:**
 
