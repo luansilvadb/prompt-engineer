@@ -50,12 +50,12 @@ Plans:
 3. A verificação local comprova que o juiz agora falha a skill do "Espelho Distorcido" devidamente.
 
 ### Phase 3: Close gap: JUD-01, JUD-02  Fix optimizer.py to target Mode B and align teleprompter with medir_drift
-
-**Goal:** [To be planned]
-**Requirements**: TBD
-**Depends on:** Phase 2
-**Plans:** 0 plans
-
-Plans:
-
-- [ ] TBD (run /gsd-plan-phase 3 to break down)
+ 
+ **Goal:** Corrigir a quebra de integração introduzida na Fase 2, garantindo que o ecossistema (MCTS no `optimizer.py` e o compilador no `teleprompter.py`) passe a usar e mirar o `AvaliadorModoB`.
+ **Requirements**: JUD-01, JUD-02
+ **Depends on:** Phase 2
+ **Plans:** 1/1 plans complete
+ 
+ Plans:
+ 
+ - [x] 03-01-PLAN.md — Mode B Target Integration
