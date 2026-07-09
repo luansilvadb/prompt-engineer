@@ -77,7 +77,10 @@ class JudgeProbeRunner:
                 predicao = dspy.Prediction(skill_otimizada=probe.skill_otimizada)
                 avaliacao = _invoke_judge_modo_b_with(self._judge_modo_b, exemplo, predicao)
                 measurement.samples.append(avaliacao)
-            except Exception:
+            except Exception as e:
+                import traceback
+                print(f"[!] Erro no DSPy (Modo B): {e}")
+                traceback.print_exc()
                 failures += 1
 
         if len(measurement.samples) == 0:

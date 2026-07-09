@@ -1,0 +1,36 @@
+﻿{
+  "planner_model": "opus",
+  "checker_model": "haiku",
+  "commit_docs": true,
+  "phase_found": true,
+  "phase_dir": ".planning/phases/01-architectural-cleanup-densification",
+  "phase_number": "01",
+  "phase_name": "architectural-cleanup-densification",
+  "has_verification": false,
+  "phase_completion": {
+    "implementation_complete": true,
+    "verification_status": "missing",
+    "verification_passed": false,
+    "phase_complete": false,
+    "completion_status": "executed",
+    "verification_next_action": "No verification report found ÔÇö the verify step never completed. Re-run execute-phase.",
+    "verification_next_command": "/gsd-execute-phase 01",
+    "uat_passed": false,
+    "uat_blockers": [
+      "01-UAT.md: test 1 (pending)",
+      "01-UAT.md: test 2 (pending)",
+      "01-UAT.md: test 3 (pending)",
+      "01-UAT.md: test 4 (pending)",
+      "01-UAT.md: test 5 (pending)",
+      "policy: verification required but no passing *-VERIFICATION.md found"
+    ],
+    "ready_to_transition": false
+  },
+  "project_root": "D:\\good\\src",
+  "agents_installed": true,
+  "missing_agents": [],
+  "agents_dir": "D:\\good\\src\\.opencode\\agents",
+  "agent_runtime": "claude",
+  "project_title": "Skill Optimizer"
+}
+

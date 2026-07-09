@@ -1,0 +1,11 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "read": {
+      "D:/good/src/.opencode/gsd-core/*": "allow"
+    },
+    "external_directory": {
+      "D:/good/src/.opencode/gsd-core/*": "allow"
+    }
+  }
+}
