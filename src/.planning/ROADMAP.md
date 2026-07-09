@@ -33,6 +33,10 @@ Plans:
 
 **Goal:** Atualizar o `AvaliadorDeSkill` para priorizar a detecção de contradições comportamentais (Modo B) no lugar de focar na estética do texto.
 **Requirements:** JUD-01, JUD-02
+**Plans:** 1/? plans complete
+Plans:
+**Wave 1**
+- [x] 02-01-PLAN.md — Injeção de classes e adaptadores do Modo B (JUD-01)
 **Success Criteria:**
 
 1. O juiz passa a identificar paradoxos e contradições estruturais nas skills testadas, refletindo em notas realistas.
