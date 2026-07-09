@@ -236,12 +236,21 @@ def funcao_de_recompensa(exemplo, predicao, trace=None):
     Retorna (score, feedback) onde score ∈ [0, 1].
     """
     try:
-        resultado = _invoke_judge(exemplo, predicao)
+        resultado = _invoke_judge_modo_b_with(avaliador_modo_b_module, exemplo, predicao)
         
         if not _check_critical_rules(resultado):
             return 0.0, resultado.feedback_detalhado
             
         score = _calculate_score(resultado)
+        
+        if resultado.defeitos_encontrados:
+            penalty = len(resultado.defeitos_encontrados) * 0.1
+            score = max(0.0, score - penalty)
+            
+            bullet_points = "\n".join(f"- {d}" for d in resultado.defeitos_encontrados)
+            feedback = f"DEFEITOS E CONTRADIÇÕES ENCONTRADAS:\n{bullet_points}\n\nCorrija as quebras arquiteturais acima urgentemente."
+            return score, feedback
+        
         return score, resultado.feedback_detalhado
     except Exception as e:
         return 0.0, f'Erro interno na avaliação: {str(e)}'
