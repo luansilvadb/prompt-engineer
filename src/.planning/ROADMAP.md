@@ -3,6 +3,13 @@
 ## Phase 1: Architectural Cleanup & Densification
 **Goal:** Reduzir a complexidade ciclomática, remover código morto e densificar módulos para garantir responsabilidade única.
 **Requirements:** ARC-01, ARC-02, ARC-03
+**Plans:** 5 plans
+Plans:
+- [ ] 01-01-PLAN.md — Create src/drift/ foundation: exceptions.py + models.py (ARC-03)
+- [ ] 01-02-PLAN.md — Create src/mutation_strategies/ package: registry, bandit (ARC-02), api (ARC-03)
+- [ ] 01-03-PLAN.md — Create src/drift/ services: golden, runner, metrics with ARC-02 helper extractions (ARC-02, ARC-03)
+- [ ] 01-04-PLAN.md — Create src/drift/ gate/circuit_breaker/cache; delete dead helper (ARC-01, ARC-02, ARC-03)
+- [ ] 01-05-PLAN.md — Convert drift_monitor.py + mutations.py to shims, ARC-01 dead-code sweep, integration verification (ARC-01, ARC-03)
 **Success Criteria:**
 1. Codebase livre de variáveis inativas, funções órfãs e imports desnecessários.
 2. Branches condicionais complexos (especialmente em `mutations.py` e `drift_monitor.py`) extraídos para unidades menores.
