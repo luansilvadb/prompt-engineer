@@ -13,8 +13,8 @@
 
 ### Judge Behavior (JUD)
 
-- [ ] **JUD-01**: Alterar o `AvaliadorDeSkill` para rodar no "Modo B" (Caça-Defeitos), forçando o modelo a identificar quebras de regras comportamentais antes de elogiar a estética.
-- [ ] **JUD-02**: O pipeline do DriftGate (`drift_monitor.py`) deve interpretar as reprovações do Modo B de maneira consistente, sem quebrar os limites de threshold atuais de rejeição.
+- [x] **JUD-01**: Alterar o `AvaliadorDeSkill` para rodar no "Modo B" (Caça-Defeitos), forçando o modelo a identificar quebras de regras comportamentais antes de elogiar a estética.
+- [x] **JUD-02**: O pipeline do DriftGate (`drift_monitor.py`) deve interpretar as reprovações do Modo B de maneira consistente, sem quebrar os limites de threshold atuais de rejeição.
 
 ## Out of Scope
 
@@ -30,8 +30,8 @@
 | ARC-01 | Phase 1 | Complete |
 | ARC-02 | Phase 1 | Complete |
 | ARC-03 | Phase 1 | Complete |
-| JUD-01 | Phase 2 | Pending |
-| JUD-02 | Phase 2 | Pending |
+| JUD-01 | Phase 2 | Complete |
+| JUD-02 | Phase 2 | Complete |
 
 **Coverage:**
 
