@@ -41,42 +41,4 @@ def _analyze_file_ast(py_file: Path) -> list:
                 
     return findings
 
-def auscultar_repositorio(path_str: str):
-    base_path = Path(path_str)
-    if not base_path.exists() or not base_path.is_dir():
-        print(f"[!] Diretório não encontrado ou inválido: {base_path}", file=sys.stderr)
-        return
-        
-    print(f"[*] Auscultando repositório: {base_path.absolute()}")
-    print("[*] Procurando entropia, funções longas (névoa) e código que não pulsa...\n")
-    
-    findings = []
-    
-    try:
-        for py_file in base_path.rglob('*.py'):
-            if any(part in ('.git', 'node_modules', '.venv', '__pycache__', 'build', 'dist') for part in py_file.parts):
-                continue
-            findings.extend(_analyze_file_ast(py_file))
-    except Exception:
-        pass
-        
-    def rank_score(finding):
-        if finding.startswith('delete:'):
-            return 3
-        elif finding.startswith('yagni:'):
-            return 2
-        elif finding.startswith('shrink:'):
-            return 1
-        return 0
-        
-    findings.sort(key=rank_score, reverse=True)
-    
-    for f in findings:
-        print(f)
-        
-    if not findings:
-        print('Lean already. Ship.')
-        return
-        
-    remocoes = len([f for f in findings if f.startswith('delete:') or f.startswith('yagni')])
-    print(f'\nnet: -{remocoes} remoções propostas. Mantenha o sistema como um ACONTECIMENTO.')
+

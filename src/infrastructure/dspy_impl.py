@@ -138,30 +138,7 @@ def _parse_manteve_regras(manteve_str: str) -> bool:
     manteve_str = str(manteve_str).strip().lower()
     return 'true' in manteve_str or 'sim' in manteve_str or 'yes' in manteve_str or manteve_str == '1'
 
-class DSPyAvaliadorDeSkill(IAvaliadorDeSkill):
-    def __init__(self, predictor=None):
-        self._predictor = predictor or dspy.Predict(AvaliadorDeSkillSignature)
 
-    def __call__(self, skill_original: str, skill_otimizada: str, regras_adicionais: str) -> Avaliacao:
-        if not regras_adicionais:
-            regras_adicionais = 'Preservar todas as regras comportamentais anteriores.'
-            
-        res = self._predictor(
-            skill_original=skill_original,
-            skill_otimizada=skill_otimizada,
-            regras_adicionais=regras_adicionais
-        )
-        
-        return Avaliacao(
-            manteve_regras_criticas=_parse_manteve_regras(res.manteve_regras_criticas),
-            nota_clareza=res.nota_clareza,
-            nota_formatacao=res.nota_formatacao,
-            nota_robustez=res.nota_robustez,
-            nota_densidade_informacional=res.nota_densidade_informacional,
-            nota_acionabilidade=res.nota_acionabilidade,
-            nota_anti_fragilidade=res.nota_anti_fragilidade,
-            feedback_detalhado=res.feedback_detalhado
-        )
 
 class DSPyAvaliadorModoB(IAvaliadorModoB):
     def __init__(self, predictor=None):
