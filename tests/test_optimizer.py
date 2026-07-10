@@ -52,3 +52,9 @@ def test_optimizer_layer2_penalty_multiplier(mock_heavy_evaluators, sample_verbo
     # The reward should be penalized by verbosity_penalty_factor (0.85 default)
     assert reward == 1.0 * opt.verbosity_penalty_factor
     assert child.last_reward == opt.verbosity_penalty_factor
+
+
+def test_optimizer_cognitivo_regression(mock_heavy_evaluators):
+    opt = Optimizer(skill_original="foo")
+    assert hasattr(opt, 'agent_cognitivo')
+    assert 'mutador_cognitivo' in opt.mutation_bandit._counts
