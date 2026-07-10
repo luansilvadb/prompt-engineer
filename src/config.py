@@ -96,6 +96,10 @@ def get_mcts_config() -> dict:
         # Thresholds do Avaliador de Profundidade Heurística
         'lexical_density_min': float(os.environ.get('MCTS_LEXICAL_DENSITY_MIN', '0.35')),
         'verbosity_penalty_factor': float(os.environ.get('MCTS_VERBOSITY_PENALTY_FACTOR', '0.85')),
+
+        # Prior boosting para MutadorCognitivo (COGN-01)
+        'cognitivo_prior_count': int(os.environ.get('MCTS_COGNITIVO_PRIOR_COUNT', '4')),
+        'cognitivo_prior_mean_delta': float(os.environ.get('MCTS_COGNITIVO_PRIOR_MEAN_DELTA', '0.05')),
     }
 
 

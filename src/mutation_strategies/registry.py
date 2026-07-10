@@ -26,6 +26,7 @@ class StrategyRegistry:
     def __init__(self):
         self.strategies: Dict[str, Dict[str, str]] = {}
         self._load()
+        self._seed_hardcoded_strategies()
 
     def _store_path(self) -> Path:
         STRATEGIES_DIR.mkdir(parents=True, exist_ok=True)
@@ -63,6 +64,22 @@ class StrategyRegistry:
         if key == '__DISCOVER__':
             return 'Descoberta Autônoma de Reflexo (Tabula Rasa)'
         return self.strategies.get(key, {}).get('name', key)
+
+    def _seed_hardcoded_strategies(self):
+        COGNITIVO_KEY = 'mutador_cognitivo'
+        if COGNITIVO_KEY not in self.strategies:
+            self.add_strategy(
+                key=COGNITIVO_KEY,
+                name='Mutador Cognitivo',
+                prompt=(
+                    "Aplique derivação lógica estruturada obrigatória. "
+                    "Antes de reescrever, derive explicitamente: "
+                    "(1) Premissas — o que o feedback revela sobre a instrução atual; "
+                    "(2) Deduções — implicações lógicas sobre o que precisa mudar; "
+                    "(3) Conclusão — a regra arquitetural que a nova instrução deve implementar. "
+                    "A nova instrução DEVE conter as seções ## Raciocínio, ## Regras, ## Conclusão."
+                )
+            )
 
     def get_all_keys(self) -> List[str]:
         return list(self.strategies.keys())
