@@ -182,12 +182,12 @@ def apply_decay(base_score, similarity, threshold=0.85):
 |---|-------|---------|---------------|
 | A1 | `torch` dependency is acceptable for the environment | Standard Stack | `torch` is large (~1GB+). May slow down container builds or hit memory limits if deployed on small instances. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Comparison Target**
    - What we know: We need to penalize semantic similarity.
    - What's unclear: Should we compare against the `root` (original instruction) or the `parent` instruction in the MCTS tree? Comparing against the parent penalizes small incremental steps; comparing against the root penalizes lack of overall progress.
-   - Recommendation: Compare against the `parent` instruction for the penalty, as it ensures each mutation actually alters the text meaningfully.
+   - RESOLVED: Compare against the `parent` instruction for the penalty, as it ensures each mutation actually alters the text meaningfully.
 
 ## Environment Availability
 

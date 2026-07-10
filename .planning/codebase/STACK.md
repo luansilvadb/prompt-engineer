@@ -16,6 +16,8 @@
 - `dspy-ai`
 - `litellm`
 - `python-dotenv`
+- `sentence-transformers`
+- `torch`
 
 ## Runtimes
 - standard CPython
