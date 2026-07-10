@@ -64,6 +64,6 @@
 | 2. Judge "Caça-Defeitos" Mode | v1.0 | 2/2 | Complete | 2026-07-09 |
 | 3. Close gap: JUD-01, JUD-02 Fix optimizer.py to target Mode B | v1.0 | 1/1 | Complete | 2026-07-09 |
 | 4. Avaliador de Profundidade Semântica | v1.1 | 2/2 | Complete   | 2026-07-10 |
-| 5. Avaliador de Profundidade Heurística | v1.1 | 0/0 | Pending | — |
+| 5. Avaliador de Profundidade Heurística | v1.1 | 1/1 | Complete   | 2026-07-10 |
 | 6. Mutador Cognitivo | v1.1 | 0/0 | Pending | — |
 | 7. Otimização por Densificação Extrema | v1.1 | 0/0 | Pending | — |
