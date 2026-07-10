@@ -1,61 +1,24 @@
-# Project Roadmap: Skill Optimizer
+# Roadmap: Skill Optimizer
 
-## Phase 1: Architectural Cleanup & Densification
+## Milestones
 
-**Goal:** Reduzir a complexidade ciclomática, remover código morto e densificar módulos para garantir responsabilidade única.
-**Requirements:** ARC-01, ARC-02, ARC-03
-**Plans:** 5/5 plans complete
-Plans:
-**Wave 1**
+- ✅ **v1.0 Skill Optimizer MVP** — Phases 1-3 (shipped 2026-07-10)
 
-- [x] 01-01-PLAN.md — Create src/drift/ foundation: exceptions.py + models.py (ARC-03)
-- [x] 01-02-PLAN.md — Create src/mutation_strategies/ package: registry, bandit (ARC-02), api (ARC-03)
+## Phases
 
-**Wave 2** *(blocked on Wave 1 completion)*
+<details>
+<summary>✅ v1.0 Skill Optimizer MVP (Phases 1-3) — SHIPPED 2026-07-10</summary>
 
-- [x] 01-03-PLAN.md — Create src/drift/ services: golden, runner, metrics with ARC-02 helper extractions (ARC-02, ARC-03)
+- [x] Phase 1: Architectural Cleanup & Densification (5/5 plans) — completed 2026-07-09
+- [x] Phase 2: Judge "Caça-Defeitos" Mode (2/2 plans) — completed 2026-07-09
+- [x] Phase 3: Close gap: JUD-01, JUD-02 Fix optimizer.py to target Mode B (1/1 plans) — completed 2026-07-09
 
-**Wave 3** *(blocked on Wave 2 completion)*
+</details>
 
-- [x] 01-04-PLAN.md — Create src/drift/ gate/circuit_breaker/cache; delete dead helper (ARC-01, ARC-02, ARC-03)
+## Progress
 
-**Wave 4** *(blocked on Wave 3 completion)*
-
-- [x] 01-05-PLAN.md — Convert drift_monitor.py + mutations.py to shims, ARC-01 dead-code sweep, integration verification (ARC-01, ARC-03)
-
-**Success Criteria:**
-
-1. Codebase livre de variáveis inativas, funções órfãs e imports desnecessários.
-2. Branches condicionais complexos (especialmente em `mutations.py` e `drift_monitor.py`) extraídos para unidades menores.
-3. O servidor FastAPI e o fluxo MCTS executam sem nenhum erro ou lentidão induzida pela refatoração.
-
-## Phase 2: Judge "Caça-Defeitos" Mode
-
-**Goal:** Atualizar o `AvaliadorDeSkill` para priorizar a detecção de contradições comportamentais (Modo B) no lugar de focar na estética do texto.
-**Requirements:** JUD-01, JUD-02
-**Plans:** 2/2 plans complete
-Plans:
-**Wave 1**
-
-- [x] 02-01-PLAN.md — Injeção de classes e adaptadores do Modo B (JUD-01)
-
-**Wave 2**
-
-- [x] 02-02-PLAN.md — Integrar o Modo B ("Caça-Defeitos") ao pipeline de avaliação
-
-**Success Criteria:**
-
-1. O juiz passa a identificar paradoxos e contradições estruturais nas skills testadas, refletindo em notas realistas.
-2. O sistema do `drift_monitor` absorve o novo comportamento do avaliador sem desativar a pipeline ou rejeitar todos os prompts válidos.
-3. A verificação local comprova que o juiz agora falha a skill do "Espelho Distorcido" devidamente.
-
-### Phase 3: Close gap: JUD-01, JUD-02  Fix optimizer.py to target Mode B and align teleprompter with medir_drift
- 
- **Goal:** Corrigir a quebra de integração introduzida na Fase 2, garantindo que o ecossistema (MCTS no `optimizer.py` e o compilador no `teleprompter.py`) passe a usar e mirar o `AvaliadorModoB`.
- **Requirements**: JUD-01, JUD-02
- **Depends on:** Phase 2
- **Plans:** 1/1 plans complete
- 
- Plans:
- 
- - [x] 03-01-PLAN.md — Mode B Target Integration
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1. Architectural Cleanup & Densification | v1.0 | 5/5 | Complete | 2026-07-09 |
+| 2. Judge "Caça-Defeitos" Mode | v1.0 | 2/2 | Complete | 2026-07-09 |
+| 3. Close gap: JUD-01, JUD-02 Fix optimizer.py to target Mode B | v1.0 | 1/1 | Complete | 2026-07-09 |

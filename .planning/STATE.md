@@ -2,9 +2,12 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Milestone complete
+current_phase: 0
+status: Awaiting next milestone
 stopped_at: Completed Phase 03 Plan 01
-last_updated: "2026-07-09T21:23:01.157Z"
+last_updated: "2026-07-10T03:21:45.934Z"
+last_activity: 2026-07-10
+last_activity_desc: Milestone v1.0 completed and archived
 progress:
   total_phases: 3
   completed_phases: 3
@@ -53,6 +56,25 @@ See: .planning/PROJECT.md (updated 2026-07-09)
 
 ## Accumulated Context
 
+### Deferred Items
+
+Items acknowledged and deferred at milestone close on 2026-07-10:
+
+| Category | Item | Status |
+|----------|------|--------|
+| uat_gaps | Phase 01: 01-UAT.md | testing (5 pending) |
+
 ### Roadmap Evolution
 
 - Phase 03 added: Close gap: JUD-01, JUD-02 Fix optimizer.py to target Mode B and align teleprompter with medir_drift
+
+## Current Position
+
+Phase: Milestone v1.0 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-07-10 — Milestone v1.0 completed and archived
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone
