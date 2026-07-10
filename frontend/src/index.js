@@ -133,16 +133,8 @@ historyVm.addEventListener('jobDetailsLoaded', (e) => {
             modelName: configVm.modelName,
             modelPrefix: configVm.modelPrefix,
             apiBase: configVm.apiBase,
-            apiKey: configVm.apiKey, // A API key não é retornada por segurança
-            regrasAdicionais: configVm.regrasAdicionais
+            apiKey: configVm.apiKey // A API key não é retornada por segurança
         }
-    }));
-    
-    // Restaurar diretrizes adicionais
-    const regrasStr = job.regras_adicionais || '';
-    configVm.regrasAdicionais = regrasStr.split('\n').filter(r => r.trim() !== '');
-    configVm.dispatchEvent(new CustomEvent('rulesChanged', {
-        detail: configVm.regrasAdicionais
     }));
 
     // 2. Restaurar Árvore MCTS
@@ -233,8 +225,7 @@ el.btnStartOpt.addEventListener('click', async () => {
         modelName: configVm.modelName || null,
         modelPrefix: configVm.modelPrefix || null,
         apiBase: configVm.apiBase || null,
-        apiKey: configVm.apiKey || null,
-        regrasAdicionais: configVm.regrasAdicionais.length > 0 ? configVm.regrasAdicionais : null
+        apiKey: configVm.apiKey || null
     };
 
     try {

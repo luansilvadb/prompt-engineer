@@ -21,10 +21,10 @@ def _gate_against_baseline_or_floor(cand_val: float, atual_val: Optional[float],
 class DriftGate:
     """
     Portão defensivo hierárquico:
-      Passo 1 — Veto absoluto (BR4): concordância de regras críticas.
-      Passo 2 — Confiança: variância alta exige melhoria estrita.
-      Passo 3 — Spearman (Cenário 2 stealth): métrica rei.
-      Passo 4 — Offset (Cenário 1 inflação): alarme.
+      Passo 1 — Veto absoluto (BR4): missed_violations > 0 → rejeita.
+      Passo 2 — Spearman (Cenário 2 stealth): métrica rei de ranking.
+      Passo 3 — Offset (Cenário 1 inflação): alarme de score inflado.
+      Passo 4 — Confiança baixa: aceita com aviso (não rejeita).
     """
 
     @staticmethod

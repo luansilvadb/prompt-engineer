@@ -19,7 +19,7 @@ export class TreeViewModel extends ViewModelBase {
             }
         });
 
-        const isNewBest = newBestScore > this.bestScore;
+        const hasBestScoreChanged = newBestScore !== this.bestScore;
         this.bestScore = newBestScore;
 
         this.dispatchEvent(new CustomEvent('nodeAdded', {
@@ -29,7 +29,7 @@ export class TreeViewModel extends ViewModelBase {
             }
         }));
 
-        if (isNewBest || newBestScore === 0.0) {
+        if (hasBestScoreChanged || newBestScore === 0.0) {
             this.dispatchEvent(new CustomEvent('bestScoreChanged', {
                 detail: {
                     bestScore: this.bestScore

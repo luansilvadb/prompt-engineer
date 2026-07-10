@@ -82,9 +82,18 @@ def compilar_avaliador(lm=None, min_reward: float = 0.8) -> str:
         # ── Portão de drift (A1) ──────────────────────────────────────
         golden = GoldenSet()
         if golden.is_empty():
-            # EC4: fail-open — não trava deploy limpo, mas avisa.
+            # EC4: fail-open — não trava deploy limpo, mas avisa com destaque máximo.
             candidate_path.replace(out_path)
-            print(f"[!] Golden set ausente. Compilação persistida sem portão (fail-open): {out_path}")
+            print(
+                "\n" + "=" * 72 + "\n"
+                "⚠  WARNING — PORTÃO DE DRIFT DESATIVADO (EC4: fail-open)\n"
+                "   Golden set ausente ou vazio. O candidato foi persistido SEM\n"
+                "   validação de drift. Um juiz com desvio comportamental severo\n"
+                "   pode estar ativo em produção.\n"
+                f"  Arquivo persistido: {out_path}\n"
+                "   AÇÃO RECOMENDADA: recrie o golden set e recompile o avaliador.\n"
+                + "=" * 72 + "\n"
+            )
             return "golden_empty_open"
 
         cfg = get_drift_thresholds()

@@ -1,5 +1,5 @@
 import pytest
-from src.heuristic_evaluator import evaluate_heuristics
+from src.heuristic_evaluator import evaluate_heuristics, _BUZZWORD_THRESHOLD, _VAGUE_BUZZWORDS
 
 def test_short_text_bypass():
     result = evaluate_heuristics("Curto e direto.")
@@ -27,3 +27,61 @@ def test_layer_2_penalty():
     result = evaluate_heuristics(text)
     assert result["prune"] is False
     assert result["penalty_multiplier"] < 1.0
+
+
+# ── Layer 0: Vague Buzzword Detection ────────────────────────────────────────
+
+def test_layer0_buzzword_threshold_triggers_penalty():
+    """Text with >= _BUZZWORD_THRESHOLD buzzword hits should receive the severe multiplier."""
+    # "moreover", "furthermore", "in conclusion", "pivotal", "seamlessly" = 5 EN buzzwords
+    text = (
+        "Moreover, this approach is pivotal. Furthermore, it seamlessly integrates all "
+        "components. In conclusion, the system is robust. The paradigm shift leverages "
+        "synergy across the entire landscape. This is groundbreaking and cutting-edge work."
+    )
+    result = evaluate_heuristics(text)
+    assert result["prune"] is False
+    assert result["penalty_multiplier"] == 0.15
+    assert "Vague Buzzwords" in result["reason"]
+
+
+def test_layer0_below_threshold_passes():
+    """Text with fewer hits than buzzword_threshold should NOT trigger Layer 0 penalty.
+
+    Exactly 2 buzzword matches (furthermore + robust) — below the injected threshold of 3.
+    The text is long enough (>30 words) to pass the short-text guard.
+    """
+    text = (
+        "Furthermore, the proposed method shows promise in real-world scenarios. "
+        "The results are robust across all test environments examined in this study. "
+        "Additional benchmarks will be needed to confirm the generalizability of the findings "
+        "and validate the approach against established baselines in the field."
+    )
+    result = evaluate_heuristics(text, buzzword_threshold=3)
+    # 2 hits < threshold=3 → Layer 0 must NOT trigger the 0.15 penalty
+    assert "Vague Buzzwords" not in result.get("reason", ""), (
+        f"Layer 0 triggered unexpectedly. reason={result['reason']}"
+    )
+
+
+
+def test_layer0_short_text_not_reached():
+    """Short texts bypass ALL layers, including Layer 0 — word-count guard comes first."""
+    short_buzzword_text = "Moreover, furthermore, in conclusion."
+    result = evaluate_heuristics(short_buzzword_text)
+    assert result["penalty_multiplier"] == 1.0
+    assert result["reason"] == "Bypassed (short text)"
+
+
+def test_layer0_pt_buzzwords_trigger_penalty():
+    """Portuguese buzzwords should also be detected."""
+    text = (
+        "Cabe ressaltar que, em suma, é importante destacar a relevância do método. "
+        "No contexto atual, o sistema é de extrema importância para a comunidade. "
+        "Em conclusão, o resultado foi valioso e deve ser ampliado. "
+        "No cenário atual, a abordagem é fundamentalmente valiosa para todos."
+    )
+    result = evaluate_heuristics(text)
+    assert result["prune"] is False
+    assert result["penalty_multiplier"] == 0.15
+    assert "Vague Buzzwords" in result["reason"]

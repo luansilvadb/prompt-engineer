@@ -19,11 +19,11 @@ def verificar_juiz_atual(thresholds: DriftThresholds, repetitions: int) -> Optio
         return None
 
     runner = JudgeProbeRunner("atual")
-    model_path = MODELS_DIR / 'avaliador_otimizado.json'
+    model_path = MODELS_DIR / 'avaliador_modo_b_otimizado.json'
     if model_path.exists():
-        runner.load_candidate(str(model_path))
+        runner.load_candidate_modo_b(str(model_path))  # Modo B — deve usar _judge_modo_b
     else:
-        runner.as_zero()
+        runner.as_zero_modo_b()
 
     return medir_drift(runner, golden, repetitions, thresholds)
 
@@ -37,10 +37,10 @@ def circuit_breaker(thresholds: DriftThresholds, repetitions: int) -> GateDecisi
         return GateDecision(True, "golden ausente; nada a verificar", None)
 
     if report.critical_rules_violated:
-        model_path = MODELS_DIR / 'avaliador_otimizado.json'
+        model_path = MODELS_DIR / 'avaliador_modo_b_otimizado.json'
         if model_path.exists():
             ts = time.strftime('%Y%m%d_%H%M%S')
-            backup = MODELS_DIR / f'avaliador_otimizado.drifted.{ts}.bak'
+            backup = MODELS_DIR / f'avaliador_modo_b_otimizado.drifted.{ts}.bak'
             try:
                 os.replace(model_path, backup)
                 print(f"[!] CIRCUIT BREAKER: juiz atual aprovou {report.missed_violations} violação(ões) "

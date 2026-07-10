@@ -1,1 +1,18 @@
-textstat
+# ── Runtime ──────────────────────────────────────────────────────────────────
+dspy-ai>=2.4.0           # DSPy framework (BootstrapFewShot, ChainOfThought, Predict)
+litellm>=1.30.0          # Unified LLM gateway (used in config.py)
+python-dotenv>=1.0.0     # .env loading (config.py)
+
+fastapi>=0.111.0         # REST API server (src/api.py)
+uvicorn[standard]>=0.29.0  # ASGI server (desktop.py + prod)
+sse-starlette>=1.8.0     # Server-Sent Events (routers/jobs.py)
+
+sentence-transformers>=2.7.0  # MiniLM embeddings (src/semantic_evaluator.py)
+torch>=2.2.0             # PyTorch backend for sentence-transformers
+textstat>=0.7.3          # Readability + TTR heuristics (src/heuristic_evaluator.py)
+
+pywebview>=4.4.0         # Native desktop window (desktop.py)
+
+# ── Dev / Test ────────────────────────────────────────────────────────────────
+pytest>=8.0.0
+pytest-asyncio>=0.23.0

@@ -135,6 +135,7 @@ class Optimizer:
         self.semantic_sim_threshold = config.get('semantic_sim_threshold', 0.85)
         self.lexical_density_min = config.get('lexical_density_min', 0.35)
         self.verbosity_penalty_factor = config.get('verbosity_penalty_factor', 0.85)
+        self.buzzword_threshold = config.get('buzzword_threshold', 3)
         self.density_threshold = config.get('density_threshold', 1.0)
         self.density_multiplier_min = config.get('density_multiplier_min', 0.5)
         self.density_multiplier_max = config.get('density_multiplier_max', 1.5)
@@ -377,11 +378,12 @@ class Optimizer:
         if self.is_cancelled():
             return True, False, 0.0
         
-        # --- HEURISTIC PENALTY (Layer 1 & 2) ---
+        # --- HEURISTIC PIPELINE (Layer 0: buzzwords · Layer 1: TTR · Layer 2: readability) ---
         heuristic_result = evaluate_heuristics(
             child.instruction,
             density_min=self.lexical_density_min,
-            penalty_factor=self.verbosity_penalty_factor
+            penalty_factor=self.verbosity_penalty_factor,
+            buzzword_threshold=self.buzzword_threshold,
         )
 
         if heuristic_result.get("prune"):
@@ -390,7 +392,7 @@ class Optimizer:
             child.last_reward = 0.0
             self.backpropagation(child, 0.0)
             return False, False, 0.0
-        # ----------------------------------------
+        # ------------------------------------------------------------------------------------
         
         reward, feedback = self.simulation(child.instruction)
         
@@ -457,6 +459,12 @@ class Optimizer:
         
         return False, False, reward
 
+    def _get_all_nodes(self, node: MCTSNode) -> list[MCTSNode]:
+        nodes = [node]
+        for child in node.children:
+            nodes.extend(self._get_all_nodes(child))
+        return nodes
+
     def optimize(self) -> str:
         self.on_progress('\n[+] Inicializando o pipeline MCTS RL customizado com refinamentos...')
         self.on_progress(f'    Config: γ={self.gamma}, C_ucb={self.c_param}, α_pw={self.progressive_alpha}, threshold={self.value_threshold}')
@@ -516,12 +524,17 @@ class Optimizer:
                     
         self.on_progress('\n=======================================================\n                OTIMIZAÇÃO CONCLUÍDA                   \n=======================================================\n')
         
-        # Seleção final via Thompson Sampling (exploração residual)
-        best = root.best_child_thompson()
-        if best:
-            self.on_progress(f'[+] Melhor filho selecionado (Thompson): score={best.q_value / max(1, best.visits):.3f}, visits={best.visits}, strategy={get_strategy_description(best.mutation_strategy)}')
-            return best.instruction
-        return root.instruction
+        # Seleção final do melhor nó em toda a árvore
+        all_nodes = self._get_all_nodes(root)
+        best_node = max(all_nodes, key=lambda n: n.q_value / max(1, n.visits))
+        
+        score = best_node.q_value / max(1, best_node.visits)
+        if best_node == root:
+            self.on_progress(f'[+] Raiz mantida como melhor resultado (nenhuma otimização superou): score={score:.3f}, visits={best_node.visits}')
+        else:
+            self.on_progress(f'[+] Melhor nó selecionado: score={score:.3f}, visits={best_node.visits}, strategy={get_strategy_description(best_node.mutation_strategy)}')
+            
+        return best_node.instruction
 
 def save_optimized_skill(content: str) -> Path:
     """

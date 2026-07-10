@@ -5,13 +5,13 @@ from src.drift.runner import JudgeProbeRunner
 from src.drift.models import GoldenProbe, ProbeExpectation, DriftThresholds
 from src.drift.metrics import medir_drift
 from src.drift.golden import GoldenSet
-import config
+from src.config import setup
 
 def auscultar_modo_b():
     print("[*] Iniciando avaliação pontual - Modo B (Caça-Defeitos)")
     
     # Configurar o LLM via config.py (usa variáveis de ambiente do projeto)
-    config.setup()
+    setup()
     
     # 1. Instanciar o JudgeProbeRunner
     runner = JudgeProbeRunner(label="Modo B - Pontual")

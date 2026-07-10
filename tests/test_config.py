@@ -40,3 +40,15 @@ def test_density_config_override(monkeypatch):
     assert cfg['density_multiplier_max'] == 2.0
     assert cfg['density_threshold'] == 0.8
     assert cfg['density_structured_bonus'] == 0.3
+
+
+def test_buzzword_threshold_default(monkeypatch):
+    monkeypatch.delenv('MCTS_BUZZWORD_THRESHOLD', raising=False)
+    cfg = get_mcts_config()
+    assert cfg['buzzword_threshold'] == 3
+
+
+def test_buzzword_threshold_override(monkeypatch):
+    monkeypatch.setenv('MCTS_BUZZWORD_THRESHOLD', '5')
+    cfg = get_mcts_config()
+    assert cfg['buzzword_threshold'] == 5
