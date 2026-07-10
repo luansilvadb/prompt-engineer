@@ -1,0 +1,22 @@
+[
+  {
+    "comment": "⚠️ Teste tests/test_dummy_flaky.py movido para quarentena após 1 falhas intermitentes. Ticket: https://github.com/mock-org/mock-repo/issues/6751.",
+    "url": "https://github.com/mock-org/mock-repo/pull/42#issuecomment-96751",
+    "timestamp": "2026-07-10T23:27:05.382771"
+  },
+  {
+    "comment": "⚠️ Teste tests/test_critical.py movido para quarentena após 1 falhas intermitentes. Ticket: https://github.com/mock-org/mock-repo/issues/9838.",
+    "url": "https://github.com/mock-org/mock-repo/pull/42#issuecomment-39838",
+    "timestamp": "2026-07-10T23:27:41.465288"
+  },
+  {
+    "comment": "⚠️ Teste tests/test_example.py movido para quarentena após 3 falhas intermitentes. Ticket: https://github.com/mock/issues/12.",
+    "url": "https://github.com/mock/pull/1#issuecomment-999",
+    "timestamp": "2026-07-10T23:29:43.792171"
+  },
+  {
+    "comment": "⚠️ Teste tests/test_example.py movido para quarentena após 3 falhas intermitentes. Ticket: https://github.com/mock/issues/12.",
+    "url": "https://github.com/mock/pull/1#issuecomment-999",
+    "timestamp": "2026-07-10T23:30:21.464470"
+  }
+]
