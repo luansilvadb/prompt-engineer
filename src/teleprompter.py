@@ -2,7 +2,7 @@ import dspy
 import threading
 from pathlib import Path
 from src.experience_store import ExperienceStore
-from src.infrastructure.dspy_impl import AvaliadorModoBSignature
+from src.domain.agent_interfaces import JudgeRegistry
 from src.config import get_drift_thresholds
 from dspy.teleprompt import BootstrapFewShot
 from src.drift_monitor import (
@@ -68,7 +68,7 @@ def compilar_avaliador(lm=None, min_reward: float = 0.8) -> str:
         print("Iniciando compilação (Teleprompting) via BootstrapFewShot...")
         teleprompter = BootstrapFewShot(metric=trivial_metric, max_bootstrapped_demos=3, max_labeled_demos=0)
 
-        avaliador_module = dspy.Predict(AvaliadorModoBSignature)
+        avaliador_module = dspy.Predict(JudgeRegistry.get_signature_modo_b())
         compilado = teleprompter.compile(avaliador_module, trainset=trainset)
 
         output_dir = Path('src/outputs/models')

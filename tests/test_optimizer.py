@@ -21,6 +21,9 @@ def test_optimizer_layer1_hard_pruning(mock_heavy_evaluators):
     opt.selection = MagicMock(return_value=root)
     opt._expand_node = MagicMock(return_value=child)
     
+    # Reset mock call count so we only track calls during iteration
+    mock_heavy_evaluators["AvaliadorModoB"].reset_mock()
+
     # Run iteration
     should_break, is_error, reward = opt._run_mcts_iteration(root)
     

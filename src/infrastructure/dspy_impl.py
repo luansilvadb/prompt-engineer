@@ -118,6 +118,9 @@ class DSPySelfReflectiveAgent(ISelfReflectiveAgent):
         )
 
 class DSPyMutadorCognitivoAgent(IMutadorCognitivoAgent):
+    input_fields = MutadorCognitivoAgentSignature.input_fields
+    output_fields = MutadorCognitivoAgentSignature.output_fields
+
     def __init__(self):
         self._predictor = dspy.ChainOfThought(MutadorCognitivoAgentSignature)
 
@@ -218,33 +221,76 @@ def _invoke_judge_with(module, exemplo, predicao) -> Avaliacao:
         feedback_detalhado=res.feedback_detalhado
     )
 
-def _invoke_judge_modo_b_with(module, exemplo, predicao) -> AvaliacaoModoB:
-    regras = getattr(exemplo, 'regras_adicionais', '')
-    if not regras:
-        regras = 'Preservar todas as regras comportamentais anteriores.'
+from src.domain.agent_interfaces import IProbeJudge, IProbeJudgeModoB, JudgeRegistry
+
+class DSPyProbeJudge(IProbeJudge):
+    def __init__(self):
+        self._predictor = dspy.Predict(AvaliadorDeSkillSignature)
+
+    def load(self, path: str) -> None:
+        self._predictor.load(path)
+
+    def as_zero(self) -> None:
+        self._predictor = dspy.Predict(AvaliadorDeSkillSignature)
+
+    def __call__(self, skill_original: str, skill_otimizada: str, regras_adicionais: str) -> Avaliacao:
+        if not regras_adicionais:
+            regras_adicionais = 'Preservar todas as regras comportamentais anteriores.'
+        res = self._predictor(
+            skill_original=skill_original,
+            skill_otimizada=skill_otimizada,
+            regras_adicionais=regras_adicionais
+        )
+        return Avaliacao(
+            manteve_regras_criticas=_parse_manteve_regras(res.manteve_regras_criticas),
+            nota_clareza=res.nota_clareza,
+            nota_formatacao=res.nota_formatacao,
+            nota_robustez=res.nota_robustez,
+            nota_densidade_informacional=res.nota_densidade_informacional,
+            nota_acionabilidade=res.nota_acionabilidade,
+            nota_anti_fragilidade=res.nota_anti_fragilidade,
+            feedback_detalhado=res.feedback_detalhado
+        )
+
+class DSPyProbeJudgeModoB(IProbeJudgeModoB):
+    def __init__(self):
+        self._predictor = dspy.Predict(AvaliadorModoBSignature)
+
+    def load(self, path: str) -> None:
+        self._predictor.load(path)
+
+    def as_zero(self) -> None:
+        self._predictor = dspy.Predict(AvaliadorModoBSignature)
+
+    def __call__(self, skill_original: str, skill_otimizada: str, regras_adicionais: str) -> AvaliacaoModoB:
+        if not regras_adicionais:
+            regras_adicionais = 'Preservar todas as regras comportamentais anteriores.'
+        res = self._predictor(
+            skill_original=skill_original,
+            skill_otimizada=skill_otimizada,
+            regras_adicionais=regras_adicionais
+        )
         
-    res = module(
-        skill_original=exemplo.skill_original,
-        skill_otimizada=predicao.skill_otimizada,
-        regras_adicionais=regras
-    )
-    
-    defeitos_raw = getattr(res, 'defeitos_encontrados', '')
-    if isinstance(defeitos_raw, str):
-        defeitos_list = [d.strip("- *").strip() for d in defeitos_raw.split('\\n') if d.strip("- *").strip()]
-    elif isinstance(defeitos_raw, list):
-        defeitos_list = [str(d) for d in defeitos_raw]
-    else:
-        defeitos_list = []
-        
-    return AvaliacaoModoB(
-        manteve_regras_criticas=_parse_manteve_regras(res.manteve_regras_criticas),
-        defeitos_encontrados=defeitos_list,
-        nota_clareza=res.nota_clareza,
-        nota_formatacao=res.nota_formatacao,
-        nota_robustez=res.nota_robustez,
-        nota_densidade_informacional=res.nota_densidade_informacional,
-        nota_acionabilidade=res.nota_acionabilidade,
-        nota_anti_fragilidade=res.nota_anti_fragilidade,
-        feedback_detalhado=res.feedback_detalhado
-    )
+        defeitos_raw = getattr(res, 'defeitos_encontrados', '')
+        if isinstance(defeitos_raw, str):
+            defeitos_list = [d.strip("- *").strip() for d in defeitos_raw.split('\\n') if d.strip("- *").strip()]
+        elif isinstance(defeitos_raw, list):
+            defeitos_list = [str(d) for d in defeitos_raw]
+        else:
+            defeitos_list = []
+
+        return AvaliacaoModoB(
+            manteve_regras_criticas=_parse_manteve_regras(res.manteve_regras_criticas),
+            defeitos_encontrados=defeitos_list,
+            nota_clareza=res.nota_clareza,
+            nota_formatacao=res.nota_formatacao,
+            nota_robustez=res.nota_robustez,
+            nota_densidade_informacional=res.nota_densidade_informacional,
+            nota_acionabilidade=res.nota_acionabilidade,
+            nota_anti_fragilidade=res.nota_anti_fragilidade,
+            feedback_detalhado=res.feedback_detalhado
+        )
+
+# Register with JudgeRegistry
+JudgeRegistry.register(DSPyProbeJudge, DSPyProbeJudgeModoB)
+JudgeRegistry.register_signature_modo_b(AvaliadorModoBSignature)

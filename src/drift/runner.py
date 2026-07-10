@@ -1,20 +1,19 @@
-import dspy
 from src.signatures import Avaliacao
-from src.infrastructure.dspy_impl import AvaliadorDeSkillSignature, _invoke_judge_with, AvaliadorModoBSignature, _invoke_judge_modo_b_with
+from src.domain.agent_interfaces import JudgeRegistry
 from src.drift.exceptions import DriftMeasurementError
 from src.drift.models import ProbeMeasurement, GoldenProbe
 
 class JudgeProbeRunner:
     """
     Mede um juiz específico contra probes. Instancia seu PRÓPRIO
-    dspy.Predict(AvaliadorDeSkill) — NUNCA referencia o módulo global
-    avaliador_module (Norma 3, R2 verificado empiricamente: .demos é por-instância).
+    juiz (Modo A / Modo B) obtido do JudgeRegistry, desacoplado
+    da infraestrutura concreta (Norma 3).
     """
 
     def __init__(self, label: str):
         self.label = label
-        self._judge = dspy.Predict(AvaliadorDeSkillSignature)
-        self._judge_modo_b = dspy.Predict(AvaliadorModoBSignature)
+        self._judge = JudgeRegistry.create_judge()
+        self._judge_modo_b = JudgeRegistry.create_judge_modo_b()
 
     def load_candidate(self, path: str) -> None:
         """Carrega few-shot compilado NESTA instância apenas (Modo A)."""
@@ -38,23 +37,23 @@ class JudgeProbeRunner:
 
     def as_zero(self) -> None:
         """Juiz zerado (sem few-shot) — baseline de drift-zero garantida por construção (Modo A)."""
-        self._judge = dspy.Predict(AvaliadorDeSkillSignature)
+        self._judge.as_zero()
 
     def as_zero_modo_b(self) -> None:
         """Juiz zerado (sem few-shot) — baseline de drift-zero garantida por construção (Modo B)."""
-        self._judge_modo_b = dspy.Predict(AvaliadorModoBSignature)
+        self._judge_modo_b.as_zero()
 
     def run_modo_a(self, probe: GoldenProbe, repetitions: int) -> ProbeMeasurement:
         measurement = ProbeMeasurement(probe_id=probe.id)
         failures = 0
         for _ in range(repetitions):
             try:
-                exemplo = dspy.Example(
+                regras = probe.regras_adicionais or 'Preservar todas as regras comportamentais anteriores.'
+                avaliacao = self._judge(
                     skill_original=probe.skill_original,
-                    regras_adicionais=probe.regras_adicionais or 'Preservar todas as regras comportamentais anteriores.',
+                    skill_otimizada=probe.skill_otimizada,
+                    regras_adicionais=regras
                 )
-                predicao = dspy.Prediction(skill_otimizada=probe.skill_otimizada)
-                avaliacao = _invoke_judge_with(self._judge, exemplo, predicao)
                 measurement.samples.append(avaliacao)
             except Exception:
                 failures += 1
@@ -71,12 +70,12 @@ class JudgeProbeRunner:
         failures = 0
         for _ in range(repetitions):
             try:
-                exemplo = dspy.Example(
+                regras = probe.regras_adicionais or 'Preservar todas as regras comportamentais anteriores.'
+                avaliacao = self._judge_modo_b(
                     skill_original=probe.skill_original,
-                    regras_adicionais=probe.regras_adicionais or 'Preservar todas as regras comportamentais anteriores.',
+                    skill_otimizada=probe.skill_otimizada,
+                    regras_adicionais=regras
                 )
-                predicao = dspy.Prediction(skill_otimizada=probe.skill_otimizada)
-                avaliacao = _invoke_judge_modo_b_with(self._judge_modo_b, exemplo, predicao)
                 measurement.samples.append(avaliacao)
             except Exception as e:
                 import traceback
