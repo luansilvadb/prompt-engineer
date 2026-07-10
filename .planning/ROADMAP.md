@@ -43,7 +43,12 @@
 **Plans:** 2 plans
 
 Plans:
+**Wave 1**
+
 - [ ] 06-01-PLAN.md — Foundation: DSPy Signature, Pydantic validators, config keys, registry seed
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 06-02-PLAN.md — Optimizer integration: prior boosting, strategy routing, integration tests
 
 **Success Criteria:**
