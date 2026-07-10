@@ -46,7 +46,7 @@ def mock_heavy_evaluators():
         feedback_detalhado='Mock feedback.',
     )
 
-    with patch('src.signatures.avaliador_modo_b_module', mock_avaliador), \
+    with patch('src.dspy_signatures.avaliador_modo_b_module', mock_avaliador), \
          patch('sentence_transformers.SentenceTransformer') as mock_st_pkg, \
          patch('src.semantic_evaluator.SentenceTransformer') as mock_st_module:
         mock_st_module.return_value = MagicMock()

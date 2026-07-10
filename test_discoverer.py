@@ -1,7 +1,7 @@
 import os
 import dspy
 from src.config import setup
-from src.signatures import StrategyDiscoverer
+from src.dspy_signatures import StrategyDiscoverer
 from src.mutations import registry
 
 def main():

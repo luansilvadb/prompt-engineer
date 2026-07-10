@@ -1,5 +1,6 @@
 import dspy
-from src.signatures import AvaliadorDeSkill, Avaliacao, _invoke_judge_with, AvaliadorModoB, _invoke_judge_modo_b_with
+from src.signatures import Avaliacao
+from src.infrastructure.dspy_impl import AvaliadorDeSkillSignature, _invoke_judge_with, AvaliadorModoBSignature, _invoke_judge_modo_b_with
 from src.drift.exceptions import DriftMeasurementError
 from src.drift.models import ProbeMeasurement, GoldenProbe
 
@@ -12,8 +13,8 @@ class JudgeProbeRunner:
 
     def __init__(self, label: str):
         self.label = label
-        self._judge = dspy.Predict(AvaliadorDeSkill)
-        self._judge_modo_b = dspy.Predict(AvaliadorModoB)
+        self._judge = dspy.Predict(AvaliadorDeSkillSignature)
+        self._judge_modo_b = dspy.Predict(AvaliadorModoBSignature)
 
     def load_candidate(self, path: str) -> None:
         """Carrega few-shot compilado NESTA instância apenas (Modo A)."""
@@ -37,11 +38,11 @@ class JudgeProbeRunner:
 
     def as_zero(self) -> None:
         """Juiz zerado (sem few-shot) — baseline de drift-zero garantida por construção (Modo A)."""
-        self._judge = dspy.Predict(AvaliadorDeSkill)
+        self._judge = dspy.Predict(AvaliadorDeSkillSignature)
 
     def as_zero_modo_b(self) -> None:
         """Juiz zerado (sem few-shot) — baseline de drift-zero garantida por construção (Modo B)."""
-        self._judge_modo_b = dspy.Predict(AvaliadorModoB)
+        self._judge_modo_b = dspy.Predict(AvaliadorModoBSignature)
 
     def run_modo_a(self, probe: GoldenProbe, repetitions: int) -> ProbeMeasurement:
         measurement = ProbeMeasurement(probe_id=probe.id)

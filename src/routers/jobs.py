@@ -8,9 +8,33 @@ from sse_starlette.sse import EventSourceResponse
 from src.schemas import OtimizacaoRequestDTO
 from src.state import JobState, jobs
 from src.services import execute_optimization_task
-from src.store import save_job_state, load_all_jobs, load_job, delete_job
+import src.store as job_store
 from src.teleprompter import compilar_avaliador
 from src.config import setup
+from src.infrastructure.dspy_impl import (
+    DSPyStrategyDiscoverer, DSPySelfReflectiveAgent, DSPyMutadorCognitivoAgent,
+    DSPyAvaliadorModoB, load_avaliador
+)
+from src.experience_store import ExperienceStore
+
+class DspyAdapter:
+    def context(self, lm):
+        import dspy
+        return dspy.context(lm=lm)
+
+class JobStoreAdapter:
+    def save_job_state(self, job_id, job):
+        job_store.save_job_state(job_id, job)
+    def load_all_jobs(self, skip=0, limit=50, status=None):
+        return job_store.load_all_jobs(skip, limit, status)
+    def load_job(self, job_id):
+        return job_store.load_job(job_id)
+    def delete_job(self, job_id):
+        return job_store.delete_job(job_id)
+
+class AvaliadorCompilerAdapter:
+    def compilar_avaliador(self, lm=None, min_reward=0.8):
+        return compilar_avaliador(lm, min_reward)
 
 router = APIRouter(prefix="/api", tags=["Jobs"])
 
@@ -35,9 +59,32 @@ async def start_optimization(request: OtimizacaoRequestDTO, background_tasks: Ba
     
     jobs[job_id] = job_state
     
-    save_job_state(job_id, job_state)
+    store_adapter = JobStoreAdapter()
+    store_adapter.save_job_state(job_id, job_state)
     loop = asyncio.get_running_loop()
-    background_tasks.add_task(execute_optimization_task, job_id, loop)
+    
+    # Injeção de dependências
+    load_avaliador()
+    strategy_discoverer = DSPyStrategyDiscoverer()
+    agent = DSPySelfReflectiveAgent()
+    agent_cognitivo = DSPyMutadorCognitivoAgent()
+    avaliador_modo_b = DSPyAvaliadorModoB()
+    compiler = AvaliadorCompilerAdapter()
+    experience_store = ExperienceStore()
+    
+    background_tasks.add_task(
+        execute_optimization_task, 
+        job_id, 
+        loop, 
+        store_adapter, 
+        strategy_discoverer, 
+        agent, 
+        agent_cognitivo, 
+        avaliador_modo_b, 
+        compiler, 
+        experience_store,
+        DspyAdapter()
+    )
     return {'job_id': job_id}
 
 @router.post('/stop/{job_id}')
@@ -48,7 +95,7 @@ async def stop_optimization(job_id: str):
         
     if job.status == 'running':
         job.status = 'cancelled'
-        save_job_state(job_id, job)
+        job_store.save_job_state(job_id, job)
         job.events_queue.put_nowait({
             'type': 'log', 
             'data': {'text': '\n[!] OTIMIZAÇÃO INTERROMPIDA PELO USUÁRIO.'}
@@ -59,7 +106,7 @@ async def stop_optimization(job_id: str):
 
 @router.get('/jobs')
 async def get_all_jobs(skip: int = 0, limit: int = 50, status: Optional[str] = None):
-    return load_all_jobs(skip=skip, limit=limit, status=status)
+    return job_store.load_all_jobs(skip=skip, limit=limit, status=status)
 
 @router.delete('/jobs/{job_id}')
 async def delete_job_endpoint(job_id: str):
@@ -72,7 +119,7 @@ async def delete_job_endpoint(job_id: str):
         if job_in_memory.status == 'running':
             job_in_memory.status = 'cancelled'
     
-    success = delete_job(job_id)
+    success = job_store.delete_job(job_id)
     if not success and not job_in_memory:
         raise HTTPException(status_code=404, detail='Job not found or could not be deleted')
         
@@ -83,7 +130,7 @@ async def delete_job_endpoint(job_id: str):
 
 @router.get('/jobs/{job_id}')
 async def get_job(job_id: str):
-    job = load_job(job_id)
+    job = job_store.load_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail='Job not found')
     return job
@@ -92,7 +139,7 @@ async def get_job(job_id: str):
 async def stream_progress(job_id: str):
     job = jobs.get(job_id)
     if not job:
-        disk_job = load_job(job_id)
+        disk_job = job_store.load_job(job_id)
         if not disk_job:
             raise HTTPException(status_code=404, detail='Job not found')
             
@@ -106,7 +153,7 @@ async def stream_progress(job_id: str):
             temp_job.model_name = disk_job.get('model_name')
             temp_job.model_prefix = disk_job.get('model_prefix')
             temp_job.regras_adicionais = disk_job.get('regras_adicionais', '')
-            save_job_state(job_id, temp_job)
+            job_store.save_job_state(job_id, temp_job)
             disk_job['status'] = 'error'
             
         async def orphaned_event_generator():

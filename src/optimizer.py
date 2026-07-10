@@ -12,7 +12,6 @@ Evolução do core inspirada nos princípios de David Silver (AlphaGo/AlphaZero)
 - Delta Reward Shaping (temporal-difference sobre reward absoluto)
 """
 
-import dspy
 import time
 import math
 import random
@@ -21,9 +20,10 @@ import uuid
 from pathlib import Path
 from typing import Callable, Tuple, Optional
 
-from src.signatures import SelfReflectiveAgent, StrategyDiscoverer, funcao_de_recompensa, calcular_delta_reward, load_avaliador, MutadorCognitivoAgent, MutadorCognitivoOutput, _validate_raciocinio
+from src.domain.agent_interfaces import IStrategyDiscoverer, ISelfReflectiveAgent, IMutadorCognitivoAgent, IAvaliadorModoB
+from src.signatures import calcular_delta_reward, MutadorCognitivoOutput, _validate_raciocinio, funcao_de_recompensa
 from src.config import get_mcts_config
-from src.experience_store import ExperienceStore, Experience, hash_instruction
+from src.experience_store import Experience, hash_instruction
 from src.value_estimator import ValueEstimator
 from src.mutations import (
     MutationBandit, get_mutation_prompt, get_strategy_description, registry
@@ -111,6 +111,11 @@ class Optimizer:
     def __init__(
         self,
         skill_original: str,
+        strategy_discoverer: IStrategyDiscoverer,
+        agent: ISelfReflectiveAgent,
+        agent_cognitivo: IMutadorCognitivoAgent,
+        avaliador_modo_b: IAvaliadorModoB,
+        experience_store,
         on_progress: Callable[[str], None] = lambda msg: None,
         on_error: Callable[[str], None] = lambda msg: None,
         is_cancelled: Callable[[], bool] = lambda: False,
@@ -118,6 +123,10 @@ class Optimizer:
         regras_adicionais: str = ''
     ):
         self.skill_original = skill_original
+        self.strategy_discoverer = strategy_discoverer
+        self.agent = agent
+        self.agent_cognitivo = agent_cognitivo
+        self.avaliador_modo_b = avaliador_modo_b
         self.on_progress = on_progress
         self.on_error = on_error
         self.is_cancelled = is_cancelled
@@ -141,11 +150,8 @@ class Optimizer:
         self.density_multiplier_max = config.get('density_multiplier_max', 1.5)
         self.density_structured_bonus = config.get('density_structured_bonus', 0.2)
         
-        # Componentes evoluídos
-        self.agent = dspy.ChainOfThought(SelfReflectiveAgent)
-        self.agent_cognitivo = dspy.ChainOfThought(MutadorCognitivoAgent)
-        self.strategy_discoverer = dspy.Predict(StrategyDiscoverer)
-        self.experience_store = ExperienceStore()
+        # Componentes evoluídos injetados no construtor
+        self.experience_store = experience_store
         self.value_estimator = ValueEstimator(learning_rate=config['value_lr'])
         self.mutation_bandit = MutationBandit(c_param=config['bandit_c_param'])
         
@@ -165,8 +171,7 @@ class Optimizer:
         self.mutation_bandit.load_priors(cognitivo_prior)
         self.on_progress(f'[*] Mutador Cognitivo prior boosting: {cognitivo_prior["mutador_cognitivo"]["count"]} virtual count, delta={cognitivo_prior["mutador_cognitivo"]["mean_delta"]}')
 
-        # Tentar carregar modelo treinado do teleprompter
-        load_avaliador()
+
 
     def selection(self, node: MCTSNode) -> MCTSNode:
         """Seleção UCB com progressive widening."""
@@ -181,9 +186,12 @@ class Optimizer:
         if self.is_cancelled():
             return 0.0, 'Cancelado pelo usuário.'
         try:
-            example = dspy.Example(skill_original=self.skill_original, regras_adicionais=self.regras_adicionais)
-            prediction = dspy.Prediction(skill_otimizada=instruction)
-            reward, feedback = funcao_de_recompensa(example, prediction)
+            reward, feedback = funcao_de_recompensa(
+                avaliador_modo_b=self.avaliador_modo_b,
+                skill_original=self.skill_original,
+                skill_otimizada=instruction,
+                regras_adicionais=self.regras_adicionais
+            )
             if reward == 0.0:
                 self.on_error(f"    [Simulação] Recompensa 0.00! Motivo: {feedback}")
             else:

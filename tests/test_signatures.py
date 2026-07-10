@@ -2,10 +2,10 @@ import pytest
 from pydantic import ValidationError
 from src.signatures import (
     RaciocinioCognitivo,
-    MutadorCognitivoAgent,
     MutadorCognitivoOutput,
     _validate_raciocinio,
 )
+from src.dspy_signatures import MutadorCognitivoAgent
 
 
 def test_raciocinio_cognitivo_happy_path():

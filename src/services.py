@@ -1,22 +1,21 @@
 import asyncio
 import threading
-import dspy
 from src.state import jobs
-from src.store import save_job_state
 from src.config import setup
 from src.optimizer import Optimizer, save_optimized_skill
-from src.teleprompter import compilar_avaliador
+from src.domain.store_interfaces import IJobStore, IAvaliadorCompiler, IExperienceStore
+from src.domain.agent_interfaces import IStrategyDiscoverer, ISelfReflectiveAgent, IMutadorCognitivoAgent, IAvaliadorModoB, IAiFramework
 
-def _create_callbacks(job_id: str, job, loop):
+def _create_callbacks(job_id: str, job, loop, store: IJobStore):
     def log_progress(msg: str):
         job.logs.append(msg)
         asyncio.run_coroutine_threadsafe(job.events_queue.put({'type': 'log', 'data': {'text': msg}}), loop)
-        save_job_state(job_id, job)
+        store.save_job_state(job_id, job)
         
     def log_error(msg: str):
         job.logs.append(msg)
         asyncio.run_coroutine_threadsafe(job.events_queue.put({'type': 'log', 'data': {'text': msg}}), loop)
-        save_job_state(job_id, job)
+        store.save_job_state(job_id, job)
         
     def handle_node(node_data: dict):
         for idx, existing in enumerate(job.mcts_nodes):
@@ -27,24 +26,35 @@ def _create_callbacks(job_id: str, job, loop):
             job.mcts_nodes.append(node_data)
             
         asyncio.run_coroutine_threadsafe(job.events_queue.put({'type': 'node', 'data': node_data}), loop)
-        save_job_state(job_id, job)
+        store.save_job_state(job_id, job)
         
     return log_progress, log_error, handle_node
 
-def _run_bg_compiler(lm):
+def _run_bg_compiler(lm, compiler: IAvaliadorCompiler):
     try:
-        compilar_avaliador(lm=lm)
+        compiler.compilar_avaliador(lm=lm)
     except Exception as e:
         print(f"[!] Erro ao rodar compilação em background: {e}")
 
-def execute_optimization_task(job_id: str, loop):
+def execute_optimization_task(
+    job_id: str, 
+    loop, 
+    store: IJobStore,
+    strategy_discoverer: IStrategyDiscoverer,
+    agent: ISelfReflectiveAgent,
+    agent_cognitivo: IMutadorCognitivoAgent,
+    avaliador_modo_b: IAvaliadorModoB,
+    compiler: IAvaliadorCompiler,
+    experience_store: IExperienceStore,
+    ai_framework: IAiFramework
+):
     job = jobs[job_id]
     if job.status == 'cancelled':
         return
     job.status = 'running'
-    save_job_state(job_id, job)
+    store.save_job_state(job_id, job)
     
-    log_progress, log_error, handle_node = _create_callbacks(job_id, job, loop)
+    log_progress, log_error, handle_node = _create_callbacks(job_id, job, loop, store)
     
     try:
         log_progress('[*] Configurando o provedor e modelo de IA...')
@@ -57,6 +67,11 @@ def execute_optimization_task(job_id: str, loop):
         
         optimizer = Optimizer(
             skill_original=job.original_skill,
+            strategy_discoverer=strategy_discoverer,
+            agent=agent,
+            agent_cognitivo=agent_cognitivo,
+            avaliador_modo_b=avaliador_modo_b,
+            experience_store=experience_store,
             on_progress=log_progress,
             on_error=log_error,
             is_cancelled=lambda: job.status == 'cancelled',
@@ -64,16 +79,14 @@ def execute_optimization_task(job_id: str, loop):
             regras_adicionais=job.regras_adicionais
         )
         
-        with dspy.context(lm=lm):
+        with ai_framework.context(lm=lm):
             melhor_instrucao = optimizer.optimize()
         
-        # Guard: se o job foi cancelado/deletado durante a execução,
-        # salvar o melhor resultado parcial encontrado mas com status correto.
         if job.status == 'cancelled':
             if not job.is_deleted and melhor_instrucao and melhor_instrucao.strip() != job.original_skill.strip():
                 output_file = save_optimized_skill(melhor_instrucao)
                 job.result = melhor_instrucao
-                save_job_state(job_id, job)
+                store.save_job_state(job_id, job)
                 log_progress(f"\n[+] Resultado parcial preservado em '{output_file}'")
             return
         
@@ -83,15 +96,13 @@ def execute_optimization_task(job_id: str, loop):
         output_file = save_optimized_skill(melhor_instrucao)
         job.result = melhor_instrucao
         job.status = 'completed'
-        save_job_state(job_id, job)
+        store.save_job_state(job_id, job)
         log_progress(f"\n[+] Skill otimizada preservada no histórico em '{output_file}'")
         
-        # Disparar compilação do teleprompter em background sem travar o loop atual
-        threading.Thread(target=_run_bg_compiler, args=(lm,), daemon=True).start()
+        threading.Thread(target=_run_bg_compiler, args=(lm, compiler), daemon=True).start()
         
     except Exception as e:
-        # Não sobrescrever status 'cancelled' com 'error'
         if job.status != 'cancelled':
             log_error(f'\n[!] Erro fatal durante a execução: {e}')
             job.status = 'error'
-            save_job_state(job_id, job)
+            store.save_job_state(job_id, job)
