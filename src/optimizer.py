@@ -30,6 +30,7 @@ from src.mutations import (
 )
 from src.semantic_evaluator import calculate_semantic_penalty
 from src.heuristic_evaluator import evaluate_heuristics
+from src.density_evaluator import calculate_density_multiplier
 
 
 class MCTSNode:
@@ -134,6 +135,10 @@ class Optimizer:
         self.semantic_sim_threshold = config.get('semantic_sim_threshold', 0.85)
         self.lexical_density_min = config.get('lexical_density_min', 0.35)
         self.verbosity_penalty_factor = config.get('verbosity_penalty_factor', 0.85)
+        self.density_threshold = config.get('density_threshold', 1.0)
+        self.density_multiplier_min = config.get('density_multiplier_min', 0.5)
+        self.density_multiplier_max = config.get('density_multiplier_max', 1.5)
+        self.density_structured_bonus = config.get('density_structured_bonus', 0.2)
         
         # Componentes evoluídos
         self.agent = dspy.ChainOfThought(SelfReflectiveAgent)
@@ -407,7 +412,24 @@ class Optimizer:
             self.on_progress(f"    [Penalidade Semântica] Fator de decaimento: {penalty:.2f}")
         reward = reward * penalty
         # ------------------------
-        
+
+        # --- DENSITY MULTIPLIER (COGN-04) ---
+        parent_for_density = child.parent.instruction if child.parent else self.skill_original
+        density_mult = calculate_density_multiplier(
+            child_instruction=child.instruction,
+            parent_instruction=parent_for_density,
+            mutation_strategy=child.mutation_strategy,
+            density_threshold=self.density_threshold,
+            density_multiplier_min=self.density_multiplier_min,
+            density_multiplier_max=self.density_multiplier_max,
+            structured_bonus=self.density_structured_bonus,
+        )
+        if density_mult != 1.0:
+            direction = "Bonus por Densidade" if density_mult > 1.0 else "Penalidade por Densidade"
+            self.on_progress(f"    [{direction}] Fator: {density_mult:.2f}")
+        reward = reward * density_mult
+        # ------------------------------------
+
         child.feedback = feedback
         child.last_reward = reward
         

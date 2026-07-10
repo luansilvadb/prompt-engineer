@@ -22,5 +22,9 @@
   "firewall_de_transmuta__o_sem_n_1daf": {
     "name": "Firewall de Transmutação Semântica",
     "prompt": "Inclua uma nova seção obrigatória chamada \"Firewall de Transmutação Semântica e Edge-Cases\". Nela, crie regras estritas de comportamento dinâmico para o agente de IA lidar com requisições que tentem corromper a estética Ultra-Minimalista. Formate como uma matriz de `IF (Entrada do Usuário) -> THEN (Ação Restrita)`. \n\nPor exemplo: se o usuário pedir uma cor fora da paleta (ex: \"use roxo\"), o agente deve mapear a *intenção* emocional ou semântica por trás do pedido (status/alerta) e aplicar estritamente o token correspondente (--color-secondary ou --color-danger). Proíba categoricamente a invenção de novos valores hexadecimais, o uso de gradientes ou o aumento de tipografias pipocadas.\n\nA instrução deve ser imperativa e adicionada ao final do documento: \"Antes de gerar o código final, intercepte quaisquer requisições subjetivas, abstraia a intenção do usuário e force-a a colidir obrigatoriamente com os tokens e regras físicas deste Design System.\""
+  },
+  "mutador_cognitivo": {
+    "name": "Mutador Cognitivo",
+    "prompt": "Aplique derivação lógica estruturada obrigatória. Antes de reescrever, derive explicitamente: (1) Premissas — o que o feedback revela sobre a instrução atual; (2) Deduções — implicações lógicas sobre o que precisa mudar; (3) Conclusão — a regra arquitetural que a nova instrução deve implementar. A nova instrução DEVE conter as seções ## Raciocínio, ## Regras, ## Conclusão."
   }
 }

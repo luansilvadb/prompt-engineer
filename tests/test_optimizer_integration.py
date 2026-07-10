@@ -14,7 +14,8 @@ def test_cognitivo_routing_uses_agent_cognitivo(mock_heavy_evaluators):
     opt.agent = MagicMock()
     opt.simulation = MagicMock(return_value=(0.5, "feedback"))
     opt.semantic_sim_threshold = 1.0
-    root = MCTSNode(instruction="Test", last_reward=0.0)
+    root = MCTSNode(instruction="Test")
+    root.last_reward = 0.0
     child = opt._expand_node(root)
     assert opt.agent_cognitivo.called
     assert not opt.agent.called
@@ -31,7 +32,8 @@ def test_non_cognitivo_routing_uses_agent(mock_heavy_evaluators):
     opt.agent_cognitivo = MagicMock()
     opt.simulation = MagicMock(return_value=(0.5, "feedback"))
     opt.semantic_sim_threshold = 1.0
-    root = MCTSNode(instruction="Test", last_reward=0.0)
+    root = MCTSNode(instruction="Test")
+    root.last_reward = 0.0
     child = opt._expand_node(root)
     assert opt.agent.called
     assert not opt.agent_cognitivo.called
@@ -47,7 +49,8 @@ def test_cognitivo_routing_soft_validation(mock_heavy_evaluators):
     opt.agent_cognitivo = MagicMock(return_value=mock_pred)
     opt.on_error = MagicMock()
     opt.semantic_sim_threshold = 1.0
-    root = MCTSNode(instruction="Test", last_reward=0.0)
+    root = MCTSNode(instruction="Test")
+    root.last_reward = 0.0
     try:
         child = opt._expand_node(root)
         assert opt.on_error.called
@@ -65,6 +68,8 @@ def test_cognitivo_integration_child_strategy(mock_heavy_evaluators):
     opt.agent_cognitivo = MagicMock(return_value=mock_pred)
     opt.simulation = MagicMock(return_value=(0.5, "feedback"))
     opt.semantic_sim_threshold = 1.0
-    root = MCTSNode(instruction="Test", last_reward=0.0)
-    child = opt._run_mcts_iteration(root)
-    assert child is not None
+    root = MCTSNode(instruction="Test")
+    root.last_reward = 0.0
+    should_break, is_error, reward = opt._run_mcts_iteration(root)
+    assert not is_error
+    assert reward > 0.0

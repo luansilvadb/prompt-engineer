@@ -100,6 +100,12 @@ def get_mcts_config() -> dict:
         # Prior boosting para MutadorCognitivo (COGN-01)
         'cognitivo_prior_count': int(os.environ.get('MCTS_COGNITIVO_PRIOR_COUNT', '4')),
         'cognitivo_prior_mean_delta': float(os.environ.get('MCTS_COGNITIVO_PRIOR_MEAN_DELTA', '0.05')),
+
+        # Parametros do Multiplicador de Densidade (COGN-04)
+        'density_multiplier_min': float(os.environ.get('MCTS_DENSITY_MULTIPLIER_MIN', '0.5')),
+        'density_multiplier_max': float(os.environ.get('MCTS_DENSITY_MULTIPLIER_MAX', '1.5')),
+        'density_threshold': float(os.environ.get('MCTS_DENSITY_THRESHOLD', '1.0')),
+        'density_structured_bonus': float(os.environ.get('MCTS_DENSITY_STRUCTURED_BONUS', '0.2')),
     }
 
 

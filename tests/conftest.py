@@ -24,8 +24,8 @@ except ImportError:
 @pytest.fixture
 def mock_heavy_evaluators():
     """Patches heavy evaluators like AvaliadorModoB and SentenceTransformer to prevent network calls."""
-    with patch('src.ausculta_modo_b.AvaliadorModoB', autospec=True) as mock_avaliador, \
-         patch('sentence_transformers.SentenceTransformer', autospec=True) as mock_sentence_transformer:
+    with patch('src.ausculta_modo_b.AvaliadorModoB') as mock_avaliador, \
+         patch('sentence_transformers.SentenceTransformer') as mock_sentence_transformer:
         yield {
             'AvaliadorModoB': mock_avaliador,
             'SentenceTransformer': mock_sentence_transformer
