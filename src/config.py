@@ -92,6 +92,10 @@ def get_mcts_config() -> dict:
 
         # Limiar de penalidade de similaridade semântica (> 0.85 inicia decaimento)
         'semantic_sim_threshold': float(os.environ.get('MCTS_SEMANTIC_SIM_THRESHOLD', '0.85')),
+
+        # Thresholds do Avaliador de Profundidade Heurística
+        'lexical_density_min': float(os.environ.get('MCTS_LEXICAL_DENSITY_MIN', '0.35')),
+        'verbosity_penalty_factor': float(os.environ.get('MCTS_VERBOSITY_PENALTY_FACTOR', '0.85')),
     }
 
 

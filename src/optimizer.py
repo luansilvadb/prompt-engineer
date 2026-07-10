@@ -29,6 +29,7 @@ from src.mutations import (
     MutationBandit, get_mutation_prompt, get_strategy_description, registry
 )
 from src.semantic_evaluator import calculate_semantic_penalty
+from src.heuristic_evaluator import evaluate_heuristics
 
 
 class MCTSNode:
@@ -131,6 +132,8 @@ class Optimizer:
         self.progressive_c = config['progressive_c']
         self.value_threshold = config['value_threshold']
         self.semantic_sim_threshold = config.get('semantic_sim_threshold', 0.85)
+        self.lexical_density_min = config.get('lexical_density_min', 0.35)
+        self.verbosity_penalty_factor = config.get('verbosity_penalty_factor', 0.85)
         
         # Componentes evoluídos
         self.agent = dspy.ChainOfThought(SelfReflectiveAgent)
@@ -341,7 +344,29 @@ class Optimizer:
         if self.is_cancelled():
             return True, False, 0.0
         
+        # --- HEURISTIC PENALTY (Layer 1 & 2) ---
+        heuristic_result = evaluate_heuristics(
+            child.instruction,
+            density_min=self.lexical_density_min,
+            penalty_factor=self.verbosity_penalty_factor
+        )
+
+        if heuristic_result.get("prune"):
+            self.on_progress(f"    [Poda Heurística] {heuristic_result.get('reason')}")
+            child.feedback = heuristic_result.get("reason")
+            child.last_reward = 0.0
+            self.backpropagation(child, 0.0)
+            return False, False, 0.0
+        # ----------------------------------------
+        
         reward, feedback = self.simulation(child.instruction)
+        
+        # --- HEURISTIC MULTIPLIER (Layer 2) ---
+        multiplier = heuristic_result.get("penalty_multiplier", 1.0)
+        if multiplier < 1.0:
+            self.on_progress(f"    [Penalidade Heurística] Fator de decaimento: {multiplier:.2f}")
+        reward = reward * multiplier
+        # --------------------------------------
         
         # --- SEMANTIC PENALTY ---
         parent_instruction = child.parent.instruction if child.parent else self.skill_original
