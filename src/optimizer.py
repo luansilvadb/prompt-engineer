@@ -21,7 +21,7 @@ import uuid
 from pathlib import Path
 from typing import Callable, Tuple, Optional
 
-from src.signatures import SelfReflectiveAgent, StrategyDiscoverer, funcao_de_recompensa, calcular_delta_reward, load_avaliador
+from src.signatures import SelfReflectiveAgent, StrategyDiscoverer, funcao_de_recompensa, calcular_delta_reward, load_avaliador, MutadorCognitivoAgent, MutadorCognitivoOutput, _validate_raciocinio
 from src.config import get_mcts_config
 from src.experience_store import ExperienceStore, Experience, hash_instruction
 from src.value_estimator import ValueEstimator
@@ -137,6 +137,7 @@ class Optimizer:
         
         # Componentes evoluídos
         self.agent = dspy.ChainOfThought(SelfReflectiveAgent)
+        self.agent_cognitivo = dspy.ChainOfThought(MutadorCognitivoAgent)
         self.strategy_discoverer = dspy.Predict(StrategyDiscoverer)
         self.experience_store = ExperienceStore()
         self.value_estimator = ValueEstimator(learning_rate=config['value_lr'])
@@ -147,6 +148,16 @@ class Optimizer:
         if strategy_stats:
             self.mutation_bandit.load_priors(strategy_stats)
             self.on_progress(f'[*] Memória experiencial carregada: {len(self.experience_store.experiences)} experiências, {len(strategy_stats)} estratégias conhecidas.')
+
+        # Prior boosting incondicional para MutadorCognitivo (COGN-01)
+        cognitivo_prior = {
+            'mutador_cognitivo': {
+                'count': config.get('cognitivo_prior_count', 4),
+                'mean_delta': config.get('cognitivo_prior_mean_delta', 0.05),
+            }
+        }
+        self.mutation_bandit.load_priors(cognitivo_prior)
+        self.on_progress(f'[*] Mutador Cognitivo prior boosting: {cognitivo_prior["mutador_cognitivo"]["count"]} virtual count, delta={cognitivo_prior["mutador_cognitivo"]["mean_delta"]}')
 
         # Tentar carregar modelo treinado do teleprompter
         load_avaliador()
