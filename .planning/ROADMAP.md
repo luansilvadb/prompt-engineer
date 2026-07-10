@@ -61,6 +61,11 @@ Plans:
 
 **Requirement**: COGN-04
 **Focus**: Recompensar instruções comprimidas e altamente lógicas.
+**Plans:** 1 plan
+
+Plans:
+- [ ] 07-01-PLAN.md — Implement density multiplier: density_evaluator.py, config keys, optimizer injection, tests
+
 **Success Criteria:**
 
 - [ ] Reward function mathematically boosts scores for answers that are both logical and concise.
@@ -76,5 +81,5 @@ Plans:
 | 3. Close gap: JUD-01, JUD-02 Fix optimizer.py to target Mode B | v1.0 | 1/1 | Complete | 2026-07-09 |
 | 4. Avaliador de Profundidade Semântica | v1.1 | 2/2 | Complete   | 2026-07-10 |
 | 5. Avaliador de Profundidade Heurística | v1.1 | 1/1 | Complete   | 2026-07-10 |
-| 6. Mutador Cognitivo | v1.1 | 0/2 | Pending | — |
-| 7. Otimização por Densificação Extrema | v1.1 | 0/0 | Pending | — |
+| 6. Mutador Cognitivo | v1.1 | 2/2 | Complete | 2026-07-10 |
+| 7. Otimização por Densificação Extrema | v1.1 | 0/1 | Pending | — |
