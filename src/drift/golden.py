@@ -73,12 +73,6 @@ class GoldenSet:
     def is_empty(self) -> bool:
         return len(self.probes) == 0
 
-    def probe_by_id(self, probe_id: str) -> Optional[GoldenProbe]:
-        for p in self.probes:
-            if p.id == probe_id:
-                return p
-        return None
-
     def save(self, version: str, curated_at: str):
         """Persistência atômica — USAR APENAS EM CURADORIA OFFLINE (BR3)."""
         path = self._store_path()

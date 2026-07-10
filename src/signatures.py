@@ -2,16 +2,6 @@ import dspy
 from pathlib import Path
 from pydantic import BaseModel, Field, field_validator
 
-class GeracaoSkill(BaseModel):
-    critica: str = Field(description="Análise do feedback e proposta de qual nova abordagem testar (proibido dizer que está perfeito).")
-    nova_instrucao: str = Field(description="A nova skill reescrita e otimizada, formatada em Markdown.")
-
-    @field_validator('nova_instrucao')
-    def validar_tamanho_instrucao(cls, v):
-        if len(v.strip()) < 50:
-            raise ValueError("A nova instrução gerada é muito curta. Forneça uma skill completa e detalhada baseada nas estratégias e feedbacks.")
-        return v
-
 class StrategyDiscoverer(dspy.Signature):
     """Analisa o contexto atual (a skill, as falhas passadas, e o que já foi tentado) e INVENTA uma heurística de mutação totalmente nova e criativa para quebrar o platô atual."""
     skill_atual: str = dspy.InputField(desc="O estado atual da instrução que estamos tentando melhorar.")
@@ -192,12 +182,6 @@ def load_avaliador():
             print(f"[*] Avaliador otimizado Modo B carregado de {model_path_b}.")
         except Exception as e:
             print(f"[!] Erro ao carregar avaliador Modo B: {e}")
-
-def _invoke_judge(exemplo, predicao) -> Avaliacao:
-    """Invoca o módulo juiz GLOBAL (avaliador_module). Mantido para compat."""
-    return _invoke_judge_with(avaliador_module, exemplo, predicao)
-
-
 def _invoke_judge_with(module, exemplo, predicao) -> Avaliacao:
     """
     Invoca um módulo juiz ESPECÍFICO sobre (exemplo, predicao).
