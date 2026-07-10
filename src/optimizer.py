@@ -300,12 +300,29 @@ class Optimizer:
                 feedback_completo += experience_context
             
             try:
-                predicao = self.agent(
-                    instrucao_anterior=leaf.instruction,
-                    nota_anterior=nota,
-                    feedback_juiz=feedback_completo,
-                    estrategia_mutacao=strategy_prompt,
-                )
+                COGNITIVO_KEY = 'mutador_cognitivo'
+                if strategy == COGNITIVO_KEY:
+                    predicao = self.agent_cognitivo(
+                        instrucao_anterior=leaf.instruction,
+                        nota_anterior=nota,
+                        feedback_juiz=feedback_completo,
+                        estrategia_mutacao=strategy_prompt,
+                    )
+                    try:
+                        _validate_raciocinio(predicao.raciocinio_estruturado)
+                    except Exception as e:
+                        self.on_error(f'[!] raciocinio_estruturado invalido: {e}')
+                    try:
+                        MutadorCognitivoOutput(nova_instrucao=predicao.nova_instrucao)
+                    except Exception as e:
+                        self.on_error(f'[!] nova_instrucao secoes cognitivas invalidas: {e}')
+                else:
+                    predicao = self.agent(
+                        instrucao_anterior=leaf.instruction,
+                        nota_anterior=nota,
+                        feedback_juiz=feedback_completo,
+                        estrategia_mutacao=strategy_prompt,
+                    )
                 candidata = predicao.nova_instrucao
                 if candidata and candidata.strip() and candidata.strip() != leaf.instruction.strip():
                     # Checar via value estimator antes de aceitar
