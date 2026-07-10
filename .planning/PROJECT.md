@@ -28,13 +28,13 @@ Otimização de prompts guiada por MCTS com um mecanismo de avaliação que efet
 - ✓ **Redução de Complexidade Ciclomática:** Refatorar funções com múltiplos branches e caminhos aninhados em unidades menores. (Validated in v1.0)
 - ✓ **Remoção de Código Morto:** Eliminar variáveis, funções e imports que não agregam valor. (Validated in v1.0)
 - ✓ **Densificação do Projeto:** Arquivos e módulos devem ter escopo e responsabilidades bem delineadas. (Validated in v1.0)
+- ✓ **Avaliador de Profundidade Semântica:** O juiz calcula a similaridade semântica da resposta com o prompt gerador para penalizar repetições rasas usando `sentence-transformers`. (Validated in Phase 04)
 
 ### Active
 
 <!-- Current scope. Building toward these. -->
 
 - [ ] Criar o Mutador Cognitivo para injetar protocolos de raciocínio.
-- [ ] Atualizar Juiz Modo B para penalizar raciocínio raso.
 
 ### Out of Scope
 
