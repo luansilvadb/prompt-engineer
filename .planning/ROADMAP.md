@@ -40,6 +40,12 @@
 
 **Requirement**: COGN-01
 **Focus**: Injetar estruturas de raciocínio lógico (blocos pydantic) nas skills criadas.
+**Plans:** 2 plans
+
+Plans:
+- [ ] 06-01-PLAN.md — Foundation: DSPy Signature, Pydantic validators, config keys, registry seed
+- [ ] 06-02-PLAN.md — Optimizer integration: prior boosting, strategy routing, integration tests
+
 **Success Criteria:**
 
 - [ ] New strategy added to `StrategyRegistry` named `MutadorCognitivo`.
@@ -65,5 +71,5 @@
 | 3. Close gap: JUD-01, JUD-02 Fix optimizer.py to target Mode B | v1.0 | 1/1 | Complete | 2026-07-09 |
 | 4. Avaliador de Profundidade Semântica | v1.1 | 2/2 | Complete   | 2026-07-10 |
 | 5. Avaliador de Profundidade Heurística | v1.1 | 1/1 | Complete   | 2026-07-10 |
-| 6. Mutador Cognitivo | v1.1 | 0/0 | Pending | — |
+| 6. Mutador Cognitivo | v1.1 | 0/2 | Pending | — |
 | 7. Otimização por Densificação Extrema | v1.1 | 0/0 | Pending | — |
