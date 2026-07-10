@@ -24,22 +24,32 @@ STRATEGIES_DIR = Path('src/outputs/strategies')
 
 class StrategyRegistry:
     def __init__(self):
+        self.job_id = None
         self.strategies: Dict[str, Dict[str, str]] = {}
+        self._load()
+        self._seed_hardcoded_strategies()
+
+    def set_job_id(self, job_id: str):
+        """Define o escopo da sessão (job) e recarrega as estratégias locais."""
+        self.job_id = job_id
         self._load()
         self._seed_hardcoded_strategies()
 
     def _store_path(self) -> Path:
         STRATEGIES_DIR.mkdir(parents=True, exist_ok=True)
+        if self.job_id:
+            return STRATEGIES_DIR / f'discovered_strategies_{self.job_id}.json'
         return STRATEGIES_DIR / 'discovered_strategies.json'
 
     def _load(self):
+        self.strategies = {}
         path = self._store_path()
         if path.exists():
             try:
                 with open(path, 'r', encoding='utf-8') as f:
                     self.strategies = json.load(f)
             except Exception:
-                self.strategies = {}
+                pass
 
     def save(self):
         path = self._store_path()

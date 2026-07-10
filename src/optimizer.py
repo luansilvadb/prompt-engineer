@@ -133,6 +133,10 @@ class Optimizer:
         self.on_node = on_node
         self.regras_adicionais = regras_adicionais
         
+        # Isolar escopo de estratégias para esta sessão de otimização
+        self.job_id = uuid.uuid4().hex[:8]
+        registry.set_job_id(self.job_id)
+        
         # Carregar hiperparâmetros configuráveis
         config = get_mcts_config()
         self.max_iterations = config['max_iterations']
