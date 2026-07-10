@@ -38,15 +38,15 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| COGN-01 | Phase [N] | Pending |
-| COGN-02 | Phase [N] | Pending |
-| COGN-03 | Phase [N] | Pending |
-| COGN-04 | Phase [N] | Pending |
+| COGN-01 | Phase 6 | Pending |
+| COGN-02 | Phase 4 | Pending |
+| COGN-03 | Phase 5 | Pending |
+| COGN-04 | Phase 7 | Pending |
 
 **Coverage:**
 - v1 requirements: 4 total
-- Mapped to phases: 0
-- Unmapped: 4 ⚠️
+- Mapped to phases: 4
+- Unmapped: 0 ✅
 
 ---
 *Requirements defined: 2026-07-10*
