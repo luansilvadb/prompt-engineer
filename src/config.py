@@ -89,6 +89,9 @@ def get_mcts_config() -> dict:
 
         # Constante de exploração do mutation bandit
         'bandit_c_param': float(os.environ.get('MCTS_BANDIT_C_PARAM', '1.41')),
+
+        # Limiar de penalidade de similaridade semântica (> 0.85 inicia decaimento)
+        'semantic_sim_threshold': float(os.environ.get('MCTS_SEMANTIC_SIM_THRESHOLD', '0.85')),
     }
 
 

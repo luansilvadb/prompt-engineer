@@ -28,6 +28,7 @@ from src.value_estimator import ValueEstimator
 from src.mutations import (
     MutationBandit, get_mutation_prompt, get_strategy_description, registry
 )
+from src.semantic_evaluator import calculate_semantic_penalty
 
 
 class MCTSNode:
@@ -129,6 +130,7 @@ class Optimizer:
         self.progressive_alpha = config['progressive_alpha']
         self.progressive_c = config['progressive_c']
         self.value_threshold = config['value_threshold']
+        self.semantic_sim_threshold = config.get('semantic_sim_threshold', 0.85)
         
         # Componentes evoluídos
         self.agent = dspy.ChainOfThought(SelfReflectiveAgent)
@@ -340,6 +342,19 @@ class Optimizer:
             return True, False, 0.0
         
         reward, feedback = self.simulation(child.instruction)
+        
+        # --- SEMANTIC PENALTY ---
+        parent_instruction = child.parent.instruction if child.parent else self.skill_original
+        penalty = calculate_semantic_penalty(
+            child.instruction, 
+            parent_instruction, 
+            threshold=self.semantic_sim_threshold
+        )
+        if penalty < 1.0:
+            self.on_progress(f"    [Penalidade Semântica] Fator de decaimento: {penalty:.2f}")
+        reward = reward * penalty
+        # ------------------------
+        
         child.feedback = feedback
         child.last_reward = reward
         
