@@ -5,7 +5,7 @@ from src.signatures import (
     MutadorCognitivoOutput,
     _validate_raciocinio,
 )
-from src.dspy_signatures import MutadorCognitivoAgent
+from src.infrastructure.dspy_impl import DSPyMutadorCognitivoAgent as MutadorCognitivoAgent
 
 
 def test_raciocinio_cognitivo_happy_path():

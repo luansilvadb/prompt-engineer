@@ -1,4 +1,4 @@
-import torch
+
 from sentence_transformers import SentenceTransformer, util
 
 # Global singleton to avoid reloading the model

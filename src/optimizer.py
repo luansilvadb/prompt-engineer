@@ -81,30 +81,7 @@ class MCTSNode:
             
         return max(self.children, key=ucb_score)
 
-    def best_child_thompson(self) -> Optional['MCTSNode']:
-        """
-        Thompson Sampling para a seleção FINAL.
-        
-        Silver: "Think ahead, don't be greedy."
-        
-        Em vez do greedy best_child(c_param=0), sorteia da posterior
-        Beta(α, β) de cada filho. Naturalmente seleciona o melhor
-        mas com exploração residual proporcional à incerteza.
-        """
-        if not self.children:
-            return None
-        
-        def thompson_score(child: 'MCTSNode') -> float:
-            if child.visits == 0:
-                return random.random()
-            # Converter q_value médio [0,1] em parâmetros Beta
-            mean = child.q_value / max(1, child.visits)
-            # α e β proporcionais às visitas (mais visitas → distribuição mais concentrada)
-            alpha = max(1.0, mean * child.visits + 1)
-            beta = max(1.0, (1 - mean) * child.visits + 1)
-            return random.betavariate(alpha, beta)
-        
-        return max(self.children, key=thompson_score)
+
 
 
 class Optimizer:
