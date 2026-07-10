@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 def test_optimizer_layer1_hard_pruning(mock_heavy_evaluators):
     # Setup optimizer mock
     opt = Optimizer(skill_original="foo")
+    mock_heavy_evaluators["AvaliadorModoB"].reset_mock()
     # Disable semantic penalty so we only test heuristics
     opt.semantic_sim_threshold = 1.0 
     

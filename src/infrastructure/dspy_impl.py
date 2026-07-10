@@ -118,6 +118,9 @@ class DSPySelfReflectiveAgent(ISelfReflectiveAgent):
         )
 
 class DSPyMutadorCognitivoAgent(IMutadorCognitivoAgent):
+    input_fields = MutadorCognitivoAgentSignature.input_fields
+    output_fields = MutadorCognitivoAgentSignature.output_fields
+
     def __init__(self):
         self._predictor = dspy.ChainOfThought(MutadorCognitivoAgentSignature)
 

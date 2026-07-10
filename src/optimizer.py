@@ -88,17 +88,33 @@ class Optimizer:
     def __init__(
         self,
         skill_original: str,
-        strategy_discoverer: IStrategyDiscoverer,
-        agent: ISelfReflectiveAgent,
-        agent_cognitivo: IMutadorCognitivoAgent,
-        avaliador_modo_b: IAvaliadorModoB,
-        experience_store,
+        strategy_discoverer: IStrategyDiscoverer = None,
+        agent: ISelfReflectiveAgent = None,
+        agent_cognitivo: IMutadorCognitivoAgent = None,
+        avaliador_modo_b: IAvaliadorModoB = None,
+        experience_store = None,
         on_progress: Callable[[str], None] = lambda msg: None,
         on_error: Callable[[str], None] = lambda msg: None,
         is_cancelled: Callable[[], bool] = lambda: False,
         on_node: Callable[[dict], None] = lambda node: None,
         regras_adicionais: str = ''
     ):
+        if strategy_discoverer is None:
+            from src.infrastructure.dspy_impl import DSPyStrategyDiscoverer
+            strategy_discoverer = DSPyStrategyDiscoverer()
+        if agent is None:
+            from src.infrastructure.dspy_impl import DSPySelfReflectiveAgent
+            agent = DSPySelfReflectiveAgent()
+        if agent_cognitivo is None:
+            from src.infrastructure.dspy_impl import DSPyMutadorCognitivoAgent
+            agent_cognitivo = DSPyMutadorCognitivoAgent()
+        if avaliador_modo_b is None:
+            from src.infrastructure.dspy_impl import DSPyAvaliadorModoB
+            avaliador_modo_b = DSPyAvaliadorModoB()
+        if experience_store is None:
+            from src.experience_store import ExperienceStore
+            experience_store = ExperienceStore()
+
         self.skill_original = skill_original
         self.strategy_discoverer = strategy_discoverer
         self.agent = agent

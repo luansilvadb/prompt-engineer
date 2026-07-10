@@ -1,8 +1,8 @@
 from pathlib import Path
 from dataclasses import dataclass
+from pydantic import BaseModel, field_validator
 
-@dataclass
-class RaciocinioCognitivo:
+class RaciocinioCognitivo(BaseModel):
     """
     premissas: Premissas extraídas do feedback e da instrução atual.
     deducoes: Deduções e implicações lógicas derivadas das premissas.
@@ -12,21 +12,23 @@ class RaciocinioCognitivo:
     deducoes: str
     conclusao: str
 
-    def __post_init__(self):
-        for v in (self.premissas, self.deducoes, self.conclusao):
-            if not v or len(v.strip()) < 10:
-                raise ValueError("Campo obrigatório do raciocínio estruturado está vazio ou genérico.")
+    @field_validator('premissas', 'deducoes', 'conclusao')
+    @classmethod
+    def check_non_empty_and_long_enough(cls, v: str) -> str:
+        if not v or len(v.strip()) < 10:
+            raise ValueError("Campo obrigatório do raciocínio estruturado está vazio ou genérico.")
+        return v
 
 
-@dataclass
-class MutadorCognitivoOutput:
+class MutadorCognitivoOutput(BaseModel):
     """
     nova_instrucao: A nova skill reescrita com seções cognitivas obrigatórias.
     """
     nova_instrucao: str
 
-    def __post_init__(self):
-        v = self.nova_instrucao
+    @field_validator('nova_instrucao')
+    @classmethod
+    def validate_nova_instrucao(cls, v: str) -> str:
         normalized = v.lower()
         required = ['## raciocínio', '## regras', '## conclusão']
         missing = [s for s in required if s not in normalized]
@@ -34,6 +36,7 @@ class MutadorCognitivoOutput:
             raise ValueError(f"nova_instrucao deve conter as seções: {missing}")
         if len(v.strip()) < 50:
             raise ValueError("nova_instrucao muito curta para conter derivação cognitiva completa.")
+        return v
 
 
 def _validate_raciocinio(raciocinio_str: str) -> None:
