@@ -1,24 +1,22 @@
 import pytest
 from unittest.mock import patch, MagicMock
 import sys
+from types import ModuleType
 
-# Mock modules if they don't exist to avoid ModuleNotFoundError during patch
+SRC_REPLACED = False
 try:
     import src.ausculta_modo_b
 except ImportError:
-    import sys
-    from types import ModuleType
-    src = ModuleType('src')
-    sys.modules['src'] = src
+    # Only mock src.ausculta_modo_b, not the entire src package
+    # (src.signatures or src.config may already be cached)
     ausculta_modo_b = ModuleType('ausculta_modo_b')
     sys.modules['src.ausculta_modo_b'] = ausculta_modo_b
     ausculta_modo_b.AvaliadorModoB = MagicMock()
+    SRC_REPLACED = True
 
 try:
     import sentence_transformers
 except ImportError:
-    from types import ModuleType
-    import sys
     sentence_transformers = ModuleType('sentence_transformers')
     sys.modules['sentence_transformers'] = sentence_transformers
     sentence_transformers.SentenceTransformer = MagicMock()
