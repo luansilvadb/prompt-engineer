@@ -29,6 +29,83 @@ class SelfReflectiveAgent(dspy.Signature):
     critica: str = dspy.OutputField(desc="Análise do feedback e proposta de qual nova abordagem testar (proibido dizer que está perfeito).")
     nova_instrucao: str = dspy.OutputField(desc="A nova skill reescrita e otimizada, formatada em Markdown.")
 
+
+class RaciocinioCognitivo(BaseModel):
+    premissas: str = Field(description="Premissas extraídas do feedback e da instrução atual.")
+    deducoes: str = Field(description="Deduções e implicações lógicas derivadas das premissas.")
+    conclusao: str = Field(description="Conclusão acionável — o que a nova instrução DEVE fazer diferente.")
+
+    @field_validator('premissas', 'deducoes', 'conclusao')
+    @classmethod
+    def validar_campo_preenchido(cls, v):
+        if not v or len(v.strip()) < 10:
+            raise ValueError("Campo obrigatório do raciocínio estruturado está vazio ou genérico.")
+        return v
+
+
+class MutadorCognitivoAgent(dspy.Signature):
+    """Analisa a instrução com derivação lógica estruturada obrigatória. OBRIGATÓRIO: preencha
+    raciocinio_estruturado com premissas, deduções e conclusão explícitas antes de reescrever.
+    A nova instrução DEVE incluir as seções ## Raciocínio, ## Regras, ## Conclusão derivadas do raciocínio."""
+    instrucao_anterior: str = dspy.InputField()
+    nota_anterior: str = dspy.InputField()
+    feedback_juiz: str = dspy.InputField(desc="Feedback detalhado do avaliador explicando os motivos da nota.")
+    estrategia_mutacao: str = dspy.InputField(desc="Estratégia de mutação a ser aplicada nesta iteração. Siga rigorosamente a diretriz.")
+    critica: str = dspy.OutputField(desc="Análise do feedback e proposta de nova abordagem com derivação cognitiva.")
+    raciocinio_estruturado: str = dspy.OutputField(
+        desc="Derivação lógica obrigatória com campos: premissas | deducoes | conclusao. Não pode ser genérico."
+    )
+    nova_instrucao: str = dspy.OutputField(
+        desc="A nova skill reescrita em Markdown. DEVE conter ## Raciocínio, ## Regras, ## Conclusão derivados do raciocinio_estruturado."
+    )
+
+
+class MutadorCognitivoOutput(BaseModel):
+    nova_instrucao: str = Field(description="A nova skill reescrita com seções cognitivas obrigatórias.")
+
+    @field_validator('nova_instrucao')
+    @classmethod
+    def validar_secoes_cognitivas(cls, v):
+        normalized = v.lower()
+        required = ['## raciocínio', '## regras', '## conclusão']
+        missing = [s for s in required if s not in normalized]
+        if missing:
+            raise ValueError(f"nova_instrucao deve conter as seções: {missing}")
+        if len(v.strip()) < 50:
+            raise ValueError("nova_instrucao muito curta para conter derivação cognitiva completa.")
+        return v
+
+
+def _validate_raciocinio(raciocinio_str: str) -> None:
+    normalized = raciocinio_str.lower()
+    labels = ['premissas', 'dedu', 'conclus']
+
+    positions = []
+    for label in labels:
+        pos = normalized.find(label)
+        if pos == -1:
+            raise ValueError(f"raciocinio_estruturado está faltando a seção obrigatória: {label}")
+        positions.append((label, pos))
+
+    positions.sort(key=lambda x: x[1])
+
+    extracted = {}
+    for i, (label, start) in enumerate(positions):
+        end = positions[i + 1][1] if i + 1 < len(positions) else len(raciocinio_str)
+        content = raciocinio_str[start:end].strip()
+        for prefix in ['premissas:', 'premissas', 'deduções:', 'deducoes:', 'dedu', 'conclusão:', 'conclusao:', 'conclus']:
+            if content.lower().startswith(prefix):
+                content = content[len(prefix):].lstrip(':').strip()
+                break
+        extracted[label] = content
+
+    RaciocinioCognitivo(
+        premissas=extracted['premissas'],
+        deducoes=extracted['dedu'],
+        conclusao=extracted['conclus'],
+    )
+
+
 class Avaliacao(BaseModel):
     manteve_regras_criticas: bool = Field(description="True se nenhuma regra comportamental vital (inclusive as regras adicionais) foi omitida. False caso contrário.")
     nota_clareza: float = Field(description="Nota de 0 a 100 avaliando se a instrução é clara e direta.")

@@ -76,19 +76,15 @@ def test_validate_raciocinio_missing_label():
         _validate_raciocinio(raw)
 
 
-def test_mutador_cognitivo_agent_output_fields(mock_heavy_evaluators):
-    import dspy
-    agent = dspy.ChainOfThought(MutadorCognitivoAgent)
-    output_fields = agent.output_fields
+def test_mutador_cognitivo_agent_output_fields():
+    output_fields = MutadorCognitivoAgent.output_fields
     assert "raciocinio_estruturado" in output_fields
     assert "critica" in output_fields
     assert "nova_instrucao" in output_fields
 
 
-def test_mutador_cognitivo_agent_input_fields(mock_heavy_evaluators):
-    import dspy
-    agent = dspy.ChainOfThought(MutadorCognitivoAgent)
-    input_fields = agent.input_fields
+def test_mutador_cognitivo_agent_input_fields():
+    input_fields = MutadorCognitivoAgent.input_fields
     assert "instrucao_anterior" in input_fields
     assert "nota_anterior" in input_fields
     assert "feedback_juiz" in input_fields
