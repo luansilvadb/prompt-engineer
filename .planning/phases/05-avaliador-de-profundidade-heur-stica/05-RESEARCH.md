@@ -14,7 +14,7 @@
 - **D-02:** Utiliza-se uma abordagem combinada. A Densidade Lexical age como o filtro inicial de poda rápida. Nós que sobrevivem a esse filtro são avaliados por uma fórmula combinada (ex: Flesch-Kincaid e outras) para o decaimento progressivo da pontuação.
 - **D-03:** As heurísticas lexicais atuam de forma sequencial como filtro primário. Os cálculos do `textstat` rodam ANTES da avaliação pesada. Apenas se o nó passar nesse filtro primário é que as chamadas ao LLM e ao `sentence-transformers` são feitas, as quais podem ocorrer em paralelo para maior eficiência.
 
-### the agent's Discretion
+### The Agent's Discretion
 - Nenhuma.
 
 ### Deferred Ideas (OUT OF SCOPE)
@@ -246,12 +246,46 @@ def evaluate_heuristics(text: str) -> dict:
    - Recommendation: Expose the thresholds (e.g., `LEXICAL_DENSITY_MIN` and `VERBOSITY_PENALTY_FACTOR`) in `config.py` to allow tuning during the execution phase.
 </open_questions>
 
+<validation_architecture>
+## Validation Architecture
+
+Nyquist validation is ENABLED for this phase.
+
+### Test Strategy Mapping
+
+**Requirement: COGN-03 (Avaliador de Profundidade utiliza heurísticas lexicais)**
+
+| Strategy Layer | Focus Area | Implementation Approach |
+|----------------|------------|-------------------------|
+| **Unit Tests** | Heuristic Evaluator (`heuristic_evaluator.py`) | Test `evaluate_heuristics` with varied input strings. Verify accurate calculation of lexical density (TTR) and Flesch Reading Ease. Validate that `prune` boolean and `penalty_multiplier` are correct. |
+| **Unit Tests** | Multilingual Support | Verify that `textstat` uses the correct language settings (`textstat.set_lang('pt')`) and syllable counts are appropriate for Portuguese. |
+| **Integration Tests** | MCTS Pipeline Injection (`optimizer.py`) | Mock the LLM evaluator (`AvaliadorModoB`) and Semantic Evaluator (`sentence-transformers`). Inject the heuristic evaluator into the simulation step. Verify that Layer 1 hard pruning skips the heavy evaluation entirely. |
+| **Integration Tests** | Pipeline Penalty Multiplier | Verify that Layer 2 penalty multiplier correctly scales the final reward produced by the heavy evaluators. |
+
+### Wave 0 (Setup) Gaps
+- **Test Fixtures for Verbosidade**: Need a dataset/fixture of textual examples categorized into "hollow verbosity" (low TTR, high word count, high reading ease) and "dense reasoning" to establish a baseline for threshold tuning in tests.
+- **Mocking Infrastructure**: Ensure the MCTS test harness can reliably mock and spy on the heavy evaluators to assert short-circuiting logic sem causar chamadas vivas de rede (LLM).
+
+### UAT & Quality Gates
+
+**Gate 1: Short-Circuit Logic (COGN-03 Layer 1)**
+- [ ] Nodes with excessive lexical repetition (e.g., repeating the same instructions to inflate token count) are immediately pruned (score 0.0).
+- [ ] The heavy evaluator (LLM/embeddings) is verifiably NOT called for hard-pruned nodes.
+
+**Gate 2: Progressive Penalty (COGN-03 Layer 2)**
+- [ ] Nodes with high word counts mas texto excessivamente simples (high Flesch Reading Ease) recebem um multiplicador progressivo de penalidade (< 1.0) aplicado na sua avaliação final.
+
+**Gate 3: System Performance**
+- [ ] O custo de avaliação (API) ou o tempo da árvore de busca do MCTS diminui de forma mensurável devido à poda prematura das branches não promissoras.
+</validation_architecture>
+
 <sources>
 ## Sources
 
 ### Primary (HIGH confidence)
 - textstat PyPI & GitHub docs - verified functions like `lexicon_count`, `flesch_reading_ease`, and `set_lang`.
 - Phase 05 CONTEXT.md - verified implementation decisions (D-01 to D-03).
+- REQUIREMENTS.md - mapped COGN-03 requirement to the Nyquist Validation Architecture.
 
 ### Secondary (MEDIUM confidence)
 - NLTK Lexical Diversity principles - applied mathematical formula for Lexical Density (Unique / Total tokens) adapted for raw Python.
