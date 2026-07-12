@@ -342,3 +342,35 @@ def _build_evidence(
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+
+class BudgetGuard:
+    """
+    Encapsula a verificação de orçamento de execução dentro do loop MCTS.
+    Injetado no Optimizer via MCTSConfig.maximum_attempts (mapping direto).
+    """
+
+    def __init__(self, budget: ExecutionBudget) -> None:
+        self._budget = budget
+        self._exceeded_reason: str = ""
+
+    def check_attempts(self, current_iteration: int) -> bool:
+        """Returns True when within budget (not exceeded)."""
+        return current_iteration <= self._budget.maximum_attempts
+
+    def check_duration(self, elapsed_seconds: float) -> bool:
+        """Returns True when within budget (not exceeded)."""
+        return elapsed_seconds <= self._budget.maximum_duration_seconds
+
+    def is_exceeded(self, current_iteration: int, elapsed_seconds: float) -> bool:
+        if not self.check_attempts(current_iteration):
+            self._exceeded_reason = f"maximum_attempts ({self._budget.maximum_attempts}) reached at iteration {current_iteration}"
+            return True
+        if not self.check_duration(elapsed_seconds):
+            self._exceeded_reason = f"maximum_duration_seconds ({self._budget.maximum_duration_seconds}s) exceeded after {elapsed_seconds:.1f}s"
+            return True
+        return False
+
+    def exceeded_reason(self) -> str:
+        return self._exceeded_reason
