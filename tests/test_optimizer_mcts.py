@@ -1,10 +1,9 @@
 from unittest.mock import MagicMock, patch
-from src.optimizer import Optimizer
 from src.domain.mcts import MCTSNode
 
-def test_evaluate_and_prune(mock_heavy_evaluators):
-    opt = Optimizer(skill_original="skill")
-    opt.on_progress = MagicMock()
+def test_evaluate_and_prune(mock_optimizer_factory):
+    opt = mock_optimizer_factory(skill_original="skill")
+    opt._emitter.emit_log = MagicMock()
     opt.backpropagation = MagicMock()
     child = MCTSNode(instruction="child")
 
@@ -15,47 +14,50 @@ def test_evaluate_and_prune(mock_heavy_evaluators):
         assert child.last_reward == 0.0
         opt.backpropagation.assert_called_once_with(child, 0.0)
 
-def test_apply_heuristic_multiplier(mock_heavy_evaluators):
-    opt = Optimizer(skill_original="skill")
-    opt.on_progress = MagicMock()
+def test_apply_heuristic_multiplier(mock_optimizer_factory):
+    opt = mock_optimizer_factory(skill_original="skill")
+    opt._emitter.emit_log = MagicMock()
 
     res = opt._apply_heuristic_multiplier(10.0, {"penalty_multiplier": 0.5})
     assert res == 5.0
-    opt.on_progress.assert_called()
+    opt._emitter.emit_log.assert_called()
 
-def test_apply_semantic_penalty(mock_heavy_evaluators):
-    opt = Optimizer(skill_original="skill")
-    opt.on_progress = MagicMock()
+def test_apply_semantic_penalty(mock_optimizer_factory):
+    opt = mock_optimizer_factory(skill_original="skill")
+    opt._emitter.emit_log = MagicMock()
     child = MCTSNode(instruction="child")
 
     with patch('src.optimizer.calculate_semantic_penalty', return_value=0.8):
         res = opt._apply_semantic_penalty(child, 10.0)
         assert res == 8.0
-        opt.on_progress.assert_called()
+        opt._emitter.emit_log.assert_called()
 
-def test_apply_density_multiplier(mock_heavy_evaluators):
-    opt = Optimizer(skill_original="skill")
-    opt.on_progress = MagicMock()
-    child = MCTSNode(instruction="child")
+def test_apply_density_multiplier(mock_optimizer_factory):
+    opt = mock_optimizer_factory(skill_original="skill")
+    opt._emitter.emit_log = MagicMock()
+    opt.lexical_density_min = 0.35  # Enable density calculation
+    parent = MCTSNode(instruction="parent")
+    child = MCTSNode(instruction="child", parent=parent)
 
     with patch('src.optimizer.calculate_density_multiplier', return_value=1.2):
         res = opt._apply_density_multiplier(child, 10.0)
         assert res == 12.0
-        opt.on_progress.assert_called()
+        opt._emitter.emit_log.assert_called()
 
-def test_optimizer_mcts_iteration_cancelled(mock_heavy_evaluators):
-    opt = Optimizer(skill_original="skill")
-    opt.is_cancelled = MagicMock(return_value=True)
+def test_optimizer_mcts_iteration_cancelled(mock_optimizer_factory):
+    opt = mock_optimizer_factory(skill_original="skill")
+    opt._emitter.is_cancelled = MagicMock(return_value=True)
     root = MCTSNode(instruction="skill")
 
     should_break, is_error, reward = opt._run_mcts_iteration(root)
     assert should_break is True
     assert reward == 0.0
 
-def test_optimizer_mcts_iteration_happy_path(mock_heavy_evaluators):
-    opt = Optimizer(skill_original="skill")
+def test_optimizer_mcts_iteration_happy_path(mock_optimizer_factory):
+    opt = mock_optimizer_factory(skill_original="skill")
     opt.semantic_sim_threshold = 1.0
     opt.lexical_density_min = 0.0
+    opt.density_threshold = 1.0  # Ensure no density modification
 
     root = MCTSNode(instruction="skill")
     child = MCTSNode(instruction="child", parent=root)
@@ -72,10 +74,11 @@ def test_optimizer_mcts_iteration_happy_path(mock_heavy_evaluators):
     assert child.feedback == "feedback"
     assert child.last_reward == 10.0
 
-def test_optimizer_mcts_iteration_max_children(mock_heavy_evaluators):
-    opt = Optimizer(skill_original="skill")
+def test_optimizer_mcts_iteration_max_children(mock_optimizer_factory):
+    opt = mock_optimizer_factory(skill_original="skill")
     opt.semantic_sim_threshold = 1.0
     opt.lexical_density_min = 0.0
+    opt.density_threshold = 1.0  # Ensure no density modification
 
     root = MCTSNode(instruction="skill")
     child = MCTSNode(instruction="child", parent=root)

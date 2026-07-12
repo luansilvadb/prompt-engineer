@@ -1,4 +1,5 @@
 import pytest
+import json
 from unittest.mock import MagicMock, patch
 from src.drift.exceptions import DriftMeasurementError
 from src.drift.models import (
@@ -266,3 +267,179 @@ def test_judge_probe_runner(mock_invoke_b, mock_invoke_a):
     mock_invoke_a.side_effect = Exception("DSPy Error")
     with pytest.raises(DriftMeasurementError, match="Todas as 2 repetições falharam"):
         runner.run(probe, repetitions=2, modo='a')
+
+
+# ---------------------------------------------------------------------------
+# GoldenSet persistence + JudgeProbeRunner error paths — previously uncovered.
+# Contratos sob teste:
+#   - GoldenSet._parse_golden_json / save: round-trip atômico (BR3 curadoria)
+#   - GoldenSet._load: fail-open (golden ausente) e resiliência a JSON inválido
+#   - JudgeProbeRunner.load_candidate(_modo_b): fail-closed em erro de carga
+#   - JudgeProbeRunner.as_zero(_modo_b): reinicializa juiz p/ baseline zero
+# ---------------------------------------------------------------------------
+
+
+def _make_probe(pid="p1", rank="alto", verifier="v1"):
+    exp = ProbeExpectation(
+        manteve_regras_criticas=True,
+        nota_clareza=80.0, nota_formatacao=80.0, nota_robustez=80.0,
+        nota_densidade_informacional=80.0, nota_acionabilidade=80.0,
+        nota_anti_fragilidade=80.0,
+    )
+    return GoldenProbe(
+        id=pid, skill_original="orig", skill_otimizada="opt",
+        regras_adicionais="rules", expected=exp,
+        expected_rank_band=rank, verifier=verifier,
+    )
+
+
+@patch('src.drift.golden.GOLDEN_DIR', None)
+def test_golden_set_parse_save_round_trip(tmp_path):
+    """save() escreve JSON atômico e _load() reconstitui probes idênticos (BR3)."""
+    golden_dir = tmp_path / 'golden'
+    with patch('src.drift.golden.GOLDEN_DIR', golden_dir):
+        gs = GoldenSet()  # não há arquivo → probes=[]
+        assert gs.is_empty()
+
+        gs.probes = [_make_probe('p1', 'alto', 'v1'), _make_probe('p2', 'baixo', 'v2')]
+        gs.save(version='1.2.0', curated_at='2026-07-12T00:00:00Z')
+
+        # O arquivo persistido existe e é JSON válido.
+        stored = golden_dir / 'golden_set.json'
+        assert stored.exists()
+        data = json.loads(stored.read_text(encoding='utf-8'))
+        assert data['version'] == '1.2.0'
+        assert data['curated_at'] == '2026-07-12T00:00:00Z'
+        assert len(data['probes']) == 2
+
+        # Nova instância carrega o mesmo conteúdo.
+        reloaded = GoldenSet()
+        assert reloaded.version == '1.2.0'
+        assert len(reloaded.probes) == 2
+        assert {p.id for p in reloaded.probes} == {'p1', 'p2'}
+        first = reloaded.probes[0]
+        assert first.expected.nota_clareza == 80.0
+        assert first.expected_rank_band in ('alto', 'baixo')
+
+
+@patch('src.drift.golden.GOLDEN_DIR', None)
+def test_golden_set_parse_handles_missing_optional_fields(tmp_path):
+    """_parse_golden_json aceita probes sem regras_adicionais/verifier (defaults)."""
+    golden_dir = tmp_path / 'golden'
+    payload = {
+        'version': '1.0.0', 'curated_at': 'now',
+        'probes': [{
+            'id': 'px', 'skill_original': 'o', 'skill_otimizada': 'p',
+            'expected': {
+                'manteve_regras_criticas': True, 'nota_clareza': 70,
+                'nota_formatacao': 70, 'nota_robustez': 70,
+                'nota_densidade_informacional': 70, 'nota_acionabilidade': 70,
+                'nota_anti_fragilidade': 70,
+            },
+            'expected_rank_band': 'medio',
+            # regras_adicionais e verifier omitidos proposicalmente
+        }],
+    }
+    with patch('src.drift.golden.GOLDEN_DIR', golden_dir):
+        (golden_dir).mkdir(parents=True, exist_ok=True)
+        (golden_dir / 'golden_set.json').write_text(json.dumps(payload), encoding='utf-8')
+        gs = GoldenSet()
+
+    assert len(gs.probes) == 1
+    probe = gs.probes[0]
+    assert probe.regras_adicionais == ''   # default .get('')
+    assert probe.verifier == ''            # default .get('')
+    assert probe.id == 'px'
+
+
+@patch('src.drift.golden.GOLDEN_DIR', None)
+def test_golden_set_load_malformed_json_falls_back_to_empty(tmp_path, capsys):
+    """JSON corrompido → fail-open: probes=[] sem lançar (mensagem de aviso)."""
+    golden_dir = tmp_path / 'golden'
+    golden_dir.mkdir(parents=True, exist_ok=True)
+    (golden_dir / 'golden_set.json').write_text('{ NOT VALID JSON !!!', encoding='utf-8')
+    with patch('src.drift.golden.GOLDEN_DIR', golden_dir):
+        gs = GoldenSet()
+    assert gs.probes == []
+    assert gs.is_empty()
+    assert 'Erro ao carregar golden set' in capsys.readouterr().out
+
+
+@patch('src.drift.golden.GOLDEN_DIR', None)
+def test_golden_set_load_missing_file_is_empty_fail_open(tmp_path, capsys):
+    """Arquivo ausente → fail-open (probes=[]), mensagem explícita."""
+    with patch('src.drift.golden.GOLDEN_DIR', tmp_path / 'absent'):
+        gs = GoldenSet()
+    assert gs.is_empty()
+    assert 'Golden set ausente' in capsys.readouterr().out
+
+
+# --- JudgeProbeRunner error paths ------------------------------------------
+
+
+def test_runner_load_candidate_raises_on_failure():
+    """Falha ao carregar few-shot do candidato (Modo A) → DriftMeasurementError."""
+    runner = JudgeProbeRunner(label="cand")
+    with patch.object(runner._judge, 'load', side_effect=FileNotFoundError("no file")):
+        with pytest.raises(DriftMeasurementError, match="Falha ao carregar juiz candidato"):
+            runner.load_candidate('/path/to/cand.json')
+
+
+def test_runner_load_candidate_modo_b_raises_on_failure():
+    """Falha ao carregar few-shot do candidato (Modo B) → DriftMeasurementError."""
+    runner = JudgeProbeRunner(label="cand")
+    with patch.object(runner._judge_modo_b, 'load', side_effect=OSError("corrupt")):
+        with pytest.raises(DriftMeasurementError, match="Modo B"):
+            runner.load_candidate_modo_b('/path/to/cand_b.json')
+
+
+def test_runner_load_candidate_error_preserves_context():
+    """DriftMeasurementError carrega contexto diagnóstico (label/path/original)."""
+    runner = JudgeProbeRunner(label="meu_juiz")
+    with patch.object(runner._judge, 'load', side_effect=RuntimeError("bad demo")):
+        with pytest.raises(DriftMeasurementError) as exc_info:
+            runner.load_candidate('/x/y.json')
+    ctx = exc_info.value.context
+    assert ctx['judge_label'] == 'meu_juiz'
+    assert ctx['path'] == '/x/y.json'
+    assert 'bad demo' in ctx['original']
+
+
+def test_runner_as_zero_replaces_modoa_judge():
+    """as_zero() reinicializa o juiz Modo A (baseline de drift-zero)."""
+    runner = JudgeProbeRunner(label="z")
+    original = runner._judge
+    runner.as_zero()
+    assert runner._judge is not original  # nova instância zerada
+
+
+def test_runner_as_zero_modo_b_replaces_modob_judge():
+    """as_zero_modo_b() reinicializa o juiz Modo B."""
+    runner = JudgeProbeRunner(label="z")
+    original = runner._judge_modo_b
+    runner.as_zero_modo_b()
+    assert runner._judge_modo_b is not original
+
+
+def test_runner_run_modo_b_partial_failure_still_returns_samples():
+    """run_modo_b tolera falhas parciais: retorna samples das reps bem-sucedidas."""
+    runner = JudgeProbeRunner(label="partial")
+    ok = AvaliacaoModoB(
+        manteve_regras_criticas=True, nota_clareza=80, nota_formatacao=80,
+        nota_robustez=80, nota_densidade_informacional=80, nota_acionabilidade=80,
+        nota_anti_fragilidade=80, feedback_detalhado="ok", defeitos_encontrados=[],
+    )
+    # 1a rep OK, 2a rep falha.
+    with patch('src.drift.runner._invoke_judge_modo_b_with', side_effect=[ok, Exception("boom")]):
+        probe = _make_probe()
+        measurement = runner.run_modo_b(probe, repetitions=2)
+    assert len(measurement.samples) == 1
+    assert measurement.samples[0].feedback_detalhado == "ok"
+
+
+def test_runner_run_modo_b_all_fail_raises():
+    """run_modo_b: todas as reps falhando → DriftMeasurementError (Modo B)."""
+    runner = JudgeProbeRunner(label="allfail")
+    with patch('src.drift.runner._invoke_judge_modo_b_with', side_effect=Exception("down")):
+        with pytest.raises(DriftMeasurementError, match="Modo B"):
+            runner.run_modo_b(_make_probe(), repetitions=2)

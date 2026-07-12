@@ -1,10 +1,10 @@
-from src.optimizer import Optimizer, MCTSNode
+from src.domain.mcts import MCTSNode
 from src.density_evaluator import calculate_density_multiplier
 from unittest.mock import MagicMock
 
-def test_optimizer_layer1_hard_pruning(mock_heavy_evaluators):
+def test_optimizer_layer1_hard_pruning(mock_optimizer_factory, mock_heavy_evaluators):
     # Setup optimizer mock
-    opt = Optimizer(skill_original="foo")
+    opt = mock_optimizer_factory(skill_original="foo")
     # Disable semantic penalty so we only test heuristics
     opt.semantic_sim_threshold = 1.0
 
@@ -32,8 +32,8 @@ def test_optimizer_layer1_hard_pruning(mock_heavy_evaluators):
     mock_heavy_evaluators["AvaliadorModoB"].assert_not_called()
     mock_heavy_evaluators["SentenceTransformer"].assert_not_called()
 
-def test_optimizer_layer2_penalty_multiplier(mock_heavy_evaluators, sample_verbose_text):
-    opt = Optimizer(skill_original="foo")
+def test_optimizer_layer2_penalty_multiplier(mock_optimizer_factory, sample_verbose_text):
+    opt = mock_optimizer_factory(skill_original="foo")
     # Mock simulation so we get a base reward
     opt.simulation = MagicMock(return_value=(1.0, "Good job"))
     opt.semantic_sim_threshold = 1.0
@@ -53,17 +53,17 @@ def test_optimizer_layer2_penalty_multiplier(mock_heavy_evaluators, sample_verbo
     assert reward > 0.0
 
 
-def test_optimizer_cognitivo_regression(mock_heavy_evaluators):
-    opt = Optimizer(skill_original="foo")
-    assert hasattr(opt, 'agent_cognitivo')
+def test_optimizer_cognitivo_regression(mock_optimizer_factory):
+    opt = mock_optimizer_factory(skill_original="foo")
+    assert hasattr(opt, '_agent_cognitivo')
     assert 'mutador_cognitivo' in opt.mutation_bandit._counts
 
 
-def test_density_boost_applied(mock_heavy_evaluators):
-    opt = Optimizer(skill_original="This is a very long parent instruction that should compress well and demonstrate density boost behavior in the MCTS pipeline.")
+def test_density_boost_applied(mock_optimizer_factory):
+    opt = mock_optimizer_factory(skill_original="This is a very long parent instruction that should compress well and demonstrate density boost behavior in the MCTS pipeline.")
     opt.simulation = MagicMock(return_value=(1.0, "Good job"))
     opt.semantic_sim_threshold = 1.0
-    opt.lexical_density_min = 0.0
+    opt.lexical_density_min = 0.35  # Enable density calculation
     root = MCTSNode(instruction=opt.skill_original)
     root.last_reward = 0.0
     child = MCTSNode(instruction="Short compressed instruction.", parent=root)
@@ -73,11 +73,11 @@ def test_density_boost_applied(mock_heavy_evaluators):
     assert reward > 1.0
 
 
-def test_density_penalty_applied(mock_heavy_evaluators, sample_verbose_text):
-    opt = Optimizer(skill_original="Short parent.")
+def test_density_penalty_applied(mock_optimizer_factory, sample_verbose_text):
+    opt = mock_optimizer_factory(skill_original="Short parent.")
     opt.simulation = MagicMock(return_value=(1.0, "Good job"))
     opt.semantic_sim_threshold = 1.0
-    opt.lexical_density_min = 0.0
+    opt.lexical_density_min = 0.35  # Enable density calculation
     root = MCTSNode(instruction="Short parent.")
     root.last_reward = 0.0
     child = MCTSNode(instruction=sample_verbose_text, parent=root)
@@ -87,11 +87,12 @@ def test_density_penalty_applied(mock_heavy_evaluators, sample_verbose_text):
     assert reward < 1.0
 
 
-def test_density_neutral_at_same_length(mock_heavy_evaluators):
-    opt = Optimizer(skill_original="Same length instruction here")
+def test_density_neutral_at_same_length(mock_optimizer_factory):
+    opt = mock_optimizer_factory(skill_original="Same length instruction here")
     opt.simulation = MagicMock(return_value=(1.0, "Good job"))
     opt.semantic_sim_threshold = 1.0
     opt.lexical_density_min = 0.0
+    opt.density_threshold = 1.0  # Ensure neutral multiplier for same-length
     root = MCTSNode(instruction="Same length instruction here")
     root.last_reward = 0.0
     child = MCTSNode(instruction="Same length instruction here", parent=root)
@@ -101,16 +102,16 @@ def test_density_neutral_at_same_length(mock_heavy_evaluators):
     assert reward == 1.0
 
 
-def test_density_structured_bonus_integration(mock_heavy_evaluators):
-    opt = Optimizer(skill_original="Test")
+def test_density_structured_bonus_integration(mock_optimizer_factory):
+    opt = mock_optimizer_factory(skill_original="Test")
     assert hasattr(opt, 'density_threshold')
-    assert opt.density_threshold == 1.0
+    assert opt.density_threshold == 0.9
     assert hasattr(opt, 'density_multiplier_min')
-    assert opt.density_multiplier_min == 0.5
+    assert opt.density_multiplier_min == 0.8
     assert hasattr(opt, 'density_multiplier_max')
-    assert opt.density_multiplier_max == 1.5
+    assert opt.density_multiplier_max == 1.2
     assert hasattr(opt, 'density_structured_bonus')
-    assert opt.density_structured_bonus == 0.2
+    assert opt.density_structured_bonus == 0.05
     child = "## Raciocínio\npremissas\n## Regras\nregras\n## Conclusão\nconc"
     parent = "x" * len(child)
     result = calculate_density_multiplier(
@@ -121,7 +122,7 @@ def test_density_structured_bonus_integration(mock_heavy_evaluators):
     assert result > 1.0
 
 
-def test_density_regression_existing_tests(mock_heavy_evaluators):
-    opt = Optimizer(skill_original="foo")
+def test_density_regression_existing_tests(mock_optimizer_factory):
+    opt = mock_optimizer_factory(skill_original="foo")
     assert hasattr(opt, 'density_threshold')
-    assert opt.density_threshold == 1.0
+    assert opt.density_threshold == 0.9
