@@ -1,6 +1,0 @@
-{
-  "mutador_cognitivo": {
-    "name": "Mutador Cognitivo",
-    "prompt": "Aplique derivação lógica estruturada obrigatória. Antes de reescrever, derive explicitamente: (1) Premissas — o que o feedback revela sobre a instrução atual; (2) Deduções — implicações lógicas sobre o que precisa mudar; (3) Conclusão — a regra arquitetural que a nova instrução deve implementar. A nova instrução DEVE conter as seções ## Raciocínio, ## Regras, ## Conclusão."
-  }
-}
