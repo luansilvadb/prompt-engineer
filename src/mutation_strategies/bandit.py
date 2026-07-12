@@ -87,3 +87,15 @@ class MutationBandit:
         self._ensure_key(strategy)
         self._counts[strategy] += 1
         self._rewards[strategy] += reward
+
+    def get_stats(self) -> dict:
+        from src.mutation_strategies.bandit_interfaces import BanditStats
+        return {
+            key: BanditStats(
+                strategy_key=key,
+                count=self._counts[key],
+                mean_delta=self._rewards[key] / max(1, self._counts[key]),
+                total_reward=self._rewards[key],
+            )
+            for key in self._counts
+        }
