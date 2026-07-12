@@ -1,6 +1,11 @@
 import dspy
 from src.domain.agent_interfaces import IStrategyDiscoverer, ISelfReflectiveAgent, IMutadorCognitivoAgent, IAvaliadorModoB, IAiFramework
+from src.domain.config import MCTSConfig, load_mcts_config
+from src.domain.scoring_pipeline import IScoringPipeline
 from src.domain.store_interfaces import IJobStore, IAvaliadorCompiler, IExperienceStore
+from src.mutation_strategies.bandit import MutationBandit
+from src.mutation_strategies.bandit_interfaces import IMutationBandit, IStrategyRegistry
+from src.mutation_strategies.registry import StrategyRegistry
 
 from src.infrastructure.dspy_impl import (
     DSPyStrategyDiscoverer,
@@ -9,6 +14,7 @@ from src.infrastructure.dspy_impl import (
     DSPyAvaliadorModoB,
     load_avaliador
 )
+from src.infrastructure.scoring_pipeline import ScoringPipeline
 from src.experience_store import ExperienceStore
 import src.store as store_module
 from src.teleprompter import compilar_avaliador
@@ -38,6 +44,15 @@ class Container:
     def __init__(self) -> None:
         # Carrega os modelos/pesos treinados do avaliador
         load_avaliador()
+        self._config = load_mcts_config()
+        self._scoring_pipeline = ScoringPipeline(
+            semantic_sim_threshold=self._config.semantic_sim_threshold,
+            density_threshold=self._config.density_threshold,
+            density_multiplier_min=self._config.density_multiplier_min,
+            density_multiplier_max=self._config.density_multiplier_max,
+            density_structured_bonus=self._config.density_structured_bonus,
+            lexical_density_min=self._config.lexical_density_min,
+        )
         self._strategy_discoverer = DSPyStrategyDiscoverer()
         self._agent = DSPySelfReflectiveAgent()
         self._agent_cognitivo = DSPyMutadorCognitivoAgent()
@@ -70,3 +85,15 @@ class Container:
 
     def get_ai_framework(self) -> IAiFramework:
         return self._ai_framework
+
+    def get_config(self) -> MCTSConfig:
+        return self._config
+
+    def get_scoring_pipeline(self) -> IScoringPipeline:
+        return self._scoring_pipeline
+
+    def create_bandit(self) -> IMutationBandit:
+        return MutationBandit(c_param=self._config.bandit_c_param)
+
+    def create_strategy_registry(self) -> IStrategyRegistry:
+        return StrategyRegistry()

@@ -70,7 +70,11 @@ async def start_optimization(request: OtimizacaoRequestDTO, background_tasks: Ba
         compiler=container.get_compiler(),
         experience_store=container.get_experience_store(),
         job_store=container.get_job_store(),
-        ai_framework=container.get_ai_framework()
+        ai_framework=container.get_ai_framework(),
+        config=container.get_config(),
+        scoring_pipeline=container.get_scoring_pipeline(),
+        bandit=container.create_bandit(),
+        strategy_registry=container.create_strategy_registry(),
     )
 
     background_tasks.add_task(

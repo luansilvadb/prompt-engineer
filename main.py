@@ -5,6 +5,7 @@ from pathlib import Path
 
 from src.config import setup
 from src.optimizer import Optimizer, save_optimized_skill
+from src.infrastructure.events import JobEventEmitter
 
 # Força o terminal do Windows a aceitar caracteres Unicode (ex: '→')
 sys.stdout.reconfigure(encoding='utf-8')
@@ -40,16 +41,24 @@ def main():
             setup()
             from src.infrastructure.container import Container
             container = Container()
-            
+
+            emitter = JobEventEmitter(
+                on_log=print,
+                on_error=lambda msg: print(msg, file=sys.stderr),
+            )
+
             optimizer = Optimizer(
                 skill_original=skill_bruta,
+                config=container.get_config(),
+                emitter=emitter,
+                scoring_pipeline=container.get_scoring_pipeline(),
                 strategy_discoverer=container.get_strategy_discoverer(),
                 agent=container.get_agent(),
                 agent_cognitivo=container.get_agent_cognitivo(),
                 avaliador_modo_b=container.get_avaliador_modo_b(),
                 experience_store=container.get_experience_store(),
-                on_progress=print,
-                on_error=lambda msg: print(msg, file=sys.stderr)
+                bandit=container.create_bandit(),
+                strategy_registry=container.create_strategy_registry(),
             )
             
             melhor_instrucao = optimizer.optimize()

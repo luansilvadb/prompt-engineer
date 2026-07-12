@@ -3,8 +3,15 @@ import threading
 from src.state import jobs
 from src.config import setup
 from src.optimizer import Optimizer, save_optimized_skill
-from src.domain.store_interfaces import IJobStore, IAvaliadorCompiler, IExperienceStore
 from src.domain.agent_interfaces import IStrategyDiscoverer, ISelfReflectiveAgent, IMutadorCognitivoAgent, IAvaliadorModoB, IAiFramework
+from src.domain.config import MCTSConfig, load_mcts_config
+from src.domain.scoring_pipeline import IScoringPipeline
+from src.domain.store_interfaces import IJobStore, IAvaliadorCompiler, IExperienceStore
+from src.infrastructure.events import JobEventEmitter
+from src.infrastructure.scoring_pipeline import ScoringPipeline
+from src.mutation_strategies.bandit import MutationBandit
+from src.mutation_strategies.bandit_interfaces import IMutationBandit, IStrategyRegistry
+from src.mutation_strategies.registry import StrategyRegistry
 
 def _create_callbacks(job_id: str, job, loop, store: IJobStore):
     def log_progress(msg: str):
@@ -46,7 +53,11 @@ class OptimizationService:
         compiler: IAvaliadorCompiler,
         experience_store: IExperienceStore,
         job_store: IJobStore,
-        ai_framework: IAiFramework
+        ai_framework: IAiFramework,
+        config: MCTSConfig | None = None,
+        scoring_pipeline: IScoringPipeline | None = None,
+        bandit: IMutationBandit | None = None,
+        strategy_registry: IStrategyRegistry | None = None,
     ) -> None:
         self.strategy_discoverer = strategy_discoverer
         self.agent = agent
@@ -56,6 +67,20 @@ class OptimizationService:
         self.experience_store = experience_store
         self.job_store = job_store
         self.ai_framework = ai_framework
+        self._config = config if config is not None else load_mcts_config()
+        self._scoring_pipeline = scoring_pipeline if scoring_pipeline is not None else self._build_default_scoring_pipeline()
+        self._bandit = bandit if bandit is not None else MutationBandit(c_param=self._config.bandit_c_param)
+        self._strategy_registry = strategy_registry if strategy_registry is not None else StrategyRegistry()
+
+    def _build_default_scoring_pipeline(self) -> ScoringPipeline:
+        return ScoringPipeline(
+            semantic_sim_threshold=self._config.semantic_sim_threshold,
+            density_threshold=self._config.density_threshold,
+            density_multiplier_min=self._config.density_multiplier_min,
+            density_multiplier_max=self._config.density_multiplier_max,
+            density_structured_bonus=self._config.density_structured_bonus,
+            lexical_density_min=self._config.lexical_density_min,
+        )
 
     def execute(self, job_id: str, loop) -> None:
         job = jobs[job_id]
@@ -65,6 +90,12 @@ class OptimizationService:
         self.job_store.save_job_state(job_id, job)
 
         log_progress, log_error, handle_node = _create_callbacks(job_id, job, loop, self.job_store)
+        emitter = JobEventEmitter(
+            on_log=log_progress,
+            on_error=log_error,
+            on_node=handle_node,
+            is_cancelled=lambda: job.status == 'cancelled',
+        )
 
         try:
             log_progress('[*] Configurando o provedor e modelo de IA...')
@@ -77,16 +108,17 @@ class OptimizationService:
 
             optimizer = Optimizer(
                 skill_original=job.original_skill,
+                config=self._config,
+                emitter=emitter,
+                scoring_pipeline=self._scoring_pipeline,
                 strategy_discoverer=self.strategy_discoverer,
                 agent=self.agent,
                 agent_cognitivo=self.agent_cognitivo,
                 avaliador_modo_b=self.avaliador_modo_b,
                 experience_store=self.experience_store,
-                on_progress=log_progress,
-                on_error=log_error,
-                is_cancelled=lambda: job.status == 'cancelled',
-                on_node=handle_node,
-                regras_adicionais=job.regras_adicionais
+                bandit=self._bandit,
+                strategy_registry=self._strategy_registry,
+                regras_adicionais=job.regras_adicionais,
             )
 
             with self.ai_framework.context(lm=lm):
@@ -127,7 +159,11 @@ def execute_optimization_task(
     avaliador_modo_b: IAvaliadorModoB,
     compiler: IAvaliadorCompiler,
     experience_store: IExperienceStore,
-    ai_framework: IAiFramework
+    ai_framework: IAiFramework,
+    config: MCTSConfig | None = None,
+    scoring_pipeline: IScoringPipeline | None = None,
+    bandit: IMutationBandit | None = None,
+    strategy_registry: IStrategyRegistry | None = None,
 ) -> None:
     service = OptimizationService(
         strategy_discoverer=strategy_discoverer,
@@ -137,6 +173,10 @@ def execute_optimization_task(
         compiler=compiler,
         experience_store=experience_store,
         job_store=store,
-        ai_framework=ai_framework
+        ai_framework=ai_framework,
+        config=config,
+        scoring_pipeline=scoring_pipeline,
+        bandit=bandit,
+        strategy_registry=strategy_registry,
     )
     service.execute(job_id, loop)
