@@ -3,7 +3,6 @@ import webview
 import threading
 import time
 import socket
-import sys
 
 from src.api import app
 

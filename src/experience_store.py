@@ -15,7 +15,7 @@ import hashlib
 import re
 import time
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict
 from collections import Counter
 
 EXPERIENCES_DIR = Path('src/outputs/experiences')

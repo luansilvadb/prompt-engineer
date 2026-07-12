@@ -8,8 +8,7 @@ from src.domain.agent_interfaces import (
     IStrategyDiscoverer,
     ISelfReflectiveAgent,
     IMutadorCognitivoAgent,
-    IAvaliadorModoB,
-    IAvaliadorDeSkill
+    IAvaliadorModoB
 )
 
 class StrategyDiscovererSignature(dspy.Signature):
@@ -54,7 +53,7 @@ class AvaliadorDeSkillSignature(dspy.Signature):
     skill_original: str = dspy.InputField()
     skill_otimizada: str = dspy.InputField()
     regras_adicionais: str = dspy.InputField(desc="Diretrizes, restrições ou métricas extras especificadas pelo usuário que devem ser estritamente seguidas.")
-    
+
     manteve_regras_criticas: str = dspy.OutputField(desc="True se nenhuma regra comportamental vital (inclusive as regras adicionais) foi omitida. False caso contrário.")
     nota_clareza: str = dspy.OutputField(desc="Nota de 0 a 100 avaliando se a instrução é clara e direta.")
     nota_formatacao: str = dspy.OutputField(desc="Nota de 0 a 100 avaliando o uso de markdown, listas e negritos.")
@@ -72,7 +71,7 @@ class AvaliadorModoBSignature(dspy.Signature):
     skill_original: str = dspy.InputField()
     skill_otimizada: str = dspy.InputField()
     regras_adicionais: str = dspy.InputField(desc="Diretrizes, restrições ou métricas extras especificadas pelo usuário que devem ser estritamente seguidas.")
-    
+
     manteve_regras_criticas: str = dspy.OutputField(desc="True se nenhuma regra comportamental vital (inclusive as regras adicionais) foi omitida. False caso contrário.")
     defeitos_encontrados: str = dspy.OutputField(desc="Lista de violações, paradoxos e ambiguidades detectadas. Enumere cada defeito encontrado (use nova linha para cada).")
     nota_clareza: str = dspy.OutputField(desc="Nota de 0 a 100 avaliando se a instrução é clara e direta.")
@@ -118,6 +117,9 @@ class DSPySelfReflectiveAgent(ISelfReflectiveAgent):
         )
 
 class DSPyMutadorCognitivoAgent(IMutadorCognitivoAgent):
+    input_fields = MutadorCognitivoAgentSignature.input_fields
+    output_fields = MutadorCognitivoAgentSignature.output_fields
+
     def __init__(self):
         self._predictor = dspy.ChainOfThought(MutadorCognitivoAgentSignature)
 
@@ -147,13 +149,13 @@ class DSPyAvaliadorModoB(IAvaliadorModoB):
     def __call__(self, skill_original: str, skill_otimizada: str, regras_adicionais: str) -> AvaliacaoModoB:
         if not regras_adicionais:
             regras_adicionais = 'Preservar todas as regras comportamentais anteriores.'
-            
+
         res = self._predictor(
             skill_original=skill_original,
             skill_otimizada=skill_otimizada,
             regras_adicionais=regras_adicionais
         )
-        
+
         defeitos_raw = getattr(res, 'defeitos_encontrados', '')
         if isinstance(defeitos_raw, str):
             defeitos_list = [d.strip("- *").strip() for d in defeitos_raw.split('\\n') if d.strip("- *").strip()]
@@ -161,7 +163,7 @@ class DSPyAvaliadorModoB(IAvaliadorModoB):
             defeitos_list = [str(d) for d in defeitos_raw]
         else:
             defeitos_list = []
-            
+
         return AvaliacaoModoB(
             manteve_regras_criticas=_parse_manteve_regras(res.manteve_regras_criticas),
             defeitos_encontrados=defeitos_list,
@@ -186,7 +188,7 @@ def load_avaliador():
             print(f"[*] Avaliador otimizado Modo A carregado de {model_path_a}.")
         except Exception as e:
             print(f"[!] Erro ao carregar avaliador Modo A: {e}")
-            
+
     model_path_b = Path('src/outputs/models/avaliador_modo_b_otimizado.json')
     if model_path_b.exists():
         try:
@@ -200,13 +202,13 @@ def _invoke_judge_with(module, exemplo, predicao) -> Avaliacao:
     regras = getattr(exemplo, 'regras_adicionais', '')
     if not regras:
         regras = 'Preservar todas as regras comportamentais anteriores.'
-        
+
     res = module(
         skill_original=exemplo.skill_original,
         skill_otimizada=predicao.skill_otimizada,
         regras_adicionais=regras
     )
-    
+
     return Avaliacao(
         manteve_regras_criticas=_parse_manteve_regras(res.manteve_regras_criticas),
         nota_clareza=res.nota_clareza,
@@ -222,13 +224,13 @@ def _invoke_judge_modo_b_with(module, exemplo, predicao) -> AvaliacaoModoB:
     regras = getattr(exemplo, 'regras_adicionais', '')
     if not regras:
         regras = 'Preservar todas as regras comportamentais anteriores.'
-        
+
     res = module(
         skill_original=exemplo.skill_original,
         skill_otimizada=predicao.skill_otimizada,
         regras_adicionais=regras
     )
-    
+
     defeitos_raw = getattr(res, 'defeitos_encontrados', '')
     if isinstance(defeitos_raw, str):
         defeitos_list = [d.strip("- *").strip() for d in defeitos_raw.split('\\n') if d.strip("- *").strip()]
@@ -236,7 +238,7 @@ def _invoke_judge_modo_b_with(module, exemplo, predicao) -> AvaliacaoModoB:
         defeitos_list = [str(d) for d in defeitos_raw]
     else:
         defeitos_list = []
-        
+
     return AvaliacaoModoB(
         manteve_regras_criticas=_parse_manteve_regras(res.manteve_regras_criticas),
         defeitos_encontrados=defeitos_list,

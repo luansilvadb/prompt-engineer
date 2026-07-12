@@ -2,7 +2,7 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 from src.drift.models import ProbeExpectation, GoldenProbe
 

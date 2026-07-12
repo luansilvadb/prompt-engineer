@@ -13,7 +13,6 @@ chamadas LLM no juiz, permitindo 2-3x mais expansões no mesmo orçamento.
 
 import math
 import re
-from typing import Optional
 
 
 # ─────────────────────────────────────────────
@@ -30,9 +29,9 @@ def _extract_features(text: str) -> dict:
     total_lines = len(lines)
 
     # Densidade de markdown (headers, bold, lists)
-    headers = sum(1 for l in lines if l.strip().startswith('#'))
+    headers = sum(1 for line in lines if line.strip().startswith('#'))
     bolds = len(re.findall(r'\*\*[^*]+\*\*', text))
-    lists = sum(1 for l in lines if re.match(r'^\s*[-*]\s', l))
+    lists = sum(1 for line in lines if re.match(r'^\s*[-*]\s', line))
     code_blocks = len(re.findall(r'```', text)) // 2
 
     # Comprimento normalizado (sweet spot: 1000-5000 chars)

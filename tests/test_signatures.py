@@ -20,7 +20,7 @@ def test_raciocinio_cognitivo_happy_path():
 
 
 def test_raciocinio_cognitivo_empty_field():
-    with pytest.raises(ValidationError):
+    with pytest.raises((ValueError, ValidationError)):
         RaciocinioCognitivo(
             premissas="",
             deducoes="The instruction must change its approach.",
@@ -29,7 +29,7 @@ def test_raciocinio_cognitivo_empty_field():
 
 
 def test_raciocinio_cognitivo_short_field():
-    with pytest.raises(ValidationError):
+    with pytest.raises((ValueError, ValidationError)):
         RaciocinioCognitivo(
             premissas="short",
             deducoes="The instruction must change its approach.",
@@ -48,7 +48,7 @@ def test_mutador_cognitivo_output_valid():
 
 
 def test_mutador_cognitivo_output_missing_heading():
-    with pytest.raises(ValidationError):
+    with pytest.raises((ValueError, ValidationError)):
         MutadorCognitivoOutput(
             nova_instrucao=(
                 "## Raciocínio\nThe analysis shows we need better structure here.\n"

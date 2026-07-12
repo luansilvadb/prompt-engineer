@@ -1,4 +1,3 @@
-import pytest
 from src.mutation_strategies.bandit import MutationBandit
 
 

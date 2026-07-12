@@ -13,14 +13,14 @@ Evolução do core inspirada nos princípios de David Silver (AlphaGo/AlphaZero)
 """
 
 import time
-import math
-import random
 import datetime
 import uuid
 from pathlib import Path
 from typing import Callable, Tuple, Optional
 
 from src.domain.agent_interfaces import IStrategyDiscoverer, ISelfReflectiveAgent, IMutadorCognitivoAgent, IAvaliadorModoB
+from src.domain.store_interfaces import IExperienceStore
+from src.domain.mcts import MCTSNode
 from src.signatures import calcular_delta_reward, MutadorCognitivoOutput, _validate_raciocinio, funcao_de_recompensa
 from src.config import get_mcts_config
 from src.experience_store import Experience, hash_instruction
@@ -33,87 +33,36 @@ from src.heuristic_evaluator import evaluate_heuristics
 from src.density_evaluator import calculate_density_multiplier
 
 
-class MCTSNode:
-    def __init__(
-        self,
-        instruction: str,
-        parent: Optional['MCTSNode'] = None,
-        feedback: str = '',
-        node_id: Optional[str] = None,
-        critica: str = '',
-        mutation_strategy: str = '',
-        depth: int = 0,
-    ):
-        self.instruction = instruction
-        self.q_value = 0.0
-        self.visits = 0
-        self.feedback = feedback
-        self.children = []
-        self.parent = parent
-        self.node_id = node_id if node_id else str(uuid.uuid4())
-        self.critica = critica
-        self.mutation_strategy = mutation_strategy
-        self.depth = depth
-        # Reward absoluto da última simulação (usado para delta shaping)
-        self.last_reward = 0.0
-
-    def max_children_allowed(self, progressive_c: float = 2.0, alpha: float = 0.5) -> int:
-        """
-        Progressive Widening: max_children = ceil(C * visits^α).
-        Nós mais visitados (promissores) ganham mais filhos.
-        Nós com poucas visitas ficam com poucos filhos (poda natural).
-        """
-        if self.visits == 0:
-            return 1
-        return max(1, math.ceil(progressive_c * (self.visits ** alpha)))
-
-    def best_child_ucb(self, c_param: float = 1.41) -> Optional['MCTSNode']:
-        """Seleção UCB1 padrão para a fase de seleção."""
-        if not self.children:
-            return None
-            
-        def ucb_score(child: 'MCTSNode') -> float:
-            if child.visits == 0:
-                return float('inf')
-            return (child.q_value / child.visits) + c_param * math.sqrt(
-                math.log(max(1, self.visits)) / child.visits
-            )
-            
-        return max(self.children, key=ucb_score)
-
-
-
-
 class Optimizer:
     def __init__(
         self,
         skill_original: str,
-        strategy_discoverer: IStrategyDiscoverer,
-        agent: ISelfReflectiveAgent,
-        agent_cognitivo: IMutadorCognitivoAgent,
-        avaliador_modo_b: IAvaliadorModoB,
-        experience_store,
+        strategy_discoverer: Optional[IStrategyDiscoverer] = None,
+        agent: Optional[ISelfReflectiveAgent] = None,
+        agent_cognitivo: Optional[IMutadorCognitivoAgent] = None,
+        avaliador_modo_b: Optional[IAvaliadorModoB] = None,
+        experience_store: Optional[IExperienceStore] = None,
         on_progress: Callable[[str], None] = lambda msg: None,
         on_error: Callable[[str], None] = lambda msg: None,
         is_cancelled: Callable[[], bool] = lambda: False,
         on_node: Callable[[dict], None] = lambda node: None,
         regras_adicionais: str = ''
-    ):
+    ) -> None:
         self.skill_original = skill_original
-        self.strategy_discoverer = strategy_discoverer
-        self.agent = agent
-        self.agent_cognitivo = agent_cognitivo
-        self.avaliador_modo_b = avaliador_modo_b
+        self._strategy_discoverer = strategy_discoverer
+        self._agent = agent
+        self._agent_cognitivo = agent_cognitivo
+        self._avaliador_modo_b = avaliador_modo_b
         self.on_progress = on_progress
         self.on_error = on_error
         self.is_cancelled = is_cancelled
         self.on_node = on_node
         self.regras_adicionais = regras_adicionais
-        
+
         # Isolar escopo de estratégias para esta sessão de otimização
         self.job_id = uuid.uuid4().hex[:8]
         registry.set_job_id(self.job_id)
-        
+
         # Carregar hiperparâmetros configuráveis
         config = get_mcts_config()
         self.max_iterations = config['max_iterations']
@@ -130,12 +79,15 @@ class Optimizer:
         self.density_multiplier_min = config.get('density_multiplier_min', 0.5)
         self.density_multiplier_max = config.get('density_multiplier_max', 1.5)
         self.density_structured_bonus = config.get('density_structured_bonus', 0.2)
-        
-        # Componentes evoluídos injetados no construtor
+
+        # Componentes evoluídos injetados no construtor (preguiçoso para stores e estimators)
+        if experience_store is None:
+            from src.experience_store import ExperienceStore
+            experience_store = ExperienceStore()
         self.experience_store = experience_store
         self.value_estimator = ValueEstimator(learning_rate=config['value_lr'])
         self.mutation_bandit = MutationBandit(c_param=config['bandit_c_param'])
-        
+
         # Carregar priors do experience store no bandit
         strategy_stats = self.experience_store.get_strategy_stats()
         if strategy_stats:
@@ -151,6 +103,50 @@ class Optimizer:
         }
         self.mutation_bandit.load_priors(cognitivo_prior)
         self.on_progress(f'[*] Mutador Cognitivo prior boosting: {cognitivo_prior["mutador_cognitivo"]["count"]} virtual count, delta={cognitivo_prior["mutador_cognitivo"]["mean_delta"]}')
+
+    @property
+    def strategy_discoverer(self):
+        if self._strategy_discoverer is None:
+            from src.infrastructure.dspy_impl import DSPyStrategyDiscoverer
+            self._strategy_discoverer = DSPyStrategyDiscoverer()
+        return self._strategy_discoverer
+
+    @strategy_discoverer.setter
+    def strategy_discoverer(self, value):
+        self._strategy_discoverer = value
+
+    @property
+    def agent(self):
+        if self._agent is None:
+            from src.infrastructure.dspy_impl import DSPySelfReflectiveAgent
+            self._agent = DSPySelfReflectiveAgent()
+        return self._agent
+
+    @agent.setter
+    def agent(self, value):
+        self._agent = value
+
+    @property
+    def agent_cognitivo(self):
+        if self._agent_cognitivo is None:
+            from src.infrastructure.dspy_impl import DSPyMutadorCognitivoAgent
+            self._agent_cognitivo = DSPyMutadorCognitivoAgent()
+        return self._agent_cognitivo
+
+    @agent_cognitivo.setter
+    def agent_cognitivo(self, value):
+        self._agent_cognitivo = value
+
+    @property
+    def avaliador_modo_b(self):
+        if self._avaliador_modo_b is None:
+            from src.infrastructure.dspy_impl import DSPyAvaliadorModoB
+            self._avaliador_modo_b = DSPyAvaliadorModoB()
+        return self._avaliador_modo_b
+
+    @avaliador_modo_b.setter
+    def avaliador_modo_b(self, value):
+        self._avaliador_modo_b = value
 
 
 
@@ -177,10 +173,10 @@ class Optimizer:
                 self.on_error(f"    [Simulação] Recompensa 0.00! Motivo: {feedback}")
             else:
                 self.on_progress(f"    [Simulação] Recompensa obtida: {reward:.2f}")
-            
+
             # Atualizar value estimator com observação real (online learning)
             self.value_estimator.update(instruction, reward)
-            
+
             return float(reward), feedback
         except Exception as e:
             self.on_error(f"[!] Erro na simulação: {e}")
@@ -193,7 +189,7 @@ class Optimizer:
         """
         if self.value_estimator.confidence < 0.3:
             return False  # Estimador ainda não confiável
-        
+
         estimated = self.value_estimator.estimate(instruction)
         if estimated < self.value_threshold:
             self.on_progress(f"    [Poda] Value estimator: {estimated:.2f} < threshold {self.value_threshold}. Podando.")
@@ -235,112 +231,134 @@ class Optimizer:
             current = current.parent
             depth_from_leaf += 1
 
+    def _discover_strategy(self, leaf: MCTSNode) -> str:
+        self.on_progress('[*] Bandit escolheu __DISCOVER__. Inventando nova heurística de mutação...')
+        try:
+            estrategias_conhecidas = ", ".join([registry.get_name(k) for k in registry.get_all_keys() if k != '__DISCOVER__'])
+            if not estrategias_conhecidas:
+                estrategias_conhecidas = "Nenhuma. Você é livre para criar a primeira heurística (Tabula Rasa)."
+
+            nova_estrat = self.strategy_discoverer(
+                skill_atual=leaf.instruction,
+                feedbacks_recentes=leaf.feedback or "Nenhum feedback ainda. Invente algo inovador.",
+                estrategias_conhecidas=estrategias_conhecidas
+            )
+
+            # Gerar chave segura
+            import re
+            key_raw = nova_estrat.nome_estrategia.lower()
+            key = re.sub(r'[^a-z0-9_]', '_', key_raw)[:30] + '_' + str(uuid.uuid4())[:4]
+
+            registry.add_strategy(key, nova_estrat.nome_estrategia, nova_estrat.prompt_estrategia)
+            self.on_progress(f'[+] Nova estratégia descoberta! {nova_estrat.nome_estrategia}')
+            return key
+        except Exception as e:
+            self.on_error(f'[!] Falha ao inventar estratégia: {e}. Usando fallback.')
+            return '__DISCOVER__'
+
+    def _get_lessons_context(self, feedback: str) -> str:
+        similar_experiences = self.experience_store.query_similar(feedback, top_k=3)
+        if similar_experiences:
+            lessons = [f"- Estratégia '{exp.mutation_strategy}': delta={exp.delta_reward:+.2f}"
+                       for exp in similar_experiences if exp.delta_reward != 0]
+            if lessons:
+                return '\nLições de otimizações passadas:\n' + '\n'.join(lessons[:3])
+        return ''
+
+    def _try_generate_mutation(
+        self,
+        leaf: MCTSNode,
+        strategy: str,
+        strategy_prompt: str,
+        feedback_completo: str,
+        nota: str,
+        critica: str
+    ) -> Tuple[str, str, bool]:
+        try:
+            COGNITIVO_KEY = 'mutador_cognitivo'
+            if strategy == COGNITIVO_KEY:
+                predicao = self.agent_cognitivo(
+                    instrucao_anterior=leaf.instruction,
+                    nota_anterior=nota,
+                    feedback_juiz=feedback_completo,
+                    estrategia_mutacao=strategy_prompt,
+                )
+                try:
+                    _validate_raciocinio(predicao.raciocinio_estruturado)
+                except Exception as e:
+                    self.on_error(f'[!] raciocinio_estruturado invalido: {e}')
+                try:
+                    MutadorCognitivoOutput(nova_instrucao=predicao.nova_instrucao)
+                except Exception as e:
+                    self.on_error(f'[!] nova_instrucao secoes cognitivas invalidas: {e}')
+            else:
+                predicao = self.agent(
+                    instrucao_anterior=leaf.instruction,
+                    nota_anterior=nota,
+                    feedback_juiz=feedback_completo,
+                    estrategia_mutacao=strategy_prompt,
+                )
+            candidata = predicao.nova_instrucao
+            if candidata and candidata.strip() and candidata.strip() != leaf.instruction.strip():
+                # Checar via value estimator antes de aceitar
+                if self._should_prune(candidata):
+                    self.on_progress('    [!] Candidata podada pelo value estimator. Tentando novamente...')
+                    nova_critica = f'{critica}\nA última tentativa gerou uma skill de baixa qualidade estimada. Mude radicalmente a abordagem.'
+                    return '', nova_critica, False
+
+                self.on_progress(f'    [Crítica]: {predicao.critica}')
+                return candidata, predicao.critica, True
+            else:
+                self.on_error('    [!] Instrução gerada nula ou idêntica. Mudando abordagem...')
+                nova_critica = f'{critica}\nInstrução idêntica ou nula. Teste uma mudança radical.'
+                return '', nova_critica, False
+        except Exception as e:
+            self.on_error(f'    [!] Erro técnico na geração: {str(e)}')
+            nova_critica = f'{critica}\nErro técnico ({e}). Tente uma reescrita mais simples.'
+            return '', nova_critica, False
+
     def _expand_node(self, leaf: MCTSNode) -> MCTSNode:
         # Selecionar estratégia de mutação via bandit
         strategy = self.mutation_bandit.select()
-        
+
         if strategy == '__DISCOVER__':
-            self.on_progress('[*] Bandit escolheu __DISCOVER__. Inventando nova heurística de mutação...')
-            try:
-                estrategias_conhecidas = ", ".join([registry.get_name(k) for k in registry.get_all_keys() if k != '__DISCOVER__'])
-                if not estrategias_conhecidas:
-                    estrategias_conhecidas = "Nenhuma. Você é livre para criar a primeira heurística (Tabula Rasa)."
-                    
-                nova_estrat = self.strategy_discoverer(
-                    skill_atual=leaf.instruction,
-                    feedbacks_recentes=leaf.feedback or "Nenhum feedback ainda. Invente algo inovador.",
-                    estrategias_conhecidas=estrategias_conhecidas
-                )
-                
-                # Gerar chave segura
-                import re
-                key_raw = nova_estrat.nome_estrategia.lower()
-                key = re.sub(r'[^a-z0-9_]', '_', key_raw)[:30] + '_' + str(uuid.uuid4())[:4]
-                
-                registry.add_strategy(key, nova_estrat.nome_estrategia, nova_estrat.prompt_estrategia)
-                self.on_progress(f'[+] Nova estratégia descoberta! {nova_estrat.nome_estrategia}')
-                
-                strategy = key
-            except Exception as e:
-                self.on_error(f'[!] Falha ao inventar estratégia: {e}. Usando fallback.')
-                strategy = '__DISCOVER__'
-                
+            strategy = self._discover_strategy(leaf)
+
         strategy_prompt = get_mutation_prompt(strategy)
         strategy_desc = get_strategy_description(strategy)
-        
+
         # Buscar experiências similares para enriquecer o contexto
-        similar_experiences = self.experience_store.query_similar(leaf.feedback, top_k=3)
-        experience_context = ''
-        if similar_experiences:
-            lessons = [f"- Estratégia '{exp.mutation_strategy}': delta={exp.delta_reward:+.2f}" 
-                       for exp in similar_experiences if exp.delta_reward != 0]
-            if lessons:
-                experience_context = '\nLições de otimizações passadas:\n' + '\n'.join(lessons[:3])
-        
+        experience_context = self._get_lessons_context(leaf.feedback)
+
         critica = leaf.feedback
         nova_instrucao = leaf.instruction
-        
+
         for tentativa in range(3):
             if self.is_cancelled():
                 break
             if tentativa > 0:
                 time.sleep(2 * tentativa)
-            
+
             nota = str(leaf.q_value / max(1, leaf.visits))
             self.on_progress(f'[*] Expandindo nó (Tentativa {tentativa + 1}/3) | Estratégia: {strategy_desc} | Nota: {nota}')
-            
+
             # Compor o contexto completo de feedback
             feedback_completo = critica
             if experience_context:
                 feedback_completo += experience_context
-            
-            try:
-                COGNITIVO_KEY = 'mutador_cognitivo'
-                if strategy == COGNITIVO_KEY:
-                    predicao = self.agent_cognitivo(
-                        instrucao_anterior=leaf.instruction,
-                        nota_anterior=nota,
-                        feedback_juiz=feedback_completo,
-                        estrategia_mutacao=strategy_prompt,
-                    )
-                    try:
-                        _validate_raciocinio(predicao.raciocinio_estruturado)
-                    except Exception as e:
-                        self.on_error(f'[!] raciocinio_estruturado invalido: {e}')
-                    try:
-                        MutadorCognitivoOutput(nova_instrucao=predicao.nova_instrucao)
-                    except Exception as e:
-                        self.on_error(f'[!] nova_instrucao secoes cognitivas invalidas: {e}')
-                else:
-                    predicao = self.agent(
-                        instrucao_anterior=leaf.instruction,
-                        nota_anterior=nota,
-                        feedback_juiz=feedback_completo,
-                        estrategia_mutacao=strategy_prompt,
-                    )
-                candidata = predicao.nova_instrucao
-                if candidata and candidata.strip() and candidata.strip() != leaf.instruction.strip():
-                    # Checar via value estimator antes de aceitar
-                    if self._should_prune(candidata):
-                        self.on_progress(f'    [!] Candidata podada pelo value estimator. Tentando novamente...')
-                        critica = f'{critica}\nA última tentativa gerou uma skill de baixa qualidade estimada. Mude radicalmente a abordagem.'
-                        continue
-                    
-                    self.on_progress(f'    [Crítica]: {predicao.critica}')
-                    critica = predicao.critica
-                    nova_instrucao = candidata
-                    break
-                else:
-                    self.on_error('    [!] Instrução gerada nula ou idêntica. Mudando abordagem...')
-                    critica = f'{critica}\nInstrução idêntica ou nula. Teste uma mudança radical.'
-            except Exception as e:
-                self.on_error(f'    [!] Erro técnico na geração: {str(e)}')
-                critica = f'{critica}\nErro técnico ({e}). Tente uma reescrita mais simples.'
+
+            candidata, nova_critica, sucesso = self._try_generate_mutation(
+                leaf, strategy, strategy_prompt, feedback_completo, nota, critica
+            )
+            critica = nova_critica
+            if sucesso:
+                nova_instrucao = candidata
+                break
         else:
             self.on_error('[!] Falha em gerar nova instrução após 3 tentativas. Usando variação mínima.')
             nova_instrucao = f'{leaf.instruction}\n '
             critica = 'Fallback automático.'
-            
+
         child = MCTSNode(
             nova_instrucao,
             parent=leaf,
@@ -353,58 +371,40 @@ class Optimizer:
         self.notify_node(child)
         return child
 
-    def _run_mcts_iteration(self, root: MCTSNode) -> Tuple[bool, bool, float]:
-        """Returns (should_break, is_error, reward)"""
-        if self.is_cancelled():
-            return True, False, 0.0
-        
-        leaf = self.selection(root)
-        if len(leaf.children) >= leaf.max_children_allowed(self.progressive_c, self.progressive_alpha):
-            child = leaf
-        else:
-            child = self._expand_node(leaf)
-        
-        if self.is_cancelled():
-            return True, False, 0.0
-        
-        # --- HEURISTIC PIPELINE (Layer 0: buzzwords · Layer 1: TTR · Layer 2: readability) ---
+    def _evaluate_and_prune(self, child: MCTSNode) -> Tuple[bool, dict]:
+        """Returns (is_pruned, heuristic_result)"""
         heuristic_result = evaluate_heuristics(
             child.instruction,
             density_min=self.lexical_density_min,
             penalty_factor=self.verbosity_penalty_factor,
             buzzword_threshold=self.buzzword_threshold,
         )
-
         if heuristic_result.get("prune"):
             self.on_progress(f"    [Poda Heurística] {heuristic_result.get('reason')}")
             child.feedback = heuristic_result.get("reason")
             child.last_reward = 0.0
             self.backpropagation(child, 0.0)
-            return False, False, 0.0
-        # ------------------------------------------------------------------------------------
-        
-        reward, feedback = self.simulation(child.instruction)
-        
-        # --- HEURISTIC MULTIPLIER (Layer 2) ---
+            return True, heuristic_result
+        return False, heuristic_result
+
+    def _apply_heuristic_multiplier(self, reward: float, heuristic_result: dict) -> float:
         multiplier = heuristic_result.get("penalty_multiplier", 1.0)
         if multiplier < 1.0:
             self.on_progress(f"    [Penalidade Heurística] Fator de decaimento: {multiplier:.2f}")
-        reward = reward * multiplier
-        # --------------------------------------
-        
-        # --- SEMANTIC PENALTY ---
+        return reward * multiplier
+
+    def _apply_semantic_penalty(self, child: MCTSNode, reward: float) -> float:
         parent_instruction = child.parent.instruction if child.parent else self.skill_original
         penalty = calculate_semantic_penalty(
-            child.instruction, 
-            parent_instruction, 
+            child.instruction,
+            parent_instruction,
             threshold=self.semantic_sim_threshold
         )
         if penalty < 1.0:
             self.on_progress(f"    [Penalidade Semântica] Fator de decaimento: {penalty:.2f}")
-        reward = reward * penalty
-        # ------------------------
+        return reward * penalty
 
-        # --- DENSITY MULTIPLIER (COGN-04) ---
+    def _apply_density_multiplier(self, child: MCTSNode, reward: float) -> float:
         parent_for_density = child.parent.instruction if child.parent else self.skill_original
         density_mult = calculate_density_multiplier(
             child_instruction=child.instruction,
@@ -418,22 +418,45 @@ class Optimizer:
         if density_mult != 1.0:
             direction = "Bonus por Densidade" if density_mult > 1.0 else "Penalidade por Densidade"
             self.on_progress(f"    [{direction}] Fator: {density_mult:.2f}")
-        reward = reward * density_mult
-        # ------------------------------------
+        return reward * density_mult
+
+    def _run_mcts_iteration(self, root: MCTSNode) -> Tuple[bool, bool, float]:
+        """Returns (should_break, is_error, reward)"""
+        if self.is_cancelled():
+            return True, False, 0.0
+
+        leaf = self.selection(root)
+        if len(leaf.children) >= leaf.max_children_allowed(self.progressive_c, self.progressive_alpha):
+            child = leaf
+        else:
+            child = self._expand_node(leaf)
+
+        if self.is_cancelled():
+            return True, False, 0.0
+
+        is_pruned, heuristic_result = self._evaluate_and_prune(child)
+        if is_pruned:
+            return False, False, 0.0
+
+        reward, feedback = self.simulation(child.instruction)
+
+        reward = self._apply_heuristic_multiplier(reward, heuristic_result)
+        reward = self._apply_semantic_penalty(child, reward)
+        reward = self._apply_density_multiplier(child, reward)
 
         child.feedback = feedback
         child.last_reward = reward
-        
+
         # Delta reward shaping: comparar com o pai
         parent_reward = child.parent.last_reward if child.parent else 0.0
         shaped_reward = calcular_delta_reward(reward, parent_reward)
-        
+
         self.backpropagation(child, shaped_reward)
-        
+
         # Atualizar mutation bandit com a recompensa observada
         if child.mutation_strategy:
             self.mutation_bandit.update(child.mutation_strategy, shaped_reward)
-        
+
         # Registrar experiência na store
         self.experience_store.add(Experience(
             skill_hash=hash_instruction(self.skill_original),
@@ -445,7 +468,7 @@ class Optimizer:
             instruction=child.instruction,
             parent_instruction=child.parent.instruction if child.parent else self.skill_original
         ))
-        
+
         return False, False, reward
 
     def _get_all_nodes(self, node: MCTSNode) -> list[MCTSNode]:
@@ -454,76 +477,94 @@ class Optimizer:
             nodes.extend(self._get_all_nodes(child))
         return nodes
 
-    def optimize(self) -> str:
-        self.on_progress('\n[+] Inicializando o pipeline MCTS RL customizado com refinamentos...')
-        self.on_progress(f'    Config: γ={self.gamma}, C_ucb={self.c_param}, α_pw={self.progressive_alpha}, threshold={self.value_threshold}')
-        
-        root = MCTSNode(self.skill_original, critica='Rascunho Inicial')
-        self.notify_node(root)
-        
-        self.on_progress('[*] Avaliando a instrução original (raiz)...')
-        reward, feedback = self.simulation(root.instruction)
-        root.feedback = feedback
-        root.last_reward = reward
-        self.backpropagation(root, reward)
-        
-        consecutive_zeros = 0
-        consecutive_api_errors = 0
-        
-        for i in range(self.max_iterations):
-            if self.is_cancelled():
-                self.on_progress('\n[!] OTIMIZAÇÃO INTERROMPIDA PELO USUÁRIO.')
-                break
-                
-            self.on_progress(f'\n--- Iteração MCTS {i + 1}/{self.max_iterations} ---')
-            
-            try:
-                should_break, is_error, iter_reward = self._run_mcts_iteration(root)
-                if should_break:
-                    break
-                
-                if iter_reward == 0.0:
-                    consecutive_zeros += 1
-                else:
-                    consecutive_zeros = 0
-                    
-                consecutive_api_errors = 0
-                
-                if consecutive_zeros >= 5:
-                    self.on_error('\n[!] ALERTA: 5 iterações consecutivas com recompensa 0.0. Abortando por plateau.')
-                    break
-            except Exception as e:
-                consecutive_api_errors += 1
-                self.on_error(f'[!] Erro inesperado na iteração {i + 1}: {e}')
-                if consecutive_api_errors >= 3:
-                    self.on_error('[!] Falhas técnicas persistentes. Abortando.')
-                    break
-        
-        # Salvar experiências acumuladas nesta sessão
-        self.experience_store.save()
-        self.on_progress(f'[*] {len(self.experience_store.experiences)} experiências salvas na memória de longo prazo.')
-        
-        # Log das estatísticas do bandit
+    def _run_single_iteration(
+        self,
+        root: MCTSNode,
+        i: int,
+        consecutive_zeros: int,
+        consecutive_api_errors: int
+    ) -> Tuple[bool, int, int]:
+        self.on_progress(f'\n--- Iteração MCTS {i + 1}/{self.max_iterations} ---')
+        try:
+            should_break, is_error, iter_reward = self._run_mcts_iteration(root)
+            if should_break:
+                return True, consecutive_zeros, consecutive_api_errors
+
+            if iter_reward == 0.0:
+                consecutive_zeros += 1
+            else:
+                consecutive_zeros = 0
+
+            consecutive_api_errors = 0
+
+            if consecutive_zeros >= 5:
+                self.on_error('\n[!] ALERTA: 5 iterações consecutivas com recompensa 0.0. Abortando por plateau.')
+                return True, consecutive_zeros, consecutive_api_errors
+        except Exception as e:
+            consecutive_api_errors += 1
+            self.on_error(f'[!] Erro inesperado na iteração {i + 1}: {e}')
+            if consecutive_api_errors >= 3:
+                self.on_error('[!] Falhas técnicas persistentes. Abortando.')
+                return True, consecutive_zeros, consecutive_api_errors
+        return False, consecutive_zeros, consecutive_api_errors
+
+    def _log_bandit_stats(self):
         stats = self.experience_store.get_strategy_stats()
         if stats:
             self.on_progress('[*] Performance das estratégias de mutação:')
             for strategy, s in sorted(stats.items(), key=lambda x: x[1].get('mean_delta', 0), reverse=True):
                 desc = get_strategy_description(strategy)
                 self.on_progress(f'    {desc}: Δ médio={s["mean_delta"]:+.3f}, usos={int(s["count"])}')
-                    
-        self.on_progress('\n=======================================================\n                OTIMIZAÇÃO CONCLUÍDA                   \n=======================================================\n')
-        
-        # Seleção final do melhor nó em toda a árvore
+
+    def _select_and_log_best_node(self, root: MCTSNode) -> str:
         all_nodes = self._get_all_nodes(root)
         best_node = max(all_nodes, key=lambda n: n.q_value / max(1, n.visits))
-        
+
         score = best_node.q_value / max(1, best_node.visits)
         if best_node == root:
             self.on_progress(f'[+] Raiz mantida como melhor resultado (nenhuma otimização superou): score={score:.3f}, visits={best_node.visits}')
         else:
             self.on_progress(f'[+] Melhor nó selecionado: score={score:.3f}, visits={best_node.visits}, strategy={get_strategy_description(best_node.mutation_strategy)}')
-            
+
         return best_node.instruction
+
+    def optimize(self) -> str:
+        self.on_progress('\n[+] Inicializando o pipeline MCTS RL customizado com refinamentos...')
+        self.on_progress(f'    Config: γ={self.gamma}, C_ucb={self.c_param}, α_pw={self.progressive_alpha}, threshold={self.value_threshold}')
+
+        root = MCTSNode(self.skill_original, critica='Rascunho Inicial')
+        self.notify_node(root)
+
+        self.on_progress('[*] Avaliando a instrução original (raiz)...')
+        reward, feedback = self.simulation(root.instruction)
+        root.feedback = feedback
+        root.last_reward = reward
+        self.backpropagation(root, reward)
+
+        consecutive_zeros = 0
+        consecutive_api_errors = 0
+
+        for i in range(self.max_iterations):
+            if self.is_cancelled():
+                self.on_progress('\n[!] OTIMIZAÇÃO INTERROMPIDA PELO USUÁRIO.')
+                break
+
+            should_break, consecutive_zeros, consecutive_api_errors = self._run_single_iteration(
+                root, i, consecutive_zeros, consecutive_api_errors
+            )
+            if should_break:
+                break
+
+        # Salvar experiências acumuladas nesta sessão
+        self.experience_store.save()
+        self.on_progress(f'[*] {len(self.experience_store.experiences)} experiências salvas na memória de longo prazo.')
+
+        # Log das estatísticas do bandit
+        self._log_bandit_stats()
+
+        self.on_progress('\n=======================================================\n                OTIMIZAÇÃO CONCLUÍDA                   \n=======================================================\n')
+
+        return self._select_and_log_best_node(root)
 
 def save_optimized_skill(content: str) -> Path:
     """

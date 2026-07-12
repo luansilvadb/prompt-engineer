@@ -1,7 +1,7 @@
 import statistics
 from typing import List, Tuple
 
-from src.drift.models import DriftReport, DimensionError, GoldenProbe
+from src.drift.models import DriftReport, DimensionError
 from src.drift.exceptions import DriftMeasurementError
 
 

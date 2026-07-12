@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from src.optimizer import Optimizer, MCTSNode
 
 
@@ -34,7 +34,7 @@ def test_non_cognitivo_routing_uses_agent(mock_heavy_evaluators):
     opt.semantic_sim_threshold = 1.0
     root = MCTSNode(instruction="Test")
     root.last_reward = 0.0
-    child = opt._expand_node(root)
+    opt._expand_node(root)
     assert opt.agent.called
     assert not opt.agent_cognitivo.called
 
@@ -52,7 +52,7 @@ def test_cognitivo_routing_soft_validation(mock_heavy_evaluators):
     root = MCTSNode(instruction="Test")
     root.last_reward = 0.0
     try:
-        child = opt._expand_node(root)
+        opt._expand_node(root)
         assert opt.on_error.called
     except Exception:
         pytest.fail("Soft validation should not crash _expand_node")

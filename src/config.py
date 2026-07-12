@@ -9,7 +9,7 @@ def _resolve_api_key(api_key: str = None) -> str:
 def _resolve_model_name(model_name: str = None, model_prefix: str = None) -> str:
     final_model_name = model_name or os.environ.get("MODEL_NAME")
     final_provider_prefix = model_prefix if model_prefix is not None else os.environ.get("MODEL_PREFIX", "")
-    
+
     if final_provider_prefix:
         if final_provider_prefix.strip("/") == "nvidia_nim":
             final_provider_prefix = "openai"
@@ -18,34 +18,34 @@ def _resolve_model_name(model_name: str = None, model_prefix: str = None) -> str
         if not final_provider_prefix.endswith("/"):
             final_provider_prefix += "/"
         final_model_name = f"{final_provider_prefix}{final_model_name}"
-        
+
     return final_model_name
 
 def _apply_model_quirks(model_name: str, kwargs: dict) -> None:
     if "gemma-4" in model_name.lower():
         kwargs["extra_body"] = {"chat_template_kwargs": {"enable_thinking": True}}
         kwargs["max_tokens"] = 16384
-        kwargs["timeout"] = 120 
+        kwargs["timeout"] = 120
 
 def setup(model_name=None, model_prefix=None, api_base=None, api_key=None):
     load_dotenv()
     os.environ['LITELLM_LOG'] = 'DEBUG' # Habilita logs reais de debug do litellm
     litellm.drop_params = True
-    
+
     final_api_key = _resolve_api_key(api_key)
     final_model_name = _resolve_model_name(model_name, model_prefix)
     final_api_base = api_base or os.environ.get("API_BASE")
-    
+
     if "zai/" in final_model_name or "zhipu/" in final_model_name:
         os.environ["ZAI_API_KEY"] = final_api_key
         os.environ["ZHIPUAI_API_KEY"] = final_api_key
-        
+
     kwargs = {
         "model": final_model_name,
         "api_key": final_api_key,
         "api_base": final_api_base
     }
-    
+
     _apply_model_quirks(final_model_name, kwargs)
     lm = dspy.LM(**kwargs)
     try:

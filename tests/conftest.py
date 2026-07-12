@@ -5,7 +5,7 @@ from types import ModuleType
 
 SRC_REPLACED = False
 try:
-    import src.ausculta_modo_b
+    import src.ausculta_modo_b  # noqa: F401
 except ImportError:
     # Only mock src.ausculta_modo_b, not the entire src package
     # (src.signatures or src.config may already be cached)
@@ -47,7 +47,7 @@ def mock_heavy_evaluators():
     )
 
     with patch('src.infrastructure.dspy_impl.DSPyAvaliadorModoB', mock_avaliador), \
-         patch('sentence_transformers.SentenceTransformer') as mock_st_pkg, \
+         patch('sentence_transformers.SentenceTransformer'), \
          patch('src.semantic_evaluator.SentenceTransformer') as mock_st_module:
         mock_st_module.return_value = MagicMock()
         yield {

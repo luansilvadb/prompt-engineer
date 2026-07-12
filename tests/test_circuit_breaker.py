@@ -8,15 +8,11 @@ Validates:
   - When missed_violations > 0, circuit_breaker returns accept=False and triggers rollback.
 """
 
-import os
-import json
-import tempfile
-import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from src.drift.circuit_breaker import verificar_juiz_atual, circuit_breaker, MODELS_DIR
-from src.drift.models import DriftThresholds, GateDecision
+from src.drift.circuit_breaker import verificar_juiz_atual, circuit_breaker
+from src.drift.models import DriftThresholds
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────

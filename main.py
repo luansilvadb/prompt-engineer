@@ -3,11 +3,11 @@ import argparse
 import difflib
 from pathlib import Path
 
-# Força o terminal do Windows a aceitar caracteres Unicode (ex: '→')
-sys.stdout.reconfigure(encoding='utf-8')
-
 from src.config import setup
 from src.optimizer import Optimizer, save_optimized_skill
+
+# Força o terminal do Windows a aceitar caracteres Unicode (ex: '→')
+sys.stdout.reconfigure(encoding='utf-8')
 
 def diff_strings(old_text, new_text, filename):
     diff = difflib.unified_diff(
@@ -38,8 +38,16 @@ def main():
         
         try:
             setup()
+            from src.infrastructure.container import Container
+            container = Container()
+            
             optimizer = Optimizer(
                 skill_original=skill_bruta,
+                strategy_discoverer=container.get_strategy_discoverer(),
+                agent=container.get_agent(),
+                agent_cognitivo=container.get_agent_cognitivo(),
+                avaliador_modo_b=container.get_avaliador_modo_b(),
+                experience_store=container.get_experience_store(),
                 on_progress=print,
                 on_error=lambda msg: print(msg, file=sys.stderr)
             )

@@ -12,7 +12,8 @@ def main():
     
     rewards = []
     for line in lines:
-        if not line: continue
+        if not line:
+            continue
         data = json.loads(line)
         rewards.append(data.get('absolute_reward', 0.0))
         
@@ -24,7 +25,8 @@ def main():
         
     print("\n--- Últimas 3 avaliações (Feedback) ---")
     for line in lines[-3:]:
-        if not line: continue
+        if not line:
+            continue
         data = json.loads(line)
         r = data.get('absolute_reward', 0.0)
         f = data.get('feedback', '')

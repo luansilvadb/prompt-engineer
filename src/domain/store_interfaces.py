@@ -16,16 +16,16 @@ class IJobStore(Protocol):
 class IExperienceStore(Protocol):
     def save(self) -> None:
         ...
-        
+
     def add(self, experience: Any) -> None:
         ...
-        
+
     def query_similar(self, feedback_query: str, top_k: int = 5) -> List[Any]:
         ...
-        
+
     def get_strategy_stats(self) -> Dict[str, Dict[str, float]]:
         ...
-        
+
     @property
     def experiences(self) -> List[Any]:
         ...

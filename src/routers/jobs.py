@@ -7,15 +7,9 @@ from sse_starlette.sse import EventSourceResponse
 
 from src.schemas import OtimizacaoRequestDTO
 from src.state import JobState, jobs
-from src.services import execute_optimization_task
 import src.store as job_store
 from src.teleprompter import compilar_avaliador
 from src.config import setup
-from src.infrastructure.dspy_impl import (
-    DSPyStrategyDiscoverer, DSPySelfReflectiveAgent, DSPyMutadorCognitivoAgent,
-    DSPyAvaliadorModoB, load_avaliador
-)
-from src.experience_store import ExperienceStore
 
 class DspyAdapter:
     def context(self, lm):
@@ -44,10 +38,10 @@ async def start_optimization(request: OtimizacaoRequestDTO, background_tasks: Ba
         if j_state.status in ('running', 'idle'):
             j_state.status = 'cancelled'
             j_state.events_queue.put_nowait({
-                'type': 'log', 
+                'type': 'log',
                 'data': {'text': '\n[!] OTIMIZAÇÃO CANCELADA POR NOVA REQUISIÇÃO.'}
             })
-            
+
     job_id = str(uuid.uuid4())
     job_state = JobState()
     job_state.original_skill = request.skillOriginal
@@ -56,34 +50,33 @@ async def start_optimization(request: OtimizacaoRequestDTO, background_tasks: Ba
     job_state.api_base = request.apiBase
     job_state.api_key = request.apiKey
     job_state.regras_adicionais = '\n'.join(request.regrasAdicionais) if request.regrasAdicionais else ''
-    
+
     jobs[job_id] = job_state
-    
+
     store_adapter = JobStoreAdapter()
     store_adapter.save_job_state(job_id, job_state)
     loop = asyncio.get_running_loop()
-    
-    # Injeção de dependências
-    load_avaliador()
-    strategy_discoverer = DSPyStrategyDiscoverer()
-    agent = DSPySelfReflectiveAgent()
-    agent_cognitivo = DSPyMutadorCognitivoAgent()
-    avaliador_modo_b = DSPyAvaliadorModoB()
-    compiler = AvaliadorCompilerAdapter()
-    experience_store = ExperienceStore()
-    
+
+    # Injeção de dependências via Container
+    from src.infrastructure.container import Container
+    from src.services import OptimizationService
+
+    container = Container()
+    service = OptimizationService(
+        strategy_discoverer=container.get_strategy_discoverer(),
+        agent=container.get_agent(),
+        agent_cognitivo=container.get_agent_cognitivo(),
+        avaliador_modo_b=container.get_avaliador_modo_b(),
+        compiler=container.get_compiler(),
+        experience_store=container.get_experience_store(),
+        job_store=container.get_job_store(),
+        ai_framework=container.get_ai_framework()
+    )
+
     background_tasks.add_task(
-        execute_optimization_task, 
-        job_id, 
-        loop, 
-        store_adapter, 
-        strategy_discoverer, 
-        agent, 
-        agent_cognitivo, 
-        avaliador_modo_b, 
-        compiler, 
-        experience_store,
-        DspyAdapter()
+        service.execute,
+        job_id,
+        loop
     )
     return {'job_id': job_id}
 
@@ -92,16 +85,16 @@ async def stop_optimization(job_id: str):
     job = jobs.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail='Job not found')
-        
+
     if job.status == 'running':
         job.status = 'cancelled'
         job_store.save_job_state(job_id, job)
         job.events_queue.put_nowait({
-            'type': 'log', 
+            'type': 'log',
             'data': {'text': '\n[!] OTIMIZAÇÃO INTERROMPIDA PELO USUÁRIO.'}
         })
         return {'status': 'success', 'message': 'Sinal de interrupção enviado.'}
-        
+
     return {'status': 'ignored', 'message': 'Job não está rodando.'}
 
 @router.get('/jobs')
@@ -118,14 +111,14 @@ async def delete_job_endpoint(job_id: str):
         job_in_memory.is_deleted = True
         if job_in_memory.status == 'running':
             job_in_memory.status = 'cancelled'
-    
+
     success = job_store.delete_job(job_id)
     if not success and not job_in_memory:
         raise HTTPException(status_code=404, detail='Job not found or could not be deleted')
-        
+
     if job_id in jobs:
         del jobs[job_id]
-        
+
     return {'status': 'success', 'message': 'Job deletado com sucesso.'}
 
 @router.get('/jobs/{job_id}')
@@ -135,6 +128,68 @@ async def get_job(job_id: str):
         raise HTTPException(status_code=404, detail='Job not found')
     return job
 
+async def _orphaned_event_generator(disk_job: dict):
+    status = disk_job.get('status', 'error')
+    if status == 'completed':
+        yield {
+            'event': 'result',
+            'data': json.dumps({
+                'status': status,
+                'original': disk_job.get('original_skill', ''),
+                'optimized': disk_job.get('result', ''),
+                'nodes': disk_job.get('mcts_nodes', [])
+            })
+        }
+    yield {'event': 'end', 'data': status}
+
+def _format_event(event: dict) -> dict:
+    """Formata evento para envio via SSE."""
+    if event['type'] == 'log':
+        return {'data': json.dumps(event['data'])}
+    if event['type'] == 'node':
+        return {'event': 'node', 'data': json.dumps(event['data'])}
+    return {}
+
+def _format_result_event(job) -> dict:
+    """Formata o evento de resultado final."""
+    return {
+        'event': 'result',
+        'data': json.dumps({
+            'status': job.status,
+            'original': job.original_skill,
+            'optimized': job.result,
+            'nodes': job.mcts_nodes
+        })
+    }
+
+async def _live_event_generator(job):
+    while not job.events_queue.empty():
+        event = job.events_queue.get_nowait()
+        formatted = _format_event(event)
+        if formatted:
+            yield formatted
+
+    while True:
+        try:
+            event = await asyncio.wait_for(job.events_queue.get(), timeout=0.1)
+            formatted = _format_event(event)
+            if formatted:
+                yield formatted
+            job.events_queue.task_done()
+        except asyncio.TimeoutError:
+            pass
+
+        queue_empty = job.events_queue.empty()
+        if job.status == 'completed' and queue_empty:
+            yield _format_result_event(job)
+
+        if job.status in ('completed', 'error', 'cancelled') and queue_empty:
+            yield {'event': 'end', 'data': job.status}
+            await asyncio.sleep(0.5)
+            return
+
+        await asyncio.sleep(0.05)
+
 @router.get('/stream/{job_id}')
 async def stream_progress(job_id: str):
     job = jobs.get(job_id)
@@ -142,7 +197,7 @@ async def stream_progress(job_id: str):
         disk_job = job_store.load_job(job_id)
         if not disk_job:
             raise HTTPException(status_code=404, detail='Job not found')
-            
+
         if disk_job.get('status') == 'running':
             temp_job = JobState()
             temp_job.status = 'error'
@@ -155,61 +210,10 @@ async def stream_progress(job_id: str):
             temp_job.regras_adicionais = disk_job.get('regras_adicionais', '')
             job_store.save_job_state(job_id, temp_job)
             disk_job['status'] = 'error'
-            
-        async def orphaned_event_generator():
-            status = disk_job.get('status', 'error')
-            if status == 'completed':
-                yield {
-                    'event': 'result',
-                    'data': json.dumps({
-                        'status': status,
-                        'original': disk_job.get('original_skill', ''),
-                        'optimized': disk_job.get('result', ''),
-                        'nodes': disk_job.get('mcts_nodes', [])
-                    })
-                }
-            yield {'event': 'end', 'data': status}
-            
-        return EventSourceResponse(orphaned_event_generator())
-        
-    async def event_generator():
-        while not job.events_queue.empty():
-            event = job.events_queue.get_nowait()
-            if event['type'] == 'log':
-                yield {'data': json.dumps(event['data'])}
-            elif event['type'] == 'node':
-                yield {'event': 'node', 'data': json.dumps(event['data'])}
-                
-        while True:
-            try:
-                event = await asyncio.wait_for(job.events_queue.get(), timeout=0.1)
-                if event['type'] == 'log':
-                    yield {'data': json.dumps(event['data'])}
-                elif event['type'] == 'node':
-                    yield {'event': 'node', 'data': json.dumps(event['data'])}
-                job.events_queue.task_done()
-            except asyncio.TimeoutError:
-                pass
-                
-            if job.status == 'completed' and job.events_queue.empty():
-                yield {
-                    'event': 'result',
-                    'data': json.dumps({
-                        'status': job.status,
-                        'original': job.original_skill,
-                        'optimized': job.result,
-                        'nodes': job.mcts_nodes
-                    })
-                }
-                
-            if job.status in ('completed', 'error', 'cancelled') and job.events_queue.empty():
-                yield {'event': 'end', 'data': job.status}
-                await asyncio.sleep(0.5)
-                return
-                
-            await asyncio.sleep(0.05)
-            
-    return EventSourceResponse(event_generator())
+
+        return EventSourceResponse(_orphaned_event_generator(disk_job))
+
+    return EventSourceResponse(_live_event_generator(job))
 
 @router.post('/train-judge')
 async def train_judge():
@@ -256,7 +260,7 @@ async def check_drift():
 
     def _run():
         try:
-            lm = setup()
+            setup()
             cfg = get_drift_thresholds()
             thresholds = DriftThresholds.from_config(cfg)
             report = verificar_juiz_atual(thresholds, cfg['repetitions'])

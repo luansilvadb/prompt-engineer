@@ -1,5 +1,4 @@
 import dspy
-from src.signatures import Avaliacao
 from src.infrastructure.dspy_impl import AvaliadorDeSkillSignature, _invoke_judge_with, AvaliadorModoBSignature, _invoke_judge_modo_b_with
 from src.drift.exceptions import DriftMeasurementError
 from src.drift.models import ProbeMeasurement, GoldenProbe

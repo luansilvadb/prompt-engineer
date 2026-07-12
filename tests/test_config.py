@@ -1,4 +1,3 @@
-import pytest
 from src.config import get_mcts_config
 
 

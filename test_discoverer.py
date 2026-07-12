@@ -1,8 +1,6 @@
-import os
 import dspy
 from src.config import setup
-from src.dspy_signatures import StrategyDiscoverer
-from src.mutations import registry
+from src.infrastructure.dspy_impl import StrategyDiscovererSignature as StrategyDiscoverer
 
 def main():
     setup()
@@ -16,7 +14,7 @@ def main():
         estrategias_conhecidas="Nenhuma. Tabula Rasa."
     )
     
-    print(f"\n[+] ESTRATÉGIA DESCOBERTA:")
+    print("\n[+] ESTRATÉGIA DESCOBERTA:")
     print(f"Nome: {nova_estrat.nome_estrategia}")
     print(f"Prompt: {nova_estrat.prompt_estrategia}")
 

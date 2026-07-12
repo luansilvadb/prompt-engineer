@@ -1,4 +1,3 @@
-import pytest
 import torch
 from unittest.mock import patch, MagicMock
 from src.semantic_evaluator import calculate_semantic_penalty, get_embedder

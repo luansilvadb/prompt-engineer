@@ -10,7 +10,7 @@ def init_store():
 def save_job_state(job_id: str, job) -> None:
     init_store()
     file_path = JOBS_DIR / f"{job_id}.json"
-    
+
     # We serialize all fields except the events_queue and api keys for security
     state_dict = {
         "id": job_id,
@@ -23,7 +23,7 @@ def save_job_state(job_id: str, job) -> None:
         "model_prefix": job.model_prefix,
         "regras_adicionais": job.regras_adicionais
     }
-    
+
     # Write atomically via temp file to avoid corruption
     temp_path = file_path.with_suffix('.tmp')
     try:
@@ -39,10 +39,10 @@ def _read_job_summary(file_path: Path, status: str = None) -> dict:
         with open(file_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
             job_status = data.get("status", "unknown")
-            
+
             if status and job_status != status:
                 return None
-                
+
             return {
                 "id": data.get("id", file_path.stem),
                 "status": job_status,
@@ -61,12 +61,12 @@ def load_all_jobs(skip: int = 0, limit: int = 50, status: str = None) -> dict:
         job_data = _read_job_summary(file_path, status)
         if job_data:
             jobs.append(job_data)
-            
+
     jobs.sort(key=lambda x: x["updated_at"], reverse=True)
-    
+
     total = len(jobs)
     items = jobs[skip : skip + limit]
-    
+
     return {
         "total": total,
         "items": items,
@@ -79,7 +79,7 @@ def load_job(job_id: str) -> dict:
     file_path = JOBS_DIR / f"{job_id}.json"
     if not file_path.exists():
         return None
-        
+
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
             return json.load(f)

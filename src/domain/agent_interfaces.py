@@ -1,6 +1,6 @@
 from typing import Protocol, Any
 from dataclasses import dataclass
-from src.signatures import Avaliacao, AvaliacaoModoB, MutadorCognitivoOutput
+from src.signatures import Avaliacao, AvaliacaoModoB
 
 class IAiFramework(Protocol):
     def context(self, lm: Any) -> Any:

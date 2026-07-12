@@ -18,11 +18,11 @@ async def serve_spa(catchall: str):
         file_path = frontend_dir / catchall
         if file_path.is_file():
             return FileResponse(file_path)
-            
+
     index_file = frontend_dir / 'index.html'
     if index_file.is_file():
         return FileResponse(index_file)
-        
+
     raise HTTPException(
         status_code=404,
         detail="Frontend build not found. Please run 'npm run build' in frontend directory."

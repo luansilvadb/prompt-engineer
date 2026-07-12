@@ -1,5 +1,4 @@
-import pytest
-from src.heuristic_evaluator import evaluate_heuristics, _BUZZWORD_THRESHOLD, _VAGUE_BUZZWORDS
+from src.heuristic_evaluator import evaluate_heuristics
 
 def test_short_text_bypass():
     result = evaluate_heuristics("Curto e direto.")
