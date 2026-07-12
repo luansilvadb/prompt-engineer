@@ -8,6 +8,7 @@ from dspy.teleprompt import BootstrapFewShot
 from src.drift_monitor import (
     DriftGate,
     DriftMeasurementError,
+    DriftReport,
     DriftThresholds,
     GoldenSet,
     JudgeProbeRunner,
@@ -51,7 +52,32 @@ def _run_teleprompt(trainset: list, candidate_path: Path):
     compilado = teleprompter.compile(avaliador_module, trainset=trainset)
     compilado.save(str(candidate_path))
 
+def _measure_drift(candidate_path: Path, golden: GoldenSet, repetitions: int, thresholds: DriftThresholds) -> DriftReport:
+    """RN-07: Mede o drift do candidato carregado a partir do candidate_path."""
+    runner_cand = JudgeProbeRunner("candidato")
+    runner_cand.load_candidate(str(candidate_path))
+    return medir_drift(runner_cand, golden, repetitions, thresholds)
+
+
+def _gate_decision(report_cand: DriftReport, report_atual: DriftReport | None, thresholds: DriftThresholds) -> object:
+    """Toma a decisão de aprovação/rejeição no DriftGate."""
+    return DriftGate.avaliar_candidato(report_cand, report_atual, thresholds)
+
+
+def _persist_candidate(candidate_path: Path, out_path: Path, output_dir: Path, report_cand: DriftReport) -> None:
+    """Persiste o candidato e atualiza o snapshot do cache de drift."""
+    if out_path.exists():
+        bak_path = output_dir / 'avaliador_modo_b_otimizado.json.bak'
+        out_path.replace(bak_path)
+    candidate_path.replace(out_path)
+    save_drift_cache(report_cand)
+
+
 def _evaluate_drift_gate(candidate_path: Path, out_path: Path, output_dir: Path) -> str:
+    """
+    RN-07: Fail-closed em erro de medição
+    RN-08: Fail-open se golden vazio
+    """
     golden = GoldenSet()
     if golden.is_empty():
         # EC4: fail-open — não trava deploy limpo, mas avisa com destaque máximo.
@@ -73,10 +99,8 @@ def _evaluate_drift_gate(candidate_path: Path, out_path: Path, output_dir: Path)
     repetitions = cfg['repetitions']
 
     try:
-        # Medir candidato (instância DSPy isolada).
-        runner_cand = JudgeProbeRunner("candidato")
-        runner_cand.load_candidate(str(candidate_path))
-        report_cand = medir_drift(runner_cand, golden, repetitions, thresholds)
+        # Medir candidato (instância DSPy isolada) usando a função extraída.
+        report_cand = _measure_drift(candidate_path, golden, repetitions, thresholds)
 
         # Medir/recuperar juiz atual.
         report_atual = load_drift_cache()
@@ -92,7 +116,7 @@ def _evaluate_drift_gate(candidate_path: Path, out_path: Path, output_dir: Path)
                 print(f"[!] Não foi possível medir o juiz atual ({e.message}); usando floors absolutos.")
                 report_atual = None
 
-        decision = DriftGate.avaliar_candidato(report_cand, report_atual, thresholds)
+        decision = _gate_decision(report_cand, report_atual, thresholds)
 
         if not decision.accept:
             # Veto — NÃO sobrescreve o juiz em produção.
@@ -104,11 +128,7 @@ def _evaluate_drift_gate(candidate_path: Path, out_path: Path, output_dir: Path)
             return "drift_rejected"
 
         # Aceito — snapshot do anterior, persistência, cache.
-        if out_path.exists():
-            bak_path = output_dir / 'avaliador_modo_b_otimizado.json.bak'
-            out_path.replace(bak_path)
-        candidate_path.replace(out_path)
-        save_drift_cache(report_cand)
+        _persist_candidate(candidate_path, out_path, output_dir, report_cand)
 
         print(f"[*] Modelo avaliador recompilado, validado e salvo em: {out_path}")
         print(f"    Drift do novo juiz: spearman={report_cand.spearman_composite:.3f} offset={report_cand.offset_scale:.2f}")
