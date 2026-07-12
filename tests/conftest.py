@@ -23,28 +23,28 @@ except ImportError:
 
 @pytest.fixture
 def mock_heavy_evaluators():
-    """Patches heavy evaluators to prevent real LLM and network calls in tests.
+    """Provides mocked heavy evaluators so tests avoid real LLM/network calls.
 
-    Patch targets:
-      - 'src.signatures.avaliador_modo_b_module': the global dspy.Predict instance
-        that funcao_de_recompensa calls. Patching here intercepts all judge calls
-        made by Optimizer.simulation() without touching DSPy internals.
-      - 'src.semantic_evaluator.SentenceTransformer': patched at the module level
-        because the name is bound at import time (module-level import), so patching
-        the package-level name has no effect after first import.
+    The configured AvaliacaoModoB result is reused by mock_optimizer_factory as the
+    Optimizer's avaliador_modo_b, so simulation() returns a deterministic numeric
+    score instead of a bare MagicMock (whose nota attributes break calcular_composite).
+    SentenceTransformer is patched at import-bound locations to short-circuit the
+    semantic evaluator.
     """
-    mock_avaliador = MagicMock()
-    mock_avaliador.return_value = MagicMock(
-        manteve_regras_criticas='true',
-        defeitos_encontrados='',
-        nota_clareza='80',
-        nota_formatacao='80',
-        nota_robustez='80',
-        nota_densidade_informacional='80',
-        nota_acionabilidade='80',
-        nota_anti_fragilidade='80',
+    from src.signatures import AvaliacaoModoB
+
+    mock_resultado = AvaliacaoModoB(
+        manteve_regras_criticas=True,
+        nota_clareza=80.0,
+        nota_formatacao=80.0,
+        nota_robustez=80.0,
+        nota_densidade_informacional=80.0,
+        nota_acionabilidade=80.0,
+        nota_anti_fragilidade=80.0,
         feedback_detalhado='Mock feedback.',
+        defeitos_encontrados=[],
     )
+    mock_avaliador = MagicMock(return_value=mock_resultado)
 
     with patch('src.infrastructure.dspy_impl.DSPyAvaliadorModoB', mock_avaliador), \
          patch('sentence_transformers.SentenceTransformer'), \
@@ -95,7 +95,7 @@ def mock_optimizer_factory(mock_heavy_evaluators):
         mock_strategy_discoverer = MagicMock()
         mock_agent = MagicMock()
         mock_agent_cognitivo = MagicMock()
-        mock_avaliador_modo_b = MagicMock()
+        mock_avaliador_modo_b = mock_heavy_evaluators['AvaliadorModoB']
         
         # Create real instances with proper initialization
         experience_store = ExperienceStore()
