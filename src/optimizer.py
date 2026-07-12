@@ -430,6 +430,7 @@ class Optimizer:
             density_multiplier_min=self.density_multiplier_min,
             density_multiplier_max=self.density_multiplier_max,
             structured_bonus=self.density_structured_bonus,
+            min_density=self.lexical_density_min,
         )
         if density_mult != 1.0:
             direction = "Bonus por Densidade" if density_mult > 1.0 else "Penalidade por Densidade"
@@ -512,7 +513,7 @@ class Optimizer:
         consecutive_zeros: int,
         consecutive_api_errors: int
     ) -> Tuple[bool, int, int]:
-        self.on_progress(f'\n--- Iteração MCTS {i + 1}/{self.max_iterations} ---')
+        self._emitter.emit_log(f'\n--- Iteração MCTS {i + 1}/{self.max_iterations} ---')
         try:
             should_break, is_error, iter_reward = self._run_mcts_iteration(root)
             if should_break:
@@ -526,23 +527,23 @@ class Optimizer:
             consecutive_api_errors = 0
 
             if consecutive_zeros >= 5:
-                self.on_error('\n[!] ALERTA: 5 iterações consecutivas com recompensa 0.0. Abortando por plateau.')
+                self._emitter.emit_error('\n[!] ALERTA: 5 iterações consecutivas com recompensa 0.0. Abortando por plateau.')
                 return True, consecutive_zeros, consecutive_api_errors
         except Exception as e:
             consecutive_api_errors += 1
-            self.on_error(f'[!] Erro inesperado na iteração {i + 1}: {e}')
+            self._emitter.emit_error(f'[!] Erro inesperado na iteração {i + 1}: {e}')
             if consecutive_api_errors >= 3:
-                self.on_error('[!] Falhas técnicas persistentes. Abortando.')
+                self._emitter.emit_error('[!] Falhas técnicas persistentes. Abortando.')
                 return True, consecutive_zeros, consecutive_api_errors
         return False, consecutive_zeros, consecutive_api_errors
 
     def _log_bandit_stats(self):
         stats = self.experience_store.get_strategy_stats()
         if stats:
-            self.on_progress('[*] Performance das estratégias de mutação:')
+            self._emitter.emit_log('[*] Performance das estratégias de mutação:')
             for strategy, s in sorted(stats.items(), key=lambda x: x[1].get('mean_delta', 0), reverse=True):
                 desc = get_strategy_description(strategy)
-                self.on_progress(f'    {desc}: Δ médio={s["mean_delta"]:+.3f}, usos={int(s["count"])}')
+                self._emitter.emit_log(f'    {desc}: Δ médio={s["mean_delta"]:+.3f}, usos={int(s["count"])}')
 
     def _select_and_log_best_node(self, root: MCTSNode) -> str:
         all_nodes = self._get_all_nodes(root)
@@ -550,20 +551,20 @@ class Optimizer:
 
         score = best_node.q_value / max(1, best_node.visits)
         if best_node == root:
-            self.on_progress(f'[+] Raiz mantida como melhor resultado (nenhuma otimização superou): score={score:.3f}, visits={best_node.visits}')
+            self._emitter.emit_log(f'[+] Raiz mantida como melhor resultado (nenhuma otimização superou): score={score:.3f}, visits={best_node.visits}')
         else:
-            self.on_progress(f'[+] Melhor nó selecionado: score={score:.3f}, visits={best_node.visits}, strategy={get_strategy_description(best_node.mutation_strategy)}')
+            self._emitter.emit_log(f'[+] Melhor nó selecionado: score={score:.3f}, visits={best_node.visits}, strategy={get_strategy_description(best_node.mutation_strategy)}')
 
         return best_node.instruction
 
     def optimize(self) -> str:
-        self.on_progress('\n[+] Inicializando o pipeline MCTS RL customizado com refinamentos...')
-        self.on_progress(f'    Config: γ={self.gamma}, C_ucb={self.c_param}, α_pw={self.progressive_alpha}, threshold={self.value_threshold}')
+        self._emitter.emit_log('\n[+] Inicializando o pipeline MCTS RL customizado com refinamentos...')
+        self._emitter.emit_log(f'    Config: γ={self.gamma}, C_ucb={self.c_param}, α_pw={self.progressive_alpha}, threshold={self.value_threshold}')
 
         root = MCTSNode(self.skill_original, critica='Rascunho Inicial')
         self.notify_node(root)
 
-        self.on_progress('[*] Avaliando a instrução original (raiz)...')
+        self._emitter.emit_log('[*] Avaliando a instrução original (raiz)...')
         reward, feedback = self.simulation(root.instruction)
         root.feedback = feedback
         root.last_reward = reward
@@ -574,7 +575,7 @@ class Optimizer:
 
         for i in range(self.max_iterations):
             if self._emitter.is_cancelled():
-                self.on_progress('\n[!] OTIMIZAÇÃO INTERROMPIDA PELO USUÁRIO.')
+                self._emitter.emit_log('\n[!] OTIMIZAÇÃO INTERROMPIDA PELO USUÁRIO.')
                 break
 
             should_break, consecutive_zeros, consecutive_api_errors = self._run_single_iteration(
@@ -585,12 +586,12 @@ class Optimizer:
 
         # Salvar experiências acumuladas nesta sessão
         self.experience_store.save()
-        self.on_progress(f'[*] {len(self.experience_store.experiences)} experiências salvas na memória de longo prazo.')
+        self._emitter.emit_log(f'[*] {len(self.experience_store.experiences)} experiências salvas na memória de longo prazo.')
 
         # Log das estatísticas do bandit
         self._log_bandit_stats()
 
-        self.on_progress('\n=======================================================\n                OTIMIZAÇÃO CONCLUÍDA                   \n=======================================================\n')
+        self._emitter.emit_log('\n=======================================================\n                OTIMIZAÇÃO CONCLUÍDA                   \n=======================================================\n')
 
         return self._select_and_log_best_node(root)
 
