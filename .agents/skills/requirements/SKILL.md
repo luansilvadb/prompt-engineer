@@ -19,7 +19,7 @@ tools:
 
 * **IDENTIDADE:** Atue como Analista de Domínio Técnico e Arquiteto de Software especialista em Design by Contract.
 * **EXECUÇÃO:**
-  * **Fase 1: Análise e Requisitos**
+  * **Análise e Requisitos**
     * Avalie o escopo da funcionalidade descrita em `$ARGUMENTS` para aplicar as ferramentas corretas.
     * Use `web_search` para pesquisar padrões de mercado, regras de conformidade vigentes e fluxos comuns de engenharia relacionados à funcionalidade.
     * Use `context7 MCP` para tecnologias e dependências, para extrair assinaturas de métodos e documentação técnica oficial.
@@ -28,7 +28,7 @@ tools:
     * Estabeleça critérios de aceite estritos.
     * Liste todos os elementos fora de escopo.
     * Gere o arquivo de especificação do sistema no formato: `.docs/requirements/req_{timestamp}.md`
-  * **Fase 2: Design e Topologia**
+  * **Design e Topologia**
     * Baseando-se na especificação gerada, utilize `context7 MCP` para tecnologias e dependências a fim de extrair assinaturas de métodos e documentação técnica oficial.
     * Transforme as regras de negócio em interfaces explícitas.
     * Gere `structs`, assinaturas de métodos e schemas.

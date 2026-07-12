@@ -94,3 +94,32 @@ Tags de número, scores e visitas em nós da árvore abandonam os grandes blocos
 
 ### Scrollbars Customizadas
 A experiência nativa de rolagem do SO deve ser sobrescrita em todo o site. Barras ultra-finas (6px) em tons de cinza/vidro translúcido, mantendo a tela imersiva.
+
+---
+
+## 6. Contratos de Qualidade (Backend MCTS)
+
+O backend do Skill Optimizer MCTS enforca contratos estritos de qualidade (Design by Contract) para garantir a integridade do processo de otimização de instruções:
+
+### 6.1 `IQualityGuard`
+Enforca validações pré-commit essenciais:
+*   **RN-01 (Linter):** Verifica violações do Ruff.
+*   **RN-02 (Tests):** Executa suíte do Pytest e reporta falhas.
+*   **RN-03 (Complexity):** Bloqueia funções com complexidade ciclomática $> 15$.
+*   **RN-04 (Coverage):** Monitora cobertura de teste em módulos críticos (deve ser $\ge 70\%$).
+
+### 6.2 `IDensityMultiplier`
+Garante que o multiplicador de densidade lexical opere estritamente dentro das regras de negócio (RN-05):
+*   Deve retornar $1.0$ se o threshold de densidade estiver desabilitado ou se as instruções (original vs. otimizada) tiverem o mesmo tamanho.
+*   Invariante: o multiplicador resultante é limitado entre o piso e o teto definidos na configuração.
+
+### 6.3 `IMCTSCancellation`
+Força o cancelamento imediato de uma iteração MCTS caso o sinalizador de interrupção seja ativado. RN-06 define três checkpoints obrigatórios para fail-fast:
+1.  Antes da seleção do nó.
+2.  Imediatamente após a expansão do nó.
+3.  Antes do início da simulação.
+
+### 6.4 `IDriftGate`
+O portão de controle de drift previne desvios de comportamento nos candidatos avaliados:
+*   **RN-07 (Fail-Closed):** Qualquer exceção ou erro ao medir o drift causa a rejeição automática do candidato (segurança absoluta).
+*   **RN-08 (Fail-Open):** Se o Golden Set de calibração estiver vazio ou ausente, a compilação segue com advertência explícita no log.
