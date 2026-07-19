@@ -3,29 +3,29 @@ from contextlib import contextmanager
 from unittest.mock import patch, MagicMock
 
 from src.config import (
-    get_mcts_config,
     get_drift_thresholds,
     _resolve_api_key,
     _resolve_model_name,
     _apply_model_quirks,
     setup,
 )
+from src.domain.config import load_mcts_config
 
 
 def test_cognitivo_config_defaults(monkeypatch):
     monkeypatch.delenv('MCTS_COGNITIVO_PRIOR_COUNT', raising=False)
     monkeypatch.delenv('MCTS_COGNITIVO_PRIOR_MEAN_DELTA', raising=False)
-    cfg = get_mcts_config()
-    assert cfg['cognitivo_prior_count'] == 4
-    assert cfg['cognitivo_prior_mean_delta'] == 0.05
+    cfg = load_mcts_config()
+    assert cfg.cognitivo_prior_count == 4
+    assert cfg.cognitivo_prior_mean_delta == 0.05
 
 
 def test_cognitivo_config_override(monkeypatch):
     monkeypatch.setenv('MCTS_COGNITIVO_PRIOR_COUNT', '6')
     monkeypatch.setenv('MCTS_COGNITIVO_PRIOR_MEAN_DELTA', '0.1')
-    cfg = get_mcts_config()
-    assert cfg['cognitivo_prior_count'] == 6
-    assert cfg['cognitivo_prior_mean_delta'] == 0.1
+    cfg = load_mcts_config()
+    assert cfg.cognitivo_prior_count == 6
+    assert cfg.cognitivo_prior_mean_delta == 0.1
 
 
 def test_density_config_defaults(monkeypatch):
@@ -33,11 +33,11 @@ def test_density_config_defaults(monkeypatch):
     monkeypatch.delenv('MCTS_DENSITY_MULTIPLIER_MAX', raising=False)
     monkeypatch.delenv('MCTS_DENSITY_THRESHOLD', raising=False)
     monkeypatch.delenv('MCTS_DENSITY_STRUCTURED_BONUS', raising=False)
-    cfg = get_mcts_config()
-    assert cfg['density_multiplier_min'] == 0.5
-    assert cfg['density_multiplier_max'] == 1.5
-    assert cfg['density_threshold'] == 1.0
-    assert cfg['density_structured_bonus'] == 0.2
+    cfg = load_mcts_config()
+    assert cfg.density_multiplier_min == 0.5
+    assert cfg.density_multiplier_max == 1.5
+    assert cfg.density_threshold == 1.0
+    assert cfg.density_structured_bonus == 0.2
 
 
 def test_density_config_override(monkeypatch):
@@ -45,23 +45,23 @@ def test_density_config_override(monkeypatch):
     monkeypatch.setenv('MCTS_DENSITY_MULTIPLIER_MAX', '2.0')
     monkeypatch.setenv('MCTS_DENSITY_THRESHOLD', '0.8')
     monkeypatch.setenv('MCTS_DENSITY_STRUCTURED_BONUS', '0.3')
-    cfg = get_mcts_config()
-    assert cfg['density_multiplier_min'] == 0.3
-    assert cfg['density_multiplier_max'] == 2.0
-    assert cfg['density_threshold'] == 0.8
-    assert cfg['density_structured_bonus'] == 0.3
+    cfg = load_mcts_config()
+    assert cfg.density_multiplier_min == 0.3
+    assert cfg.density_multiplier_max == 2.0
+    assert cfg.density_threshold == 0.8
+    assert cfg.density_structured_bonus == 0.3
 
 
 def test_buzzword_threshold_default(monkeypatch):
     monkeypatch.delenv('MCTS_BUZZWORD_THRESHOLD', raising=False)
-    cfg = get_mcts_config()
-    assert cfg['buzzword_threshold'] == 3
+    cfg = load_mcts_config()
+    assert cfg.buzzword_threshold == 3
 
 
 def test_buzzword_threshold_override(monkeypatch):
     monkeypatch.setenv('MCTS_BUZZWORD_THRESHOLD', '5')
-    cfg = get_mcts_config()
-    assert cfg['buzzword_threshold'] == 5
+    cfg = load_mcts_config()
+    assert cfg.buzzword_threshold == 5
 
 
 def test_resolve_api_key_explicit_arg_takes_priority(monkeypatch):

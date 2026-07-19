@@ -3,17 +3,6 @@ from unittest.mock import patch, MagicMock
 import sys
 from types import ModuleType
 
-SRC_REPLACED = False
-try:
-    import src.ausculta_modo_b  # noqa: F401
-except ImportError:
-    # Only mock src.ausculta_modo_b, not the entire src package
-    # (src.signatures or src.config may already be cached)
-    ausculta_modo_b = ModuleType('ausculta_modo_b')
-    sys.modules['src.ausculta_modo_b'] = ausculta_modo_b
-    ausculta_modo_b.AvaliadorModoB = MagicMock()
-    SRC_REPLACED = True
-
 try:
     import sentence_transformers
 except ImportError:
@@ -76,33 +65,20 @@ def mock_optimizer_factory(mock_heavy_evaluators):
     from src.experience_store import ExperienceStore
     
     def _create_optimizer(skill_original: str = "Test", **overrides):
-        """
-        Create an Optimizer with sensible defaults for testing.
-        
-        Args:
-            skill_original: The original skill text
-            **overrides: Override any default mock or config value
-        """
-        # Create default mocks
         mock_emitter = MagicMock()
         mock_emitter.emit_log = MagicMock()
         mock_emitter.emit_node = MagicMock()
         mock_emitter.is_cancelled = MagicMock(return_value=False)
-        
-        mock_scoring_pipeline = MagicMock()
-        mock_scoring_pipeline.run = MagicMock(return_value=MagicMock(final_score=0.8))
         
         mock_strategy_discoverer = MagicMock()
         mock_agent = MagicMock()
         mock_agent_cognitivo = MagicMock()
         mock_avaliador_modo_b = mock_heavy_evaluators['AvaliadorModoB']
         
-        # Create real instances with proper initialization
         experience_store = ExperienceStore()
         bandit = MutationBandit()
         strategy_registry = StrategyRegistry()
         
-        # Default config
         config = MCTSConfig(
             max_iterations=100,
             c_param=1.41,
@@ -124,10 +100,8 @@ def mock_optimizer_factory(mock_heavy_evaluators):
             density_structured_bonus=0.05,
         )
         
-        # Apply overrides
         final_config = overrides.get('config', config)
         final_emitter = overrides.get('emitter', mock_emitter)
-        final_scoring_pipeline = overrides.get('scoring_pipeline', mock_scoring_pipeline)
         final_strategy_discoverer = overrides.get('strategy_discoverer', mock_strategy_discoverer)
         final_agent = overrides.get('agent', mock_agent)
         final_agent_cognitivo = overrides.get('agent_cognitivo', mock_agent_cognitivo)
@@ -140,7 +114,6 @@ def mock_optimizer_factory(mock_heavy_evaluators):
             skill_original=skill_original,
             config=final_config,
             emitter=final_emitter,
-            scoring_pipeline=final_scoring_pipeline,
             strategy_discoverer=final_strategy_discoverer,
             agent=final_agent,
             agent_cognitivo=final_agent_cognitivo,
@@ -149,9 +122,6 @@ def mock_optimizer_factory(mock_heavy_evaluators):
             bandit=final_bandit,
             strategy_registry=final_strategy_registry,
         )
-        
-        # Add is_cancelled method that delegates to emitter
-        opt.is_cancelled = final_emitter.is_cancelled
         
         return opt
     

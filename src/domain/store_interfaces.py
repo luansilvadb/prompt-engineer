@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Protocol, Sequence
-
-from src.domain.job_interfaces import JobStatus
+from typing import Any, Dict, List, Optional, Protocol
 
 
 class IJobStore(Protocol):
@@ -23,9 +21,6 @@ class IJobStore(Protocol):
         ...
 
     def delete_job(self, job_id: str) -> bool:
-        ...
-
-    def list_by_status(self, status: JobStatus) -> Sequence[str]:
         ...
 
 

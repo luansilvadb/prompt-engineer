@@ -2,13 +2,12 @@ import asyncio
 import threading
 from src.state import jobs
 from src.config import setup
-from src.optimizer import Optimizer, save_optimized_skill
+from src.optimizer import Optimizer
+from src.store import save_optimized_skill
 from src.domain.agent_interfaces import IStrategyDiscoverer, ISelfReflectiveAgent, IMutadorCognitivoAgent, IAvaliadorModoB, IAiFramework
 from src.domain.config import MCTSConfig, load_mcts_config
-from src.domain.scoring_pipeline import IScoringPipeline
 from src.domain.store_interfaces import IJobStore, IAvaliadorCompiler, IExperienceStore
 from src.infrastructure.events import JobEventEmitter
-from src.infrastructure.scoring_pipeline import ScoringPipeline
 from src.mutation_strategies.bandit import MutationBandit
 from src.mutation_strategies.bandit_interfaces import IMutationBandit, IStrategyRegistry
 from src.mutation_strategies.registry import StrategyRegistry
@@ -55,7 +54,6 @@ class OptimizationService:
         job_store: IJobStore,
         ai_framework: IAiFramework,
         config: MCTSConfig | None = None,
-        scoring_pipeline: IScoringPipeline | None = None,
         bandit: IMutationBandit | None = None,
         strategy_registry: IStrategyRegistry | None = None,
     ) -> None:
@@ -68,19 +66,8 @@ class OptimizationService:
         self.job_store = job_store
         self.ai_framework = ai_framework
         self._config = config if config is not None else load_mcts_config()
-        self._scoring_pipeline = scoring_pipeline if scoring_pipeline is not None else self._build_default_scoring_pipeline()
         self._bandit = bandit if bandit is not None else MutationBandit(c_param=self._config.bandit_c_param)
         self._strategy_registry = strategy_registry if strategy_registry is not None else StrategyRegistry()
-
-    def _build_default_scoring_pipeline(self) -> ScoringPipeline:
-        return ScoringPipeline(
-            semantic_sim_threshold=self._config.semantic_sim_threshold,
-            density_threshold=self._config.density_threshold,
-            density_multiplier_min=self._config.density_multiplier_min,
-            density_multiplier_max=self._config.density_multiplier_max,
-            density_structured_bonus=self._config.density_structured_bonus,
-            lexical_density_min=self._config.lexical_density_min,
-        )
 
     def execute(self, job_id: str, loop) -> None:
         job = jobs[job_id]
@@ -110,7 +97,6 @@ class OptimizationService:
                 skill_original=job.original_skill,
                 config=self._config,
                 emitter=emitter,
-                scoring_pipeline=self._scoring_pipeline,
                 strategy_discoverer=self.strategy_discoverer,
                 agent=self.agent,
                 agent_cognitivo=self.agent_cognitivo,
@@ -161,7 +147,6 @@ def execute_optimization_task(
     experience_store: IExperienceStore,
     ai_framework: IAiFramework,
     config: MCTSConfig | None = None,
-    scoring_pipeline: IScoringPipeline | None = None,
     bandit: IMutationBandit | None = None,
     strategy_registry: IStrategyRegistry | None = None,
 ) -> None:
@@ -175,7 +160,6 @@ def execute_optimization_task(
         job_store=store,
         ai_framework=ai_framework,
         config=config,
-        scoring_pipeline=scoring_pipeline,
         bandit=bandit,
         strategy_registry=strategy_registry,
     )

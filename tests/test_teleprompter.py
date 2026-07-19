@@ -70,7 +70,7 @@ def test_drift_gate_fail_closed_on_measurement_error(mock_golden_with_data, mock
         mock_dt.from_config.return_value = MagicMock()
         
         # Simular erro na medição
-        from src.drift_monitor import DriftMeasurementError
+        from src.drift.exceptions import DriftMeasurementError
         mock_medir.side_effect = DriftMeasurementError("Simulação de falha")
         
         status = _evaluate_drift_gate(candidate_path, out_path, output_dir)
@@ -283,7 +283,7 @@ def test_drift_gate_backs_up_existing_out_path_on_accept(mock_golden_with_data, 
 
 def test_drift_gate_current_judge_measurement_failure_falls_back(mock_golden_with_data, mock_paths):
     """RN: falha ao medir juiz atual → floors absolutos (report_atual=None), candidato ainda avaliado."""
-    from src.drift_monitor import DriftMeasurementError
+    from src.drift.exceptions import DriftMeasurementError
 
     candidate_path, out_path, output_dir = mock_paths
     out_path.write_text('{}')

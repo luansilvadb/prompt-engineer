@@ -28,8 +28,8 @@ def test_bandit_cognitivo_key_exists():
 
 def test_optimizer_has_agent_cognitivo(mock_optimizer_factory):
     opt = mock_optimizer_factory(skill_original="Test")
-    assert hasattr(opt, '_agent_cognitivo')
-    assert opt._agent_cognitivo is not None
+    assert hasattr(opt, 'agent_cognitivo')
+    assert opt.agent_cognitivo is not None
 
 
 def test_optimizer_cognitivo_prior_injected(mock_optimizer_factory):

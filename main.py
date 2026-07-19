@@ -4,7 +4,8 @@ import difflib
 from pathlib import Path
 
 from src.config import setup
-from src.optimizer import Optimizer, save_optimized_skill
+from src.optimizer import Optimizer
+from src.store import save_optimized_skill
 from src.infrastructure.events import JobEventEmitter
 
 # Força o terminal do Windows a aceitar caracteres Unicode (ex: '→')
@@ -51,7 +52,6 @@ def main():
                 skill_original=skill_bruta,
                 config=container.get_config(),
                 emitter=emitter,
-                scoring_pipeline=container.get_scoring_pipeline(),
                 strategy_discoverer=container.get_strategy_discoverer(),
                 agent=container.get_agent(),
                 agent_cognitivo=container.get_agent_cognitivo(),

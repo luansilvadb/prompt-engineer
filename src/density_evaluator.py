@@ -1,7 +1,34 @@
 """Density Evaluator — COGN-04: Densificação Extrema. Calculates a density multiplier that rewards compressed, logically-structured instructions over verbose chain-of-thought."""
 
 import re
-from src.domain.quality_interfaces import DensityContext, DensityResult
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class DensityContext:
+    child_instruction: str
+    parent_instruction: str
+    min_density_threshold: float
+    multiplier_min: float
+    multiplier_max: float
+    structured_bonus: float
+
+
+@dataclass(frozen=True)
+class DensityResult:
+    multiplier: float
+    child_density: float
+    parent_density: float
+    is_neutral: bool
+    reason: str
+
+    def __post_init__(self) -> None:
+        if not (0.0 <= self.multiplier <= 2.0):
+            raise ValueError(f"multiplier must be in [0.0, 2.0], got {self.multiplier}")
+        if not (0.0 <= self.child_density <= 1.0):
+            raise ValueError(f"child_density must be in [0.0, 1.0], got {self.child_density}")
+        if not (0.0 <= self.parent_density <= 1.0):
+            raise ValueError(f"parent_density must be in [0.0, 1.0], got {self.parent_density}")
 
 class DensityResultFloat(float):
     """Subclass of float that matches DensityResult interface for backward compatibility."""

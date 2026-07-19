@@ -55,62 +55,6 @@ def setup(model_name=None, model_prefix=None, api_base=None, api_key=None):
     return lm
 
 
-# ─────────────────────────────────────────────
-# Hiperparâmetros MCTS (configuráveis via .env)
-# ─────────────────────────────────────────────
-
-def get_mcts_config() -> dict:
-    """
-    Carrega hiperparâmetros do MCTS a partir de variáveis de ambiente.
-    Cada um tem um default sensato baseado em experimentação.
-    """
-    load_dotenv()
-    return {
-        # Discount factor para backpropagation (Silver: temporal-difference)
-        'gamma': float(os.environ.get('MCTS_GAMMA', '0.95')),
-
-        # Constante de exploração UCB (√2 ≈ 1.41 é o default teórico)
-        'c_param': float(os.environ.get('MCTS_C_PARAM', '1.41')),
-
-        # Expoente do progressive widening (α=0.5 → sqrt growth)
-        'progressive_alpha': float(os.environ.get('MCTS_PROGRESSIVE_ALPHA', '0.5')),
-
-        # Threshold do value estimator para poda (< threshold → poda sem juiz)
-        'value_threshold': float(os.environ.get('MCTS_VALUE_THRESHOLD', '0.2')),
-
-        # Número máximo de iterações MCTS
-        'max_iterations': int(os.environ.get('MCTS_MAX_ITERATIONS', '10')),
-
-        # Constante base do progressive widening (C no ceil(C * visits^α))
-        'progressive_c': float(os.environ.get('MCTS_PROGRESSIVE_C', '2.0')),
-
-        # Learning rate do value estimator
-        'value_lr': float(os.environ.get('MCTS_VALUE_LR', '0.1')),
-
-        # Constante de exploração do mutation bandit
-        'bandit_c_param': float(os.environ.get('MCTS_BANDIT_C_PARAM', '1.41')),
-
-        # Limiar de penalidade de similaridade semântica (> 0.85 inicia decaimento)
-        'semantic_sim_threshold': float(os.environ.get('MCTS_SEMANTIC_SIM_THRESHOLD', '0.85')),
-
-        # Thresholds do Avaliador de Profundidade Heurística
-        'lexical_density_min': float(os.environ.get('MCTS_LEXICAL_DENSITY_MIN', '0.35')),
-        'verbosity_penalty_factor': float(os.environ.get('MCTS_VERBOSITY_PENALTY_FACTOR', '0.85')),
-        # Número mínimo de buzzwords para acionar penalidade Layer 0
-        'buzzword_threshold': int(os.environ.get('MCTS_BUZZWORD_THRESHOLD', '3')),
-
-        # Prior boosting para MutadorCognitivo (COGN-01)
-        'cognitivo_prior_count': int(os.environ.get('MCTS_COGNITIVO_PRIOR_COUNT', '4')),
-        'cognitivo_prior_mean_delta': float(os.environ.get('MCTS_COGNITIVO_PRIOR_MEAN_DELTA', '0.05')),
-
-        # Parametros do Multiplicador de Densidade (COGN-04)
-        'density_multiplier_min': float(os.environ.get('MCTS_DENSITY_MULTIPLIER_MIN', '0.5')),
-        'density_multiplier_max': float(os.environ.get('MCTS_DENSITY_MULTIPLIER_MAX', '1.5')),
-        'density_threshold': float(os.environ.get('MCTS_DENSITY_THRESHOLD', '1.0')),
-        'density_structured_bonus': float(os.environ.get('MCTS_DENSITY_STRUCTURED_BONUS', '0.2')),
-    }
-
-
 def get_drift_thresholds() -> dict:
     """
     Limiares do monitor de drift do juiz (A1 — grounding da recompensa).

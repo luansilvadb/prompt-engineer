@@ -83,14 +83,16 @@ def test_validate_raciocinio_missing_label():
 
 
 def test_mutador_cognitivo_agent_output_fields():
-    output_fields = MutadorCognitivoAgent.output_fields
+    from src.infrastructure.dspy_impl import MutadorCognitivoAgentSignature
+    output_fields = MutadorCognitivoAgentSignature.output_fields
     assert "raciocinio_estruturado" in output_fields
     assert "critica" in output_fields
     assert "nova_instrucao" in output_fields
 
 
 def test_mutador_cognitivo_agent_input_fields():
-    input_fields = MutadorCognitivoAgent.input_fields
+    from src.infrastructure.dspy_impl import MutadorCognitivoAgentSignature
+    input_fields = MutadorCognitivoAgentSignature.input_fields
     assert "instrucao_anterior" in input_fields
     assert "nota_anterior" in input_fields
     assert "feedback_juiz" in input_fields

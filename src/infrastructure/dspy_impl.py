@@ -2,7 +2,7 @@ import dspy
 from pathlib import Path
 from src.signatures import Avaliacao, AvaliacaoModoB
 from src.domain.agent_interfaces import (
-    EstrategiaDescoberta,
+    DiscoveredStrategy,
     SelfReflectiveOutput,
     MutadorCognitivoAgentOutput,
     IStrategyDiscoverer,
@@ -89,13 +89,13 @@ class DSPyStrategyDiscoverer(IStrategyDiscoverer):
     def __init__(self):
         self._predictor = dspy.Predict(StrategyDiscovererSignature)
 
-    def __call__(self, skill_atual: str, feedbacks_recentes: str, estrategias_conhecidas: str) -> EstrategiaDescoberta:
+    def __call__(self, skill_atual: str, feedbacks_recentes: str, estrategias_conhecidas: str) -> DiscoveredStrategy:
         res = self._predictor(
             skill_atual=skill_atual,
             feedbacks_recentes=feedbacks_recentes,
             estrategias_conhecidas=estrategias_conhecidas
         )
-        return EstrategiaDescoberta(
+        return DiscoveredStrategy(
             nome_estrategia=res.nome_estrategia,
             prompt_estrategia=res.prompt_estrategia
         )
@@ -117,9 +117,6 @@ class DSPySelfReflectiveAgent(ISelfReflectiveAgent):
         )
 
 class DSPyMutadorCognitivoAgent(IMutadorCognitivoAgent):
-    input_fields = MutadorCognitivoAgentSignature.input_fields
-    output_fields = MutadorCognitivoAgentSignature.output_fields
-
     def __init__(self):
         self._predictor = dspy.ChainOfThought(MutadorCognitivoAgentSignature)
 
@@ -141,6 +138,13 @@ def _parse_manteve_regras(manteve_str: str) -> bool:
     return 'true' in manteve_str or 'sim' in manteve_str or 'yes' in manteve_str or manteve_str == '1'
 
 
+def _parse_defeitos(defeitos_raw) -> list[str]:
+    if isinstance(defeitos_raw, str):
+        return [d.strip("- *").strip() for d in defeitos_raw.split('\\n') if d.strip("- *").strip()]
+    if isinstance(defeitos_raw, list):
+        return [str(d) for d in defeitos_raw]
+    return []
+
 
 class DSPyAvaliadorModoB(IAvaliadorModoB):
     def __init__(self, predictor=None):
@@ -156,13 +160,7 @@ class DSPyAvaliadorModoB(IAvaliadorModoB):
             regras_adicionais=regras_adicionais
         )
 
-        defeitos_raw = getattr(res, 'defeitos_encontrados', '')
-        if isinstance(defeitos_raw, str):
-            defeitos_list = [d.strip("- *").strip() for d in defeitos_raw.split('\\n') if d.strip("- *").strip()]
-        elif isinstance(defeitos_raw, list):
-            defeitos_list = [str(d) for d in defeitos_raw]
-        else:
-            defeitos_list = []
+        defeitos_list = _parse_defeitos(getattr(res, 'defeitos_encontrados', ''))
 
         return AvaliacaoModoB(
             manteve_regras_criticas=_parse_manteve_regras(res.manteve_regras_criticas),
@@ -231,13 +229,7 @@ def _invoke_judge_modo_b_with(module, exemplo, predicao) -> AvaliacaoModoB:
         regras_adicionais=regras
     )
 
-    defeitos_raw = getattr(res, 'defeitos_encontrados', '')
-    if isinstance(defeitos_raw, str):
-        defeitos_list = [d.strip("- *").strip() for d in defeitos_raw.split('\\n') if d.strip("- *").strip()]
-    elif isinstance(defeitos_raw, list):
-        defeitos_list = [str(d) for d in defeitos_raw]
-    else:
-        defeitos_list = []
+    defeitos_list = _parse_defeitos(getattr(res, 'defeitos_encontrados', ''))
 
     return AvaliacaoModoB(
         manteve_regras_criticas=_parse_manteve_regras(res.manteve_regras_criticas),

@@ -1,8 +1,22 @@
 import json
+import datetime
 import os
 from pathlib import Path
 
 JOBS_DIR = Path('src/outputs/jobs')
+
+
+def save_optimized_skill(content: str) -> Path:
+    """
+    Salva o conteúdo da skill otimizada em um arquivo com timestamp.
+    Retorna o caminho (Path) do arquivo salvo.
+    """
+    output_dir = Path('src/outputs/skills')
+    output_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    output_file = output_dir / f'skill_otimizada_{timestamp}.md'
+    output_file.write_text(content, encoding='utf-8')
+    return output_file
 
 def init_store():
     JOBS_DIR.mkdir(parents=True, exist_ok=True)

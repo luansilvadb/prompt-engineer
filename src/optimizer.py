@@ -12,10 +12,9 @@ Evolução do core inspirada nos princípios de David Silver (AlphaGo/AlphaZero)
 - Delta Reward Shaping (temporal-difference sobre reward absoluto)
 """
 
+import re
 import time
-import datetime
 import uuid
-from pathlib import Path
 from typing import Tuple
 
 from src.domain.agent_interfaces import (
@@ -25,15 +24,14 @@ from src.domain.agent_interfaces import (
     IStrategyDiscoverer,
 )
 from src.domain.config import MCTSConfig
-from src.domain.events import IJobEventEmitter
-from src.domain.scoring_pipeline import IScoringPipeline
+from src.domain.events import IJobEventEmitter, NodeEventPayload
 from src.domain.store_interfaces import IExperienceStore
 from src.domain.mcts import MCTSNode
 from src.mutation_strategies.bandit_interfaces import IMutationBandit, IStrategyRegistry
 from src.signatures import calcular_delta_reward, MutadorCognitivoOutput, _validate_raciocinio, funcao_de_recompensa
 from src.experience_store import Experience, hash_instruction
 from src.value_estimator import ValueEstimator
-from src.mutations import get_strategy_description
+from src.mutation_strategies.api import get_strategy_description
 from src.semantic_evaluator import calculate_semantic_penalty
 from src.heuristic_evaluator import evaluate_heuristics
 from src.density_evaluator import calculate_density_multiplier
@@ -45,7 +43,6 @@ class Optimizer:
         skill_original: str,
         config: MCTSConfig,
         emitter: IJobEventEmitter,
-        scoring_pipeline: IScoringPipeline,
         strategy_discoverer: IStrategyDiscoverer,
         agent: ISelfReflectiveAgent,
         agent_cognitivo: IMutadorCognitivoAgent,
@@ -56,40 +53,22 @@ class Optimizer:
         regras_adicionais: str = "",
     ) -> None:
         self.skill_original = skill_original
-        self._strategy_discoverer = strategy_discoverer
-        self._agent = agent
-        self._agent_cognitivo = agent_cognitivo
-        self._avaliador_modo_b = avaliador_modo_b
+        self.config = config
+        self.strategy_discoverer = strategy_discoverer
+        self.agent = agent
+        self.agent_cognitivo = agent_cognitivo
+        self.avaliador_modo_b = avaliador_modo_b
         self._emitter = emitter
-        self._scoring_pipeline = scoring_pipeline
         self.regras_adicionais = regras_adicionais
 
-        # Isolar escopo de estratégias para esta sessão de otimização
         self.job_id = uuid.uuid4().hex[:8]
         strategy_registry.set_job_id(self.job_id)
         self._strategy_registry = strategy_registry
-
-        # Extrair hiperparâmetros do MCTSConfig tipado
-        self.max_iterations = config.max_iterations
-        self.c_param = config.c_param
-        self.gamma = config.gamma
-        self.progressive_alpha = config.progressive_alpha
-        self.progressive_c = config.progressive_c
-        self.value_threshold = config.value_threshold
-        self.semantic_sim_threshold = config.semantic_sim_threshold
-        self.lexical_density_min = config.lexical_density_min
-        self.verbosity_penalty_factor = config.verbosity_penalty_factor
-        self.buzzword_threshold = config.buzzword_threshold
-        self.density_threshold = config.density_threshold
-        self.density_multiplier_min = config.density_multiplier_min
-        self.density_multiplier_max = config.density_multiplier_max
-        self.density_structured_bonus = config.density_structured_bonus
 
         self.experience_store = experience_store
         self.value_estimator = ValueEstimator(learning_rate=config.value_lr)
         self.mutation_bandit = bandit
 
-        # Carregar priors do experience store no bandit
         strategy_stats = self.experience_store.get_strategy_stats()
         if strategy_stats:
             self.mutation_bandit.load_priors(strategy_stats)
@@ -98,7 +77,6 @@ class Optimizer:
                 f'{len(strategy_stats)} estratégias conhecidas.'
             )
 
-        # Prior boosting incondicional para MutadorCognitivo (COGN-01)
         cognitivo_prior = {
             'mutador_cognitivo': {
                 'count': config.cognitivo_prior_count,
@@ -111,46 +89,13 @@ class Optimizer:
             f'delta={config.cognitivo_prior_mean_delta}'
         )
 
-    @property
-    def strategy_discoverer(self):
-        return self._strategy_discoverer
-
-    @strategy_discoverer.setter
-    def strategy_discoverer(self, value):
-        self._strategy_discoverer = value
-
-    @property
-    def agent(self):
-        return self._agent
-
-    @agent.setter
-    def agent(self, value):
-        self._agent = value
-
-    @property
-    def agent_cognitivo(self):
-        return self._agent_cognitivo
-
-    @agent_cognitivo.setter
-    def agent_cognitivo(self, value):
-        self._agent_cognitivo = value
-
-    @property
-    def avaliador_modo_b(self):
-        return self._avaliador_modo_b
-
-    @avaliador_modo_b.setter
-    def avaliador_modo_b(self, value):
-        self._avaliador_modo_b = value
-
-
-
     def selection(self, node: MCTSNode) -> MCTSNode:
         """Seleção UCB com progressive widening."""
-        while node.children and len(node.children) >= node.max_children_allowed(self.progressive_c, self.progressive_alpha):
+        cfg = self.config
+        while node.children and len(node.children) >= node.max_children_allowed(cfg.progressive_c, cfg.progressive_alpha):
             if self._emitter.is_cancelled():
                 return node
-            best = node.best_child_ucb(self.c_param)
+            best = node.best_child_ucb(cfg.c_param)
             if best is None:
                 return node
             node = best
@@ -183,14 +128,13 @@ class Optimizer:
             return False
 
         estimated = self.value_estimator.estimate(instruction)
-        if estimated < self.value_threshold:
-            self._emitter.emit_log(f"    [Poda] Value estimator: {estimated:.2f} < threshold {self.value_threshold}. Podando.")
+        if estimated < self.config.value_threshold:
+            self._emitter.emit_log(f"    [Poda] Value estimator: {estimated:.2f} < threshold {self.config.value_threshold}. Podando.")
             return True
         return False
 
     def notify_node(self, node: MCTSNode):
         try:
-            from src.domain.events import NodeEventPayload
             payload = NodeEventPayload(
                 id=node.node_id,
                 parent_id=node.parent.node_id if node.parent else None,
@@ -211,7 +155,7 @@ class Optimizer:
     def backpropagation(self, node: MCTSNode, reward: float):
         """
         Backpropagation com γ discount.
-        
+
         Silver: temporal-difference — nós mais próximos da folha
         recebem mais crédito que nós distantes.
         """
@@ -220,7 +164,7 @@ class Optimizer:
         while current is not None:
             if self._emitter.is_cancelled():
                 break
-            discounted_reward = reward * (self.gamma ** depth_from_leaf)
+            discounted_reward = reward * (self.config.gamma ** depth_from_leaf)
             current.q_value += discounted_reward
             current.visits += 1
             self.notify_node(current)
@@ -244,7 +188,6 @@ class Optimizer:
                 estrategias_conhecidas=estrategias_conhecidas
             )
 
-            import re
             key_raw = nova_estrat.nome_estrategia.lower()
             key = re.sub(r'[^a-z0-9_]', '_', key_raw)[:30] + '_' + str(uuid.uuid4())[:4]
 
@@ -264,6 +207,23 @@ class Optimizer:
                 return '\nLições de otimizações passadas:\n' + '\n'.join(lessons[:3])
         return ''
 
+    def _validate_cognitive_output(self, predicao) -> None:
+        """Valida as seções obrigatórias da saída do agente cognitivo."""
+        try:
+            _validate_raciocinio(predicao.raciocinio_estruturado)
+        except Exception as e:
+            self._emitter.emit_error(f'[!] raciocinio_estruturado invalido: {e}')
+        try:
+            MutadorCognitivoOutput(nova_instrucao=predicao.nova_instrucao)
+        except Exception as e:
+            self._emitter.emit_error(f'[!] nova_instrucao secoes cognitivas invalidas: {e}')
+
+    def _handle_empty_candidate(self, critica: str) -> Tuple[str, str, bool]:
+        """Fallback quando a candidata gerada é nula ou idêntica."""
+        self._emitter.emit_error('    [!] Instrução gerada nula ou idêntica. Mudando abordagem...')
+        nova_critica = f'{critica}\nInstrução idêntica ou nula. Teste uma mudança radical.'
+        return '', nova_critica, False
+
     def _try_generate_mutation(
         self,
         leaf: MCTSNode,
@@ -274,22 +234,14 @@ class Optimizer:
         critica: str
     ) -> Tuple[str, str, bool]:
         try:
-            COGNITIVO_KEY = 'mutador_cognitivo'
-            if strategy == COGNITIVO_KEY:
+            if strategy == 'mutador_cognitivo':
                 predicao = self.agent_cognitivo(
                     instrucao_anterior=leaf.instruction,
                     nota_anterior=nota,
                     feedback_juiz=feedback_completo,
                     estrategia_mutacao=strategy_prompt,
                 )
-                try:
-                    _validate_raciocinio(predicao.raciocinio_estruturado)
-                except Exception as e:
-                    self._emitter.emit_error(f'[!] raciocinio_estruturado invalido: {e}')
-                try:
-                    MutadorCognitivoOutput(nova_instrucao=predicao.nova_instrucao)
-                except Exception as e:
-                    self._emitter.emit_error(f'[!] nova_instrucao secoes cognitivas invalidas: {e}')
+                self._validate_cognitive_output(predicao)
             else:
                 predicao = self.agent(
                     instrucao_anterior=leaf.instruction,
@@ -307,9 +259,7 @@ class Optimizer:
                 self._emitter.emit_log(f'    [Crítica]: {predicao.critica}')
                 return candidata, predicao.critica, True
             else:
-                self._emitter.emit_error('    [!] Instrução gerada nula ou idêntica. Mudando abordagem...')
-                nova_critica = f'{critica}\nInstrução idêntica ou nula. Teste uma mudança radical.'
-                return '', nova_critica, False
+                return self._handle_empty_candidate(critica)
         except Exception as e:
             self._emitter.emit_error(f'    [!] Erro técnico na geração: {str(e)}')
             nova_critica = f'{critica}\nErro técnico ({e}). Tente uma reescrita mais simples.'
@@ -368,11 +318,12 @@ class Optimizer:
 
     def _evaluate_and_prune(self, child: MCTSNode) -> Tuple[bool, dict]:
         """Returns (is_pruned, heuristic_result)"""
+        cfg = self.config
         heuristic_result = evaluate_heuristics(
             child.instruction,
-            density_min=self.lexical_density_min,
-            penalty_factor=self.verbosity_penalty_factor,
-            buzzword_threshold=self.buzzword_threshold,
+            density_min=cfg.lexical_density_min,
+            penalty_factor=cfg.verbosity_penalty_factor,
+            buzzword_threshold=cfg.buzzword_threshold,
         )
         if heuristic_result.get("prune"):
             self._emitter.emit_log(f"    [Poda Heurística] {heuristic_result.get('reason')}")
@@ -393,7 +344,7 @@ class Optimizer:
         penalty = calculate_semantic_penalty(
             child.instruction,
             parent_instruction,
-            threshold=self.semantic_sim_threshold
+            threshold=self.config.semantic_sim_threshold
         )
         if penalty < 1.0:
             self._emitter.emit_log(f"    [Penalidade Semântica] Fator de decaimento: {penalty:.2f}")
@@ -402,7 +353,7 @@ class Optimizer:
     def _apply_density_multiplier(self, child: MCTSNode, reward: float) -> float:
         """
         RN-05: Aplica multiplicador de densidade com guard clauses
-        
+
         Retorna reward inalterado (multiplicador 1.0) se:
         - Threshold de densidade está desabilitado (lexical_density_min == 0.0)
         - Parent ausente (nó raiz)
@@ -410,60 +361,55 @@ class Optimizer:
         """
         if not child.parent:
             return reward
-        
-        # GUARD CLAUSE 1: Densidade desabilitada
-        if self.lexical_density_min == 0.0:
+
+        cfg = self.config
+        if cfg.lexical_density_min == 0.0:
             return reward
-        
-        # GUARD CLAUSE 2: Tamanhos idênticos
+
         parent_instruction = child.parent.instruction
-        parent_len = len(parent_instruction)
-        child_len = len(child.instruction)
-        if parent_len == child_len:
+        if len(parent_instruction) == len(child.instruction):
             return reward
-        
+
         density_mult = calculate_density_multiplier(
             child_instruction=child.instruction,
             parent_instruction=parent_instruction,
             mutation_strategy=child.mutation_strategy,
-            density_threshold=self.density_threshold,
-            density_multiplier_min=self.density_multiplier_min,
-            density_multiplier_max=self.density_multiplier_max,
-            structured_bonus=self.density_structured_bonus,
-            min_density=self.lexical_density_min,
+            density_threshold=cfg.density_threshold,
+            density_multiplier_min=cfg.density_multiplier_min,
+            density_multiplier_max=cfg.density_multiplier_max,
+            structured_bonus=cfg.density_structured_bonus,
+            min_density=cfg.lexical_density_min,
         )
         if density_mult != 1.0:
             direction = "Bonus por Densidade" if density_mult > 1.0 else "Penalidade por Densidade"
             self._emitter.emit_log(f"    [{direction}] Fator: {density_mult:.2f}")
         return reward * density_mult
 
-    def _run_mcts_iteration(self, root: MCTSNode) -> Tuple[bool, bool, float]:
+    def _run_mcts_iteration(self, root: MCTSNode) -> Tuple[bool, float]:
         """
-        RN-06: Verifica cancelamento em 3 checkpoints obrigatórios
-        
-        Returns (should_break, is_error, reward)
+        RN-06: Verifica cancelamento em 3 checkpoints obrigatórios.
+
+        Returns (should_break, reward).
         """
-        # CHECKPOINT 1: Antes de selection
+        cfg = self.config
         if self._emitter.is_cancelled():
-            return True, False, 0.0
+            return True, 0.0
 
         leaf = self.selection(root)
-        if len(leaf.children) >= leaf.max_children_allowed(self.progressive_c, self.progressive_alpha):
+        if len(leaf.children) >= leaf.max_children_allowed(cfg.progressive_c, cfg.progressive_alpha):
             child = leaf
         else:
             child = self._expand_node(leaf)
 
-        # CHECKPOINT 2: Após expand
         if self._emitter.is_cancelled():
-            return True, False, 0.0
+            return True, 0.0
 
         is_pruned, heuristic_result = self._evaluate_and_prune(child)
         if is_pruned:
-            return False, False, 0.0
+            return False, 0.0
 
-        # CHECKPOINT 3: Antes de simulation
         if self._emitter.is_cancelled():
-            return True, False, 0.0
+            return True, 0.0
 
         reward, feedback = self.simulation(child.instruction)
 
@@ -474,29 +420,26 @@ class Optimizer:
         child.feedback = feedback
         child.last_reward = reward
 
-        # Delta reward shaping: comparar com o pai
         parent_reward = child.parent.last_reward if child.parent else 0.0
         shaped_reward = calcular_delta_reward(reward, parent_reward)
 
         self.backpropagation(child, shaped_reward)
 
-        # Atualizar mutation bandit com a recompensa observada
         if child.mutation_strategy:
             self.mutation_bandit.update(child.mutation_strategy, shaped_reward)
 
-        # Registrar experiência na store
         self.experience_store.add(Experience(
             skill_hash=hash_instruction(self.skill_original),
             mutation_strategy=child.mutation_strategy,
             delta_reward=reward - parent_reward,
             absolute_reward=reward,
-            feedback=feedback[:500],  # Truncar feedback longo
+            feedback=feedback[:500],
             parent_instruction_hash=hash_instruction(child.parent.instruction) if child.parent else '',
             instruction=child.instruction,
             parent_instruction=child.parent.instruction if child.parent else self.skill_original
         ))
 
-        return False, False, reward
+        return False, reward
 
     def _get_all_nodes(self, node: MCTSNode) -> list[MCTSNode]:
         nodes = [node]
@@ -513,9 +456,9 @@ class Optimizer:
         consecutive_zeros: int,
         consecutive_api_errors: int
     ) -> Tuple[bool, int, int]:
-        self._emitter.emit_log(f'\n--- Iteração MCTS {i + 1}/{self.max_iterations} ---')
+        self._emitter.emit_log(f'\n--- Iteração MCTS {i + 1}/{self.config.max_iterations} ---')
         try:
-            should_break, is_error, iter_reward = self._run_mcts_iteration(root)
+            should_break, iter_reward = self._run_mcts_iteration(root)
             if should_break:
                 return True, consecutive_zeros, consecutive_api_errors
 
@@ -558,8 +501,9 @@ class Optimizer:
         return best_node.instruction
 
     def optimize(self) -> str:
+        cfg = self.config
         self._emitter.emit_log('\n[+] Inicializando o pipeline MCTS RL customizado com refinamentos...')
-        self._emitter.emit_log(f'    Config: γ={self.gamma}, C_ucb={self.c_param}, α_pw={self.progressive_alpha}, threshold={self.value_threshold}')
+        self._emitter.emit_log(f'    Config: γ={cfg.gamma}, C_ucb={cfg.c_param}, α_pw={cfg.progressive_alpha}, threshold={cfg.value_threshold}')
 
         root = MCTSNode(self.skill_original, critica='Rascunho Inicial')
         self.notify_node(root)
@@ -573,7 +517,7 @@ class Optimizer:
         consecutive_zeros = 0
         consecutive_api_errors = 0
 
-        for i in range(self.max_iterations):
+        for i in range(cfg.max_iterations):
             if self._emitter.is_cancelled():
                 self._emitter.emit_log('\n[!] OTIMIZAÇÃO INTERROMPIDA PELO USUÁRIO.')
                 break
@@ -584,25 +528,11 @@ class Optimizer:
             if should_break:
                 break
 
-        # Salvar experiências acumuladas nesta sessão
         self.experience_store.save()
         self._emitter.emit_log(f'[*] {len(self.experience_store.experiences)} experiências salvas na memória de longo prazo.')
 
-        # Log das estatísticas do bandit
         self._log_bandit_stats()
 
         self._emitter.emit_log('\n=======================================================\n                OTIMIZAÇÃO CONCLUÍDA                   \n=======================================================\n')
 
         return self._select_and_log_best_node(root)
-
-def save_optimized_skill(content: str) -> Path:
-    """
-    Salva o conteúdo da skill otimizada em um arquivo com timestamp.
-    Retorna o caminho (Path) do arquivo salvo.
-    """
-    output_dir = Path('src/outputs/skills')
-    output_dir.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-    output_file = output_dir / f'skill_otimizada_{timestamp}.md'
-    output_file.write_text(content, encoding='utf-8')
-    return output_file

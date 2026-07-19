@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass
 
 @dataclass
@@ -36,32 +37,35 @@ class MutadorCognitivoOutput:
 
 
 def _validate_raciocinio(raciocinio_str: str) -> None:
-    normalized = raciocinio_str.lower()
-    labels = ['premissas', 'dedu', 'conclus']
-
-    positions = []
-    for label in labels:
-        pos = normalized.find(label)
-        if pos == -1:
-            raise ValueError(f"raciocinio_estruturado está faltando a seção obrigatória: {label}")
-        positions.append((label, pos))
-
-    positions.sort(key=lambda x: x[1])
+    """Valida e extrai as seções obrigatórias do raciocínio estruturado."""
+    sections = {
+        'premissas': r'(?i)premissas\s*[:：]?\s*',
+        'deducoes': r'(?i)dedu(?:ç[õo]es|coes|)\s*[:：]?\s*',
+        'conclusao': r'(?i)conclus[ãa]o\s*[:：]?\s*',
+    }
 
     extracted = {}
-    for i, (label, start) in enumerate(positions):
-        end = positions[i + 1][1] if i + 1 < len(positions) else len(raciocinio_str)
-        content = raciocinio_str[start:end].strip()
-        for prefix in ['premissas:', 'premissas', 'deduções:', 'deducoes:', 'dedu', 'conclusão:', 'conclusao:', 'conclus']:
-            if content.lower().startswith(prefix):
-                content = content[len(prefix):].lstrip(':').strip()
-                break
-        extracted[label] = content
+    last_end = 0
+    ordered = list(sections.items())
+
+    for i, (key, pattern) in enumerate(ordered):
+        match = re.search(pattern, raciocinio_str[last_end:])
+        if not match:
+            raise ValueError(f"raciocinio_estruturado está faltando a seção obrigatória: {key}")
+        start = last_end + match.end()
+        if i + 1 < len(ordered):
+            next_pattern = ordered[i + 1][1]
+            next_match = re.search(next_pattern, raciocinio_str[start:])
+            end = start + next_match.start() if next_match else len(raciocinio_str)
+        else:
+            end = len(raciocinio_str)
+        extracted[key] = raciocinio_str[start:end].strip()
+        last_end = start
 
     RaciocinioCognitivo(
         premissas=extracted['premissas'],
-        deducoes=extracted['dedu'],
-        conclusao=extracted['conclus'],
+        deducoes=extracted['deducoes'],
+        conclusao=extracted['conclusao'],
     )
 
 

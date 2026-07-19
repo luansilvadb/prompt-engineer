@@ -12,27 +12,6 @@ class IAiFramework(Protocol):
 
 
 @dataclass(frozen=True)
-class StrategyDiscoveryInput:
-    skill_atual: str
-    feedbacks_recentes: str
-    estrategias_conhecidas: str
-
-
-@dataclass(frozen=True)
-class DiscoveredStrategy:
-    nome_estrategia: str
-    prompt_estrategia: str
-
-
-@dataclass(frozen=True)
-class MutationInput:
-    instrucao_anterior: str
-    nota_anterior: str
-    feedback_juiz: str
-    estrategia_mutacao: str
-
-
-@dataclass(frozen=True)
 class SelfReflectiveOutput:
     critica: str
     nova_instrucao: str
@@ -45,9 +24,8 @@ class MutadorCognitivoAgentOutput:
     nova_instrucao: str
 
 
-# Kept for backward compatibility — callers use the non-frozen variants
 @dataclass
-class EstrategiaDescoberta:
+class DiscoveredStrategy:
     nome_estrategia: str
     prompt_estrategia: str
 

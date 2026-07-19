@@ -2,26 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Union
 
 
 class EventLevel(str, Enum):
     INFO = "info"
     ERROR = "error"
-
-
-class EventType(str, Enum):
-    LOG = "log"
-    NODE = "node"
-    STATUS = "status"
-    ERROR = "error"
-
-
-@dataclass(frozen=True)
-class LogEventPayload:
-    text: str
-    level: EventLevel
-    job_id: str
 
 
 @dataclass(frozen=True)
@@ -37,31 +22,6 @@ class NodeEventPayload:
     mutation_strategy: str
     depth: int
     job_id: str
-
-
-@dataclass(frozen=True)
-class StatusEventPayload:
-    status: str
-    job_id: str
-
-
-@dataclass(frozen=True)
-class ErrorEventPayload:
-    message: str
-    job_id: str
-
-
-@dataclass(frozen=True)
-class TypedSSEEvent:
-    type: EventType
-    data: Union[LogEventPayload, NodeEventPayload, StatusEventPayload, ErrorEventPayload]
-
-    def to_sse_dict(self) -> dict:
-        import dataclasses
-        return {
-            "type": self.type.value,
-            "data": dataclasses.asdict(self.data),
-        }
 
 
 class IJobEventEmitter:

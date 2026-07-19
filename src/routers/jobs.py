@@ -11,25 +11,6 @@ import src.store as job_store
 from src.teleprompter import compilar_avaliador
 from src.config import setup
 
-class DspyAdapter:
-    def context(self, lm):
-        import dspy
-        return dspy.context(lm=lm)
-
-class JobStoreAdapter:
-    def save_job_state(self, job_id, job):
-        job_store.save_job_state(job_id, job)
-    def load_all_jobs(self, skip=0, limit=50, status=None):
-        return job_store.load_all_jobs(skip, limit, status)
-    def load_job(self, job_id):
-        return job_store.load_job(job_id)
-    def delete_job(self, job_id):
-        return job_store.delete_job(job_id)
-
-class AvaliadorCompilerAdapter:
-    def compilar_avaliador(self, lm=None, min_reward=0.8):
-        return compilar_avaliador(lm, min_reward)
-
 router = APIRouter(prefix="/api", tags=["Jobs"])
 
 @router.post('/optimize')
@@ -53,8 +34,7 @@ async def start_optimization(request: OtimizacaoRequestDTO, background_tasks: Ba
 
     jobs[job_id] = job_state
 
-    store_adapter = JobStoreAdapter()
-    store_adapter.save_job_state(job_id, job_state)
+    job_store.save_job_state(job_id, job_state)
     loop = asyncio.get_running_loop()
 
     # Injeção de dependências via Container
@@ -72,7 +52,6 @@ async def start_optimization(request: OtimizacaoRequestDTO, background_tasks: Ba
         job_store=container.get_job_store(),
         ai_framework=container.get_ai_framework(),
         config=container.get_config(),
-        scoring_pipeline=container.get_scoring_pipeline(),
         bandit=container.create_bandit(),
         strategy_registry=container.create_strategy_registry(),
     )
@@ -256,11 +235,8 @@ async def check_drift():
     Atende ao spike de medição e à checagem periódica — sem acoplar ao loop MCTS.
     """
     from src.config import get_drift_thresholds
-    from src.drift_monitor import (
-        DriftThresholds,
-        circuit_breaker,
-        verificar_juiz_atual,
-    )
+    from src.drift.models import DriftThresholds
+    from src.drift.circuit_breaker import circuit_breaker, verificar_juiz_atual
 
     def _run():
         try:

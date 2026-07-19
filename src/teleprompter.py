@@ -5,17 +5,13 @@ from src.experience_store import ExperienceStore
 from src.infrastructure.dspy_impl import AvaliadorModoBSignature
 from src.config import get_drift_thresholds
 from dspy.teleprompt import BootstrapFewShot
-from src.drift_monitor import (
-    DriftGate,
-    DriftMeasurementError,
-    DriftReport,
-    DriftThresholds,
-    GoldenSet,
-    JudgeProbeRunner,
-    load_drift_cache,
-    medir_drift,
-    save_drift_cache,
-)
+from src.drift.gate import DriftGate
+from src.drift.exceptions import DriftMeasurementError
+from src.drift.models import DriftReport, DriftThresholds
+from src.drift.golden import GoldenSet
+from src.drift.runner import JudgeProbeRunner
+from src.drift.cache import load_drift_cache, save_drift_cache
+from src.drift.metrics import medir_drift
 
 _compile_lock = threading.Lock()
 
