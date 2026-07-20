@@ -37,13 +37,16 @@ def evaluate_heuristics(
         return {"prune": False, "penalty_multiplier": 1.0, "reason": "Bypassed (short text)"}
 
     # Layer 0: Vague Buzzword Detection
-    # Textos com muitos clichês de IA recebem penalidade severa sem gastar tokens no juiz.
+    # Penalidade progressiva: 3 buzzwords = 0.9x, 5 = 0.7x, 10+ = 0.3x.
+    # Evita o cliff edge onde 3 buzzwords derrubavam o reward para 0.15.
     buzzword_hits = _BUZZWORD_PATTERN.findall(text)
     if len(buzzword_hits) >= buzzword_threshold:
         unique_hits = list(dict.fromkeys(h.lower() for h in buzzword_hits))
+        excess = len(buzzword_hits) - buzzword_threshold + 1
+        progressive_penalty = max(0.30, 1.0 - 0.10 * excess)
         return {
             "prune": False,
-            "penalty_multiplier": 0.15,
+            "penalty_multiplier": progressive_penalty,
             "reason": f"Vague Buzzwords ({len(buzzword_hits)} hits: {unique_hits[:5]})",
         }
 

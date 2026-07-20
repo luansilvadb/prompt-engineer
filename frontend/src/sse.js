@@ -1,5 +1,6 @@
 import { el } from './dom.js';
 import { parseMarkdown, computeDiff } from './utils.js';
+import { showToast } from './utils/toast.js';
 
 export function connectSSE(jobId, treeVm, consoleVm, onResult, onEnd, updateStatus, setUIRunning, configVm) {
     const url = `/api/stream/${jobId}`;
@@ -13,7 +14,7 @@ export function connectSSE(jobId, treeVm, consoleVm, onResult, onEnd, updateStat
         const data = JSON.parse(e.data);
         if (data.text) {
             consoleVm.addLog(data.text);
-            
+
             if (data.text.includes('Iteração MCTS')) {
                 const match = data.text.match(/Iteração MCTS (\d+)\/(\d+)/);
                 if (match) {
@@ -40,24 +41,35 @@ export function connectSSE(jobId, treeVm, consoleVm, onResult, onEnd, updateStat
     eventSource.addEventListener('end', (e) => {
         const finalStatus = e.data;
         eventSource.close();
-        
+
         setUIRunning(false);
         onEnd(finalStatus);
 
         if (finalStatus === 'completed') {
             updateStatus('completed', 'Concluído');
             consoleVm.addLog('[+] PROCESSO CONCLUÍDO COM SUCESSO!');
+            showToast('Otimização concluída com sucesso!', 'success');
         } else if (finalStatus === 'cancelled') {
             updateStatus('idle', 'Cancelado');
             consoleVm.addLog('[!] OTIMIZAÇÃO CANCELADA PELO USUÁRIO OU SERVIDOR.');
+            showToast('Otimização cancelada.', 'warning');
+        } else if (finalStatus === 'timeout') {
+            updateStatus('error', 'Timeout');
+            consoleVm.addLog('[!] TIMEOUT - A otimização excedeu o tempo máximo configurado.');
+            showToast('Timeout: otimização excedeu o tempo máximo.', 'error', 8000);
         } else {
             updateStatus('error', 'Erro');
             consoleVm.addLog('[!] FALHA NA EXECUÇÃO - VERIFIQUE AS CONFIGURAÇÕES.');
+            showToast('Falha na execução da otimização.', 'error', 6000);
         }
     });
 
     eventSource.onerror = (err) => {
         console.error('SSE Error:', err);
+        // Só exibe toast se ainda não houver um evento 'end' processado
+        if (eventSource.readyState === EventSource.CLOSED) {
+            showToast('Conexão SSE perdida com o servidor.', 'error', 5000);
+        }
     };
 
     return eventSource;

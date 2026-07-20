@@ -49,6 +49,7 @@ class GoldenSet:
                 expected=exp,
                 expected_rank_band=pd['expected_rank_band'],
                 verifier=pd.get('verifier', ''),
+                category=pd.get('category', 'general'),
             ))
         return probes
 
@@ -97,6 +98,7 @@ class GoldenSet:
                     },
                     'expected_rank_band': p.expected_rank_band,
                     'verifier': p.verifier,
+                    'category': p.category,
                 }
                 for p in self.probes
             ],

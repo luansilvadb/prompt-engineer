@@ -57,6 +57,96 @@ def _compute_mae_per_dimension(measurements: list, dims: List[str]) -> List[Dime
     return mae_per_dim
 
 
+# Lista configurável de buzzwords pomposas para detecção de viés estético.
+# Valores iniciais — recalibrar na Fase 4 com dados do golden set expandido (DESIGN.md).
+_STYLE_BUZZWORDS = [
+    'axioma', 'ontológico', 'ontologica', 'espectral', 'oráculo', 'oraculo',
+    'decomposição', 'decomposicao', 'transmutação', 'transmutacao',
+    'exegese', 'catarse', 'gênese', 'genese', 'primária', 'primaria',
+    'epistemológica', 'epistemologica', 'existencial', 'entropia',
+    'cognitiva', 'cognitivo', 'arquitetura ontológica', 'arquitetura ontologica',
+    'dogma', 'falácia', 'falacia', 'capitulação', 'capitulacao',
+    'paradigma', 'transcendência', 'transcendencia',
+]
+
+_STYLE_BUZZWORDS_LOWER = [w.lower() for w in _STYLE_BUZZWORDS]
+
+
+def _detect_style_drift_signal(measurements: list) -> bool:
+    """
+    Detecta sinal de viés estético analisando os feedbacks textuais do juiz.
+    Se >40% dos feedbacks contêm >=2 buzzwords em contexto de elogio,
+    retorna True como flag de auditoria.
+
+    ATENÇÃO: Isto NUNCA penaliza automaticamente. É sinal para investigação humana.
+    Threshold (>40%) é valor inicial — recalibrar na Fase 4 (DESIGN.md).
+    """
+    positive_signals = 0
+    total_feedbacks = 0
+
+    for _, m in measurements:
+        for sample in m.samples:
+            if sample is None:
+                continue
+            fb = getattr(sample, 'feedback_detalhado', '')
+            if not fb:
+                continue
+            fb_lower = fb.lower()
+            buzzword_count = sum(1 for bw in _STYLE_BUZZWORDS_LOWER if bw in fb_lower)
+            # Verificar se o contexto é de elogio (palavras positivas próximas)
+            praise_patterns = ['bom', 'boa', 'excelente', 'ótimo', 'otimo', 'bem estruturado',
+                              'bem escrito', 'sofisticado', 'elegante', 'rico', 'impressionante']
+            has_praise = any(p in fb_lower for p in praise_patterns)
+            if buzzword_count >= 2 and has_praise:
+                positive_signals += 1
+            total_feedbacks += 1
+
+    if total_feedbacks == 0:
+        return False
+    ratio = positive_signals / total_feedbacks
+    return ratio > 0.40
+
+
+def _compute_style_gap(measurements: list) -> float:
+    """
+    Computa style_gap = composite(SD1_integro) - composite(SD3_pomposo).
+    Negativo = viés estético confirmado (alarme crítico).
+    Retorna 0.0 se os probes não forem encontrados.
+    """
+    sd1_comp = None
+    sd3_comp = None
+    for p, m in measurements:
+        if p.id == 'SD-1':
+            sd1_comp = m.mean_composite()
+        elif p.id == 'SD-3':
+            sd3_comp = m.mean_composite()
+
+    if sd1_comp is not None and sd3_comp is not None:
+        return sd1_comp - sd3_comp
+    return 0.0
+
+
+def _compute_category_accuracy(measurements: list) -> dict:
+    """
+    Computa acurácia de critical_rules por categoria de probe.
+    Retorna dict: {"estilo": 0.95, "general": 1.0, ...}
+    """
+    from collections import defaultdict
+    cat_correct = defaultdict(int)
+    cat_total = defaultdict(int)
+
+    for p, m in measurements:
+        cat = getattr(p, 'category', 'general')
+        cat_total[cat] += 1
+        if m.critical_rules_all_correct(p.expected.manteve_regras_criticas):
+            cat_correct[cat] += 1
+
+    return {
+        cat: (cat_correct[cat] / cat_total[cat]) if cat_total[cat] > 0 else 0.0
+        for cat in cat_total
+    }
+
+
 def _compute_concordance_and_violations(measurements: list) -> Tuple[float, int, int]:
     if not measurements:
         return 0.0, 0, 0
@@ -109,6 +199,11 @@ def medir_drift(runner, golden, repetitions: int, thresholds) -> DriftReport:
 
     per_probe = _build_per_probe(measurements)
 
+    # Fase 3: métricas de viés estético
+    style_gap = _compute_style_gap(measurements)
+    style_drift_signal = _detect_style_drift_signal(measurements)
+    category_accuracy = _compute_category_accuracy(measurements)
+
     return DriftReport(
         judge_label=runner.label,
         spearman_composite=spearman,
@@ -122,4 +217,7 @@ def medir_drift(runner, golden, repetitions: int, thresholds) -> DriftReport:
         repetitions=repetitions,
         per_probe=per_probe,
         low_confidence=low_conf,
+        style_gap=style_gap,
+        style_drift_signal=style_drift_signal,
+        category_accuracy=category_accuracy,
     )

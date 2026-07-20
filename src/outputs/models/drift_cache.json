@@ -1,0 +1,121 @@
+{
+  "judge_label": "atual",
+  "spearman_composite": 0.8928571428571429,
+  "offset_scale": 3.0775510204081535,
+  "mae_per_dimension": [
+    {
+      "dimension": "nota_clareza",
+      "mae": 4.142857142857143
+    },
+    {
+      "dimension": "nota_formatacao",
+      "mae": 12.142857142857142
+    },
+    {
+      "dimension": "nota_robustez",
+      "mae": 12.142857142857142
+    },
+    {
+      "dimension": "nota_densidade_informacional",
+      "mae": 8.857142857142858
+    },
+    {
+      "dimension": "nota_acionabilidade",
+      "mae": 7.571428571428571
+    },
+    {
+      "dimension": "nota_anti_fragilidade",
+      "mae": 13.285714285714286
+    }
+  ],
+  "critical_rules_concordance": 1.0,
+  "critical_rules_violated": false,
+  "missed_violations": 0,
+  "false_rejections": 0,
+  "mean_variance": 0.0,
+  "repetitions": 3,
+  "low_confidence": false,
+  "style_gap": 0.4485714285714284,
+  "style_drift_signal": false,
+  "category_accuracy": {
+    "estilo": 1.0,
+    "natural": 1.0,
+    "constraint": 1.0,
+    "manual": 1.0,
+    "negation": 1.0
+  },
+  "per_probe": [
+    {
+      "probe_id": "SD-1",
+      "expected_composite": 0.9185714285714287,
+      "predicted_composite": 0.9657142857142855,
+      "variance": 0.0,
+      "expected_critical": true,
+      "observed_critical_all_correct": true,
+      "missed_violations": 0,
+      "false_rejections": 0
+    },
+    {
+      "probe_id": "SD-2",
+      "expected_composite": 0.5442857142857143,
+      "predicted_composite": 0.5871428571428571,
+      "variance": 0.0,
+      "expected_critical": false,
+      "observed_critical_all_correct": true,
+      "missed_violations": 0,
+      "false_rejections": 0
+    },
+    {
+      "probe_id": "SD-3",
+      "expected_composite": 0.4642857142857143,
+      "predicted_composite": 0.5171428571428571,
+      "variance": 0.0,
+      "expected_critical": true,
+      "observed_critical_all_correct": true,
+      "missed_violations": 0,
+      "false_rejections": 0
+    },
+    {
+      "probe_id": "NAT-1",
+      "expected_composite": 0.8385714285714284,
+      "predicted_composite": 0.8985714285714285,
+      "variance": 0.0,
+      "expected_critical": true,
+      "observed_critical_all_correct": true,
+      "missed_violations": 0,
+      "false_rejections": 0
+    },
+    {
+      "probe_id": "CON-1",
+      "expected_composite": 0.8634285714285715,
+      "predicted_composite": 0.9585714285714284,
+      "variance": 0.0,
+      "expected_critical": true,
+      "observed_critical_all_correct": true,
+      "missed_violations": 0,
+      "false_rejections": 0
+    },
+    {
+      "probe_id": "MAN-1",
+      "expected_composite": 0.8371428571428572,
+      "predicted_composite": 0.7471428571428572,
+      "variance": 0.0,
+      "expected_critical": true,
+      "observed_critical_all_correct": true,
+      "missed_violations": 0,
+      "false_rejections": 0
+    },
+    {
+      "probe_id": "NEG-1",
+      "expected_composite": 0.864,
+      "predicted_composite": 0.8714285714285713,
+      "variance": 0.0,
+      "expected_critical": true,
+      "observed_critical_all_correct": true,
+      "missed_violations": 0,
+      "false_rejections": 0
+    }
+  ],
+  "measured_at": 1784506172.9120574,
+  "judge_config_hash": "zero"
+}

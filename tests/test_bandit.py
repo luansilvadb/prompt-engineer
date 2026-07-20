@@ -4,7 +4,7 @@ from unittest.mock import patch
 import pytest
 
 from src.mutation_strategies.bandit import MutationBandit
-from src.mutation_strategies.bandit_interfaces import BanditStats
+from src.domain.bandit_interfaces import BanditStats
 
 
 def test_bandit_cognitivo_prior_counts():
@@ -136,7 +136,9 @@ def test_select_returns_untried_arm_first_first_play():
 
 
 def test_select_exploits_argmax_ucb_after_all_arms_tried():
-    bandit = MutationBandit(c_param=1.41)
+    # Com temperatura desprezível, o comportamento é argmax determinístico
+    # (equivalente ao UCB1 original).
+    bandit = MutationBandit(c_param=1.41, temperature=0.0001)
     # Dá recompensas muito diferentes para forçar um argmax determinístico.
     for key in bandit._counts:
         bandit._counts[key] = 5
@@ -145,6 +147,32 @@ def test_select_exploits_argmax_ucb_after_all_arms_tried():
 
     chosen = bandit.select()
     assert chosen == 'mutador_cognitivo'
+
+
+def test_select_thompson_sampling_is_probabilistic():
+    """Thompson Sampling com temperatura > 0 deve explorar braços subótimos."""
+    bandit = MutationBandit(c_param=1.41, temperature=10.0, temperature_decay=1.0)
+    for key in bandit._counts:
+        bandit._counts[key] = 5
+    bandit._rewards['__DISCOVER__'] = 0.1 * 5
+    bandit._rewards['mutador_cognitivo'] = 0.9 * 5
+
+    # Com T=10 alta, explosão da softmax é atenuada e a distribuição fica
+    # quase uniforme. Em 50 seleções, ambos os braços devem aparecer.
+    seen = set()
+    for _ in range(50):
+        seen.add(bandit.select())
+    assert len(seen) >= 2, f"Thompson Sampling deveria explorar ambos os braços, mas só viu: {seen}"
+
+
+def test_thompson_temperature_decays_over_time():
+    """A temperatura deve decair exponencialmente a cada select()."""
+    bandit = MutationBandit(temperature=2.0, temperature_decay=0.5)
+    initial_temp = bandit.temperature
+    bandit.select()
+    assert bandit.temperature == initial_temp * 0.5
+    bandit.select()
+    assert bandit.temperature == initial_temp * 0.5 * 0.5
 
 
 def test_update_increments_count_and_accumulates_reward():

@@ -26,6 +26,8 @@ def _apply_model_quirks(model_name: str, kwargs: dict) -> None:
         kwargs["extra_body"] = {"chat_template_kwargs": {"enable_thinking": True}}
         kwargs["max_tokens"] = 16384
         kwargs["timeout"] = 120
+    else:
+        kwargs["timeout"] = 90
 
 def setup(model_name=None, model_prefix=None, api_base=None, api_key=None):
     load_dotenv()
@@ -47,7 +49,11 @@ def setup(model_name=None, model_prefix=None, api_base=None, api_key=None):
     }
 
     _apply_model_quirks(final_model_name, kwargs)
-    lm = dspy.LM(**kwargs)
+    # num_retries=0: desativa o retry automático do dspy (default=3).
+    # Com retries, 1 chamada LLM travada custa (1+3)×timeout=360s em vez de 90s,
+    # estourando o budget por iteração do MCTS. O runner.py já tem fail-fast
+    # próprio com 3 tentativas no nível do optimizer — retry duplo é perigoso.
+    lm = dspy.LM(**kwargs, num_retries=0)
     try:
         dspy.configure(lm=lm)
     except RuntimeError:

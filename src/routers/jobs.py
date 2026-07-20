@@ -1,9 +1,14 @@
 import uuid
 import asyncio
 import json
+import os
 from typing import Optional
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from sse_starlette.sse import EventSourceResponse
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from loguru import logger
 
 from src.schemas import OtimizacaoRequestDTO
 from src.state import JobState, jobs
@@ -11,33 +16,107 @@ import src.store as job_store
 from src.teleprompter import compilar_avaliador
 from src.config import setup
 
+# ── Router ────────────────────────────────────────────────────────────────────
 router = APIRouter(prefix="/api", tags=["Jobs"])
+limiter = Limiter(key_func=get_remote_address)
 
-@router.post('/optimize')
-async def start_optimization(request: OtimizacaoRequestDTO, background_tasks: BackgroundTasks):
+# Timeout máximo de um job: calculado dinamicamente a partir de max_iterations.
+# Budget por iteração (com dspy.LM num_retries=0):
+#   - LLM mutação:  ~90s (1 chamada, sem retry automático)
+#   - LLM avaliação: ~90s
+#   - Overhead (parsing, rede, sleep de backoff mínimo): ~30s
+#   Total: ~210s/iteração
+# Fallback: 30 minutos se a config não puder ser lida.
+def _resolve_max_job_duration() -> int:
+    try:
+        from src.domain.config import load_mcts_config
+        cfg = load_mcts_config()
+        per_iteration = 210  # ~3.5 min/iter: mutação 90s + avaliação 90s + overhead 30s
+        duration = cfg.max_iterations * per_iteration
+        return max(duration, 600)  # mínimo 10 min
+    except Exception:
+        return 30 * 60
+
+MAX_JOB_DURATION_SECONDS = _resolve_max_job_duration()
+
+# Timeout máximo da verificação de drift (P1-C2). Teto absoluto: o fail-fast
+# do runner (60s) já aborta antes em cascata de infra; medições legítimas com
+# golden pequeno (≤5 probes × 3 reps) cabem em 100s com folga. Se excedido,
+# retorna HTTP 504 para o cliente (frontend tem AbortController de 120s).
+DRIFT_CHECK_TIMEOUT_SECONDS = 100
+
+# ── Health Check ──────────────────────────────────────────────────────────────
+@router.get("/health")
+async def health_check():
+    """Endpoint de health check — frontend usa para verificar se API está viva."""
+    llm_configured = bool(os.getenv("API_KEY") or os.getenv("OPENAI_API_KEY") or os.getenv("NVIDIA_API_KEY"))
+    return {
+        "status": "ok",
+        "version": "0.4.0",
+        "llm_configured": llm_configured,
+    }
+
+
+# ── Métricas Simplificadas ────────────────────────────────────────────────────
+_request_metrics: list[dict] = []  # Em produção, substituir por Prometheus
+
+
+@router.get("/metrics/summary")
+async def metrics_summary():
+    """Resumo de latência das últimas 100 requests."""
+    if not _request_metrics:
+        return {"status": "ok", "total_requests": 0, "message": "Nenhuma métrica coletada ainda."}
+
+    durations = sorted([m["duration_ms"] for m in _request_metrics])
+    n = len(durations)
+    p50 = durations[int(n * 0.50)] if n > 0 else 0
+    p95 = durations[int(n * 0.95)] if n > 1 else durations[-1]
+    p99 = durations[int(n * 0.99)] if n > 2 else durations[-1]
+
+    return {
+        "status": "ok",
+        "total_requests": n,
+        "avg_ms": round(sum(durations) / n, 2),
+        "p50_ms": p50,
+        "p95_ms": p95,
+        "p99_ms": p99,
+        "max_ms": durations[-1],
+        "min_ms": durations[0],
+    }
+
+
+# ── Optimize ──────────────────────────────────────────────────────────────────
+@router.post("/optimize")
+@limiter.limit("5/minute")
+async def start_optimization(request: Request, body: OtimizacaoRequestDTO, background_tasks: BackgroundTasks):
+    logger.info(
+        "Nova otimização solicitada | model={} | skill_len={}",
+        body.modelName or "default",
+        len(body.skillOriginal),
+    )
+
     for j_state in jobs.values():
-        if j_state.status in ('running', 'idle'):
-            j_state.status = 'cancelled'
+        if j_state.status in ("running", "idle"):
+            j_state.status = "cancelled"
             j_state.events_queue.put_nowait({
-                'type': 'log',
-                'data': {'text': '\n[!] OTIMIZAÇÃO CANCELADA POR NOVA REQUISIÇÃO.'}
+                "type": "log",
+                "data": {"text": "\n[!] OTIMIZAÇÃO CANCELADA POR NOVA REQUISIÇÃO."},
             })
 
     job_id = str(uuid.uuid4())
     job_state = JobState()
-    job_state.original_skill = request.skillOriginal
-    job_state.model_name = request.modelName
-    job_state.model_prefix = request.modelPrefix
-    job_state.api_base = request.apiBase
-    job_state.api_key = request.apiKey
-    job_state.regras_adicionais = '\n'.join(request.regrasAdicionais) if request.regrasAdicionais else ''
+    job_state.original_skill = body.skillOriginal
+    job_state.model_name = body.modelName
+    job_state.model_prefix = body.modelPrefix
+    job_state.api_base = body.apiBase
+    job_state.api_key = body.apiKey
+    job_state.regras_adicionais = "\n".join(body.regrasAdicionais) if body.regrasAdicionais else ""
 
     jobs[job_id] = job_state
-
     job_store.save_job_state(job_id, job_state)
+
     loop = asyncio.get_running_loop()
 
-    # Injeção de dependências via Container
     from src.infrastructure.container import Container
     from src.services import OptimizationService
 
@@ -56,96 +135,105 @@ async def start_optimization(request: OtimizacaoRequestDTO, background_tasks: Ba
         strategy_registry=container.create_strategy_registry(),
     )
 
-    background_tasks.add_task(
-        service.execute,
-        job_id,
-        loop
-    )
-    return {'job_id': job_id}
+    background_tasks.add_task(service.execute, job_id, loop)
+    logger.info("Job {} iniciado em background", job_id)
+    return {"job_id": job_id}
 
-@router.post('/stop/{job_id}')
+
+# ── Stop ──────────────────────────────────────────────────────────────────────
+@router.post("/stop/{job_id}")
 async def stop_optimization(job_id: str):
     job = jobs.get(job_id)
     if not job:
-        raise HTTPException(status_code=404, detail='Job not found')
+        raise HTTPException(status_code=404, detail="Job not found")
 
-    if job.status == 'running':
-        job.status = 'cancelled'
+    if job.status == "running":
+        job.status = "cancelled"
         job_store.save_job_state(job_id, job)
         job.events_queue.put_nowait({
-            'type': 'log',
-            'data': {'text': '\n[!] OTIMIZAÇÃO INTERROMPIDA PELO USUÁRIO.'}
+            "type": "log",
+            "data": {"text": "\n[!] OTIMIZAÇÃO INTERROMPIDA PELO USUÁRIO."},
         })
-        return {'status': 'success', 'message': 'Sinal de interrupção enviado.'}
+        logger.info("Job {} cancelado pelo usuário", job_id)
+        return {"status": "success", "message": "Sinal de interrupção enviado."}
 
-    return {'status': 'ignored', 'message': 'Job não está rodando.'}
+    return {"status": "ignored", "message": "Job não está rodando."}
 
-@router.get('/jobs')
+
+# ── List / Delete / Get ───────────────────────────────────────────────────────
+@router.get("/jobs")
 async def get_all_jobs(skip: int = 0, limit: int = 50, status: Optional[str] = None):
     return job_store.load_all_jobs(skip=skip, limit=limit, status=status)
 
-@router.delete('/jobs/{job_id}')
+
+@router.delete("/jobs/{job_id}")
 async def delete_job_endpoint(job_id: str):
-    # Sinalizar cancelamento para a thread de background antes de deletar.
-    # Sem isso, a thread continua rodando com referência local ao job
-    # e recria o arquivo JSON ao terminar (ghost job).
     job_in_memory = jobs.get(job_id)
     if job_in_memory:
         job_in_memory.is_deleted = True
-        if job_in_memory.status == 'running':
-            job_in_memory.status = 'cancelled'
+        if job_in_memory.status == "running":
+            job_in_memory.status = "cancelled"
 
     success = job_store.delete_job(job_id)
     if not success and not job_in_memory:
-        raise HTTPException(status_code=404, detail='Job not found or could not be deleted')
+        raise HTTPException(status_code=404, detail="Job not found or could not be deleted")
 
     if job_id in jobs:
         del jobs[job_id]
 
-    return {'status': 'success', 'message': 'Job deletado com sucesso.'}
+    logger.info("Job {} deletado", job_id)
+    return {"status": "success", "message": "Job deletado com sucesso."}
 
-@router.get('/jobs/{job_id}')
+
+@router.get("/jobs/{job_id}")
 async def get_job(job_id: str):
     job = job_store.load_job(job_id)
     if not job:
-        raise HTTPException(status_code=404, detail='Job not found')
+        raise HTTPException(status_code=404, detail="Job not found")
     return job
 
+
+# ── SSE: Geradores de Eventos ─────────────────────────────────────────────────
 async def _orphaned_event_generator(disk_job: dict):
-    status = disk_job.get('status', 'error')
-    if status == 'completed':
+    status = disk_job.get("status", "error")
+    if status == "completed":
         yield {
-            'event': 'result',
-            'data': json.dumps({
-                'status': status,
-                'original': disk_job.get('original_skill', ''),
-                'optimized': disk_job.get('result', ''),
-                'nodes': disk_job.get('mcts_nodes', [])
-            })
+            "event": "result",
+            "data": json.dumps({
+                "status": status,
+                "original": disk_job.get("original_skill", ""),
+                "optimized": disk_job.get("result", ""),
+                "nodes": disk_job.get("mcts_nodes", []),
+            }),
         }
-    yield {'event': 'end', 'data': status}
+    yield {"event": "end", "data": status}
+
 
 def _format_event(event: dict) -> dict:
-    """Formata evento para envio via SSE."""
-    if event['type'] == 'log':
-        return {'data': json.dumps(event['data'])}
-    if event['type'] == 'node':
-        return {'event': 'node', 'data': json.dumps(event['data'])}
+    if event["type"] == "log":
+        return {"data": json.dumps(event["data"])}
+    if event["type"] == "node":
+        return {"event": "node", "data": json.dumps(event["data"])}
     return {}
 
+
 def _format_result_event(job) -> dict:
-    """Formata o evento de resultado final."""
     return {
-        'event': 'result',
-        'data': json.dumps({
-            'status': job.status,
-            'original': job.original_skill,
-            'optimized': job.result,
-            'nodes': job.mcts_nodes
-        })
+        "event": "result",
+        "data": json.dumps({
+            "status": job.status,
+            "original": job.original_skill,
+            "optimized": job.result,
+            "nodes": job.mcts_nodes,
+        }),
     }
 
+
 async def _live_event_generator(job):
+    """Gera eventos SSE com timeout máximo dinâmico (calculado a partir de max_iterations)."""
+    start_time = asyncio.get_event_loop().time()
+
+    # Drena eventos já enfileirados
     while not job.events_queue.empty():
         event = job.events_queue.get_nowait()
         formatted = _format_event(event)
@@ -153,6 +241,13 @@ async def _live_event_generator(job):
             yield formatted
 
     while True:
+        # Verifica timeout máximo
+        elapsed = asyncio.get_event_loop().time() - start_time
+        if elapsed > MAX_JOB_DURATION_SECONDS:
+            logger.warning("Job {} excedeu timeout máximo de {}s — encerrando SSE", job, MAX_JOB_DURATION_SECONDS)
+            yield {"event": "end", "data": "timeout"}
+            return
+
         try:
             event = await asyncio.wait_for(job.events_queue.get(), timeout=0.1)
             formatted = _format_event(event)
@@ -161,97 +256,169 @@ async def _live_event_generator(job):
             job.events_queue.task_done()
         except asyncio.TimeoutError:
             pass
+        except asyncio.CancelledError:
+            logger.info("SSE stream do job {} cancelado (CancelledError)", id(job))
+            yield {"event": "end", "data": "cancelled"}
+            return
 
         queue_empty = job.events_queue.empty()
-        if job.status == 'completed' and queue_empty:
+        if job.status == "completed" and queue_empty:
             yield _format_result_event(job)
 
-        if job.status in ('completed', 'error', 'cancelled') and queue_empty:
-            yield {'event': 'end', 'data': job.status}
+        if job.status in ("completed", "error", "cancelled") and queue_empty:
+            yield {"event": "end", "data": job.status}
             await asyncio.sleep(0.5)
             return
 
         await asyncio.sleep(0.05)
 
-@router.get('/stream/{job_id}')
+
+# ── Stream ────────────────────────────────────────────────────────────────────
+@router.get("/stream/{job_id}")
 async def stream_progress(job_id: str):
     job = jobs.get(job_id)
     if not job:
         disk_job = job_store.load_job(job_id)
         if not disk_job:
-            raise HTTPException(status_code=404, detail='Job not found')
+            raise HTTPException(status_code=404, detail="Job not found")
 
-        if disk_job.get('status') == 'running':
+        if disk_job.get("status") == "running":
             temp_job = JobState()
-            temp_job.status = 'error'
-            temp_job.original_skill = disk_job.get('original_skill', '')
-            temp_job.result = disk_job.get('result')
-            temp_job.logs = disk_job.get('logs', [])
-            temp_job.mcts_nodes = disk_job.get('mcts_nodes', [])
-            temp_job.model_name = disk_job.get('model_name')
-            temp_job.model_prefix = disk_job.get('model_prefix')
-            temp_job.regras_adicionais = disk_job.get('regras_adicionais', '')
+            temp_job.status = "error"
+            temp_job.original_skill = disk_job.get("original_skill", "")
+            temp_job.result = disk_job.get("result")
+            temp_job.logs = disk_job.get("logs", [])
+            temp_job.mcts_nodes = disk_job.get("mcts_nodes", [])
+            temp_job.model_name = disk_job.get("model_name")
+            temp_job.model_prefix = disk_job.get("model_prefix")
+            temp_job.regras_adicionais = disk_job.get("regras_adicionais", "")
             job_store.save_job_state(job_id, temp_job)
-            disk_job['status'] = 'error'
+            disk_job["status"] = "error"
 
         return EventSourceResponse(_orphaned_event_generator(disk_job))
 
+    logger.info("SSE stream iniciado para job {}", job_id)
     return EventSourceResponse(_live_event_generator(job))
 
-@router.post('/train-judge')
+
+# ── Judge ─────────────────────────────────────────────────────────────────────
+@router.post("/train-judge")
 async def train_judge():
+    # setup() deve rodar na thread do event loop — dspy.configure() só pode ser
+    # chamado pela thread que fez a configuração inicial. Passar o lm como
+    # argumento evita reconfigurar o singleton dentro da thread worker.
+    lm = setup()
+
     def _run():
         try:
-            lm = setup()
             status = compilar_avaliador(lm=lm)
             return status
         except Exception as e:
+            logger.opt(exception=True).error("Falha ao treinar juiz")
             return str(e)
 
     result = await asyncio.to_thread(_run)
-    # Mapeamento do CompileResult.status (A1 — grounding da recompensa).
-    if result == 'compiled':
-        return {'status': 'success',
-                'message': 'Avaliador recompilado e validado contra o golden set.'}
-    elif result == 'golden_empty_open':
-        return {'status': 'success',
-                'warning': 'Golden set ausente; compilação sem portão (fail-open).'}
-    elif result == 'drift_rejected':
-        # Rejeição de negócio esperada — 422, não 500.
-        raise HTTPException(status_code=422, detail='Candidato rejeitado pelo portão de drift. Juiz atual preservado.')
-    elif result == 'measurement_error':
-        raise HTTPException(status_code=500, detail='Falha ao medir drift (golden presente). Candidato descartado (fail-closed).')
-    elif result == 'no_data':
-        raise HTTPException(status_code=400, detail='Falta histórico positivo (score > 0.8) ou treinamento em andamento.')
+    if result == "compiled":
+        return {"status": "success", "message": "Avaliador recompilado e validado contra o golden set."}
+    elif result == "golden_required":
+        raise HTTPException(
+            status_code=428,
+            detail="Golden set ausente. Candidato descartado para evitar model collapse. Crie o golden set antes de treinar o avaliador."
+        )
+    elif result == "drift_rejected":
+        raise HTTPException(status_code=422, detail="Candidato rejeitado pelo portão de drift. Juiz atual preservado.")
+    elif result == "measurement_error":
+        raise HTTPException(status_code=500, detail="Falha ao medir drift (golden presente). Candidato descartado (fail-closed).")
+    elif result == "no_data":
+        raise HTTPException(status_code=400, detail="Falta histórico positivo (score > 0.8) ou treinamento em andamento.")
     else:
-        raise HTTPException(status_code=500, detail=f'Erro: {result}')
+        raise HTTPException(status_code=500, detail=f"Erro: {result}")
 
 
-@router.post('/check-drift')
+@router.post("/check-drift")
 async def check_drift():
-    """
-    Verificação sob demanda do drift do juiz em produção contra o golden set.
-    Executa o circuit breaker se o hard-gate estiver comprometido (BR4).
-    Atende ao spike de medição e à checagem periódica — sem acoplar ao loop MCTS.
-    """
     from src.config import get_drift_thresholds
     from src.drift.models import DriftThresholds
-    from src.drift.circuit_breaker import circuit_breaker, verificar_juiz_atual
+    from src.drift.circuit_breaker import verificar_juiz_atual, _execute_circuit_breaker, _has_api_key
+    from src.drift.cache import save_drift_cache
+    from src.drift.history import append_drift_report
+    from pathlib import Path
+
+    # Pre-flight (P1-C5): distinção no endpoint entre 'no_golden' e 'no_api_key'.
+    # Mapeia para status distintos para o frontend exibir mensagem específica.
+    golden_path = Path('src/outputs/golden/golden_set.json')
+    has_golden = golden_path.exists() and golden_path.stat().st_size > 0
+    if not has_golden:
+        return {"status": "no_golden", "message": "Golden set ausente; nada a medir."}
+    if not _has_api_key():
+        model_path = Path('src/outputs/models/avaliador_modo_b_otimizado.json')
+        if not model_path.exists():
+            return {
+                "status": "no_api_key",
+                "message": "Nenhuma API key configurada e juiz não treinado. Configure API_KEY/OPENAI_API_KEY/NVIDIA_API_KEY no .env.",
+            }
+
+    # setup() na thread do event loop — mesmo motivo de train_judge.
+    setup()
 
     def _run():
         try:
-            setup()
             cfg = get_drift_thresholds()
             thresholds = DriftThresholds.from_config(cfg)
-            report = verificar_juiz_atual(thresholds, cfg['repetitions'])
+            report = verificar_juiz_atual(thresholds, cfg["repetitions"])
             if report is None:
-                return {'status': 'no_golden', 'message': 'Golden set ausente; nada a medir.'}
-            decision = circuit_breaker(thresholds, cfg['repetitions'])
-            return {'status': 'ok', 'report': report.to_dict(), 'circuit_breaker': {'accept': decision.accept, 'reason': decision.reason}}
-        except Exception as e:
-            return {'status': 'error', 'message': str(e)}
+                return {"status": "no_golden", "message": "Golden set ausente; nada a medir."}
 
-    result = await asyncio.to_thread(_run)
-    if result.get('status') == 'error':
-        raise HTTPException(status_code=500, detail=result['message'])
+            decision = _execute_circuit_breaker(report)
+            save_drift_cache(report)
+            append_drift_report(
+                report,
+                triggered_cb=not decision.accept,
+                cb_reason=decision.reason if not decision.accept else None,
+            )
+            return {
+                "status": "ok",
+                "report": report.to_dict(),
+                "circuit_breaker": {"accept": decision.accept, "reason": decision.reason},
+            }
+        except Exception as e:
+            logger.opt(exception=True).error("Falha ao verificar drift")
+            return {"status": "error", "message": str(e)}
+
+    # P1-C2: teto absoluto de tempo. Se excedido, retorna 504 (frontend tem
+    # AbortController de 120s como última linha de defesa). O fail-fast do
+    # runner (60s) já deve abortar antes em cascata de infra.
+    try:
+        result = await asyncio.wait_for(asyncio.to_thread(_run), timeout=DRIFT_CHECK_TIMEOUT_SECONDS)
+    except asyncio.TimeoutError:
+        logger.warning("check-drift excedeu timeout de {}s", DRIFT_CHECK_TIMEOUT_SECONDS)
+        raise HTTPException(
+            status_code=504,
+            detail=f"Verificação de drift excedeu o tempo máximo de {DRIFT_CHECK_TIMEOUT_SECONDS}s. Tente novamente.",
+        )
+
+    if result.get("status") == "error":
+        raise HTTPException(status_code=500, detail=result["message"])
     return result
+
+
+@router.get("/drift-history")
+async def drift_history(limit: int = 50):
+    from src.drift.history import load_drift_history
+
+    entries = load_drift_history()
+    return {
+        "status": "ok",
+        "total": len(entries),
+        "entries": entries[:limit],
+    }
+
+
+@router.get("/drift-status")
+async def drift_status():
+    from src.drift.cache import load_drift_cache
+
+    cache = load_drift_cache()
+    if cache is None:
+        return {"status": "no_cache", "message": "Nenhuma medição de drift disponível."}
+    return {"status": "ok", "report": cache.to_dict()}

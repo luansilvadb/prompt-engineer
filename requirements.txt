@@ -13,6 +13,9 @@ textstat>=0.7.3          # Readability + TTR heuristics (src/heuristic_evaluator
 
 pywebview>=4.4.0         # Native desktop window (desktop.py)
 
+loguru>=0.7.0            # Structured logging (src/infrastructure/logging_config.py)
+slowapi>=0.1.9           # Rate limiting (src/api.py)
+
 # ── Dev / Test ────────────────────────────────────────────────────────────────
 pytest>=8.0.0
 pytest-asyncio>=0.23.0

@@ -1,0 +1,922 @@
+[
+  {
+    "best_reward": 0.8,
+    "best_score": 0.46189509306260573,
+    "best_depth": 0,
+    "best_strategy": "",
+    "first_3_strategies": [
+      "adversarial",
+      "compress",
+      "dicion_rio_de_roteamento_deter_d2e6"
+    ],
+    "expansion_order": [
+      {
+        "expand_num": 1,
+        "strategy_key": "adversarial",
+        "strategy_desc": "adversarial",
+        "depth": 1,
+        "parent_score": 0.8
+      },
+      {
+        "expand_num": 2,
+        "strategy_key": "compress",
+        "strategy_desc": "compress",
+        "depth": 1,
+        "parent_score": 0.5971370558375635
+      },
+      {
+        "expand_num": 3,
+        "strategy_key": "dicion_rio_de_roteamento_deter_d2e6",
+        "strategy_desc": "dicion_rio_de_roteamento_deter_d2e6",
+        "depth": 1,
+        "parent_score": 0.5295160744500846
+      },
+      {
+        "expand_num": 4,
+        "strategy_key": "firewall_de_transmuta__o_sem_n_1daf",
+        "strategy_desc": "firewall_de_transmuta__o_sem_n_1daf",
+        "depth": 1,
+        "parent_score": 0.4957055837563452
+      },
+      {
+        "expand_num": 5,
+        "strategy_key": "generalize",
+        "strategy_desc": "generalize",
+        "depth": 1,
+        "parent_score": 0.4754192893401015
+      }
+    ],
+    "level_one_nodes": [
+      {
+        "strategy": "adversarial",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "compress",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "dicion_rio_de_roteamento_deter_d2e6",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "firewall_de_transmuta__o_sem_n_1daf",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "generalize",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      }
+    ],
+    "total_expansions": 5,
+    "run": 0
+  },
+  {
+    "best_reward": 0.8,
+    "best_score": 0.46189509306260573,
+    "best_depth": 0,
+    "best_strategy": "",
+    "first_3_strategies": [
+      "adversarial",
+      "compress",
+      "dicion_rio_de_roteamento_deter_d2e6"
+    ],
+    "expansion_order": [
+      {
+        "expand_num": 1,
+        "strategy_key": "adversarial",
+        "strategy_desc": "adversarial",
+        "depth": 1,
+        "parent_score": 0.8
+      },
+      {
+        "expand_num": 2,
+        "strategy_key": "compress",
+        "strategy_desc": "compress",
+        "depth": 1,
+        "parent_score": 0.5971370558375635
+      },
+      {
+        "expand_num": 3,
+        "strategy_key": "dicion_rio_de_roteamento_deter_d2e6",
+        "strategy_desc": "dicion_rio_de_roteamento_deter_d2e6",
+        "depth": 1,
+        "parent_score": 0.5295160744500846
+      },
+      {
+        "expand_num": 4,
+        "strategy_key": "firewall_de_transmuta__o_sem_n_1daf",
+        "strategy_desc": "firewall_de_transmuta__o_sem_n_1daf",
+        "depth": 1,
+        "parent_score": 0.4957055837563452
+      },
+      {
+        "expand_num": 5,
+        "strategy_key": "generalize",
+        "strategy_desc": "generalize",
+        "depth": 1,
+        "parent_score": 0.4754192893401015
+      }
+    ],
+    "level_one_nodes": [
+      {
+        "strategy": "adversarial",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "compress",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "dicion_rio_de_roteamento_deter_d2e6",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "firewall_de_transmuta__o_sem_n_1daf",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "generalize",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      }
+    ],
+    "total_expansions": 5,
+    "run": 1
+  },
+  {
+    "best_reward": 0.8,
+    "best_score": 0.46189509306260573,
+    "best_depth": 0,
+    "best_strategy": "",
+    "first_3_strategies": [
+      "adversarial",
+      "compress",
+      "dicion_rio_de_roteamento_deter_d2e6"
+    ],
+    "expansion_order": [
+      {
+        "expand_num": 1,
+        "strategy_key": "adversarial",
+        "strategy_desc": "adversarial",
+        "depth": 1,
+        "parent_score": 0.8
+      },
+      {
+        "expand_num": 2,
+        "strategy_key": "compress",
+        "strategy_desc": "compress",
+        "depth": 1,
+        "parent_score": 0.5971370558375635
+      },
+      {
+        "expand_num": 3,
+        "strategy_key": "dicion_rio_de_roteamento_deter_d2e6",
+        "strategy_desc": "dicion_rio_de_roteamento_deter_d2e6",
+        "depth": 1,
+        "parent_score": 0.5295160744500846
+      },
+      {
+        "expand_num": 4,
+        "strategy_key": "firewall_de_transmuta__o_sem_n_1daf",
+        "strategy_desc": "firewall_de_transmuta__o_sem_n_1daf",
+        "depth": 1,
+        "parent_score": 0.4957055837563452
+      },
+      {
+        "expand_num": 5,
+        "strategy_key": "generalize",
+        "strategy_desc": "generalize",
+        "depth": 1,
+        "parent_score": 0.4754192893401015
+      }
+    ],
+    "level_one_nodes": [
+      {
+        "strategy": "adversarial",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "compress",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "dicion_rio_de_roteamento_deter_d2e6",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "firewall_de_transmuta__o_sem_n_1daf",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "generalize",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      }
+    ],
+    "total_expansions": 5,
+    "run": 2
+  },
+  {
+    "best_reward": 0.8,
+    "best_score": 0.46189509306260573,
+    "best_depth": 0,
+    "best_strategy": "",
+    "first_3_strategies": [
+      "adversarial",
+      "compress",
+      "dicion_rio_de_roteamento_deter_d2e6"
+    ],
+    "expansion_order": [
+      {
+        "expand_num": 1,
+        "strategy_key": "adversarial",
+        "strategy_desc": "adversarial",
+        "depth": 1,
+        "parent_score": 0.8
+      },
+      {
+        "expand_num": 2,
+        "strategy_key": "compress",
+        "strategy_desc": "compress",
+        "depth": 1,
+        "parent_score": 0.5971370558375635
+      },
+      {
+        "expand_num": 3,
+        "strategy_key": "dicion_rio_de_roteamento_deter_d2e6",
+        "strategy_desc": "dicion_rio_de_roteamento_deter_d2e6",
+        "depth": 1,
+        "parent_score": 0.5295160744500846
+      },
+      {
+        "expand_num": 4,
+        "strategy_key": "firewall_de_transmuta__o_sem_n_1daf",
+        "strategy_desc": "firewall_de_transmuta__o_sem_n_1daf",
+        "depth": 1,
+        "parent_score": 0.4957055837563452
+      },
+      {
+        "expand_num": 5,
+        "strategy_key": "generalize",
+        "strategy_desc": "generalize",
+        "depth": 1,
+        "parent_score": 0.4754192893401015
+      }
+    ],
+    "level_one_nodes": [
+      {
+        "strategy": "adversarial",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "compress",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "dicion_rio_de_roteamento_deter_d2e6",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "firewall_de_transmuta__o_sem_n_1daf",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "generalize",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      }
+    ],
+    "total_expansions": 5,
+    "run": 3
+  },
+  {
+    "best_reward": 0.8,
+    "best_score": 0.46189509306260573,
+    "best_depth": 0,
+    "best_strategy": "",
+    "first_3_strategies": [
+      "adversarial",
+      "compress",
+      "dicion_rio_de_roteamento_deter_d2e6"
+    ],
+    "expansion_order": [
+      {
+        "expand_num": 1,
+        "strategy_key": "adversarial",
+        "strategy_desc": "adversarial",
+        "depth": 1,
+        "parent_score": 0.8
+      },
+      {
+        "expand_num": 2,
+        "strategy_key": "compress",
+        "strategy_desc": "compress",
+        "depth": 1,
+        "parent_score": 0.5971370558375635
+      },
+      {
+        "expand_num": 3,
+        "strategy_key": "dicion_rio_de_roteamento_deter_d2e6",
+        "strategy_desc": "dicion_rio_de_roteamento_deter_d2e6",
+        "depth": 1,
+        "parent_score": 0.5295160744500846
+      },
+      {
+        "expand_num": 4,
+        "strategy_key": "firewall_de_transmuta__o_sem_n_1daf",
+        "strategy_desc": "firewall_de_transmuta__o_sem_n_1daf",
+        "depth": 1,
+        "parent_score": 0.4957055837563452
+      },
+      {
+        "expand_num": 5,
+        "strategy_key": "generalize",
+        "strategy_desc": "generalize",
+        "depth": 1,
+        "parent_score": 0.4754192893401015
+      }
+    ],
+    "level_one_nodes": [
+      {
+        "strategy": "adversarial",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "compress",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "dicion_rio_de_roteamento_deter_d2e6",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "firewall_de_transmuta__o_sem_n_1daf",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "generalize",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      }
+    ],
+    "total_expansions": 5,
+    "run": 4
+  },
+  {
+    "best_reward": 0.8,
+    "best_score": 0.46189509306260573,
+    "best_depth": 0,
+    "best_strategy": "",
+    "first_3_strategies": [
+      "adversarial",
+      "compress",
+      "dicion_rio_de_roteamento_deter_d2e6"
+    ],
+    "expansion_order": [
+      {
+        "expand_num": 1,
+        "strategy_key": "adversarial",
+        "strategy_desc": "adversarial",
+        "depth": 1,
+        "parent_score": 0.8
+      },
+      {
+        "expand_num": 2,
+        "strategy_key": "compress",
+        "strategy_desc": "compress",
+        "depth": 1,
+        "parent_score": 0.5971370558375635
+      },
+      {
+        "expand_num": 3,
+        "strategy_key": "dicion_rio_de_roteamento_deter_d2e6",
+        "strategy_desc": "dicion_rio_de_roteamento_deter_d2e6",
+        "depth": 1,
+        "parent_score": 0.5295160744500846
+      },
+      {
+        "expand_num": 4,
+        "strategy_key": "firewall_de_transmuta__o_sem_n_1daf",
+        "strategy_desc": "firewall_de_transmuta__o_sem_n_1daf",
+        "depth": 1,
+        "parent_score": 0.4957055837563452
+      },
+      {
+        "expand_num": 5,
+        "strategy_key": "generalize",
+        "strategy_desc": "generalize",
+        "depth": 1,
+        "parent_score": 0.4754192893401015
+      }
+    ],
+    "level_one_nodes": [
+      {
+        "strategy": "adversarial",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "compress",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "dicion_rio_de_roteamento_deter_d2e6",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "firewall_de_transmuta__o_sem_n_1daf",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "generalize",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      }
+    ],
+    "total_expansions": 5,
+    "run": 5
+  },
+  {
+    "best_reward": 0.8,
+    "best_score": 0.46189509306260573,
+    "best_depth": 0,
+    "best_strategy": "",
+    "first_3_strategies": [
+      "adversarial",
+      "compress",
+      "dicion_rio_de_roteamento_deter_d2e6"
+    ],
+    "expansion_order": [
+      {
+        "expand_num": 1,
+        "strategy_key": "adversarial",
+        "strategy_desc": "adversarial",
+        "depth": 1,
+        "parent_score": 0.8
+      },
+      {
+        "expand_num": 2,
+        "strategy_key": "compress",
+        "strategy_desc": "compress",
+        "depth": 1,
+        "parent_score": 0.5971370558375635
+      },
+      {
+        "expand_num": 3,
+        "strategy_key": "dicion_rio_de_roteamento_deter_d2e6",
+        "strategy_desc": "dicion_rio_de_roteamento_deter_d2e6",
+        "depth": 1,
+        "parent_score": 0.5295160744500846
+      },
+      {
+        "expand_num": 4,
+        "strategy_key": "firewall_de_transmuta__o_sem_n_1daf",
+        "strategy_desc": "firewall_de_transmuta__o_sem_n_1daf",
+        "depth": 1,
+        "parent_score": 0.4957055837563452
+      },
+      {
+        "expand_num": 5,
+        "strategy_key": "generalize",
+        "strategy_desc": "generalize",
+        "depth": 1,
+        "parent_score": 0.4754192893401015
+      }
+    ],
+    "level_one_nodes": [
+      {
+        "strategy": "adversarial",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "compress",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "dicion_rio_de_roteamento_deter_d2e6",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "firewall_de_transmuta__o_sem_n_1daf",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "generalize",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      }
+    ],
+    "total_expansions": 5,
+    "run": 6
+  },
+  {
+    "best_reward": 0.8,
+    "best_score": 0.46189509306260573,
+    "best_depth": 0,
+    "best_strategy": "",
+    "first_3_strategies": [
+      "adversarial",
+      "compress",
+      "dicion_rio_de_roteamento_deter_d2e6"
+    ],
+    "expansion_order": [
+      {
+        "expand_num": 1,
+        "strategy_key": "adversarial",
+        "strategy_desc": "adversarial",
+        "depth": 1,
+        "parent_score": 0.8
+      },
+      {
+        "expand_num": 2,
+        "strategy_key": "compress",
+        "strategy_desc": "compress",
+        "depth": 1,
+        "parent_score": 0.5971370558375635
+      },
+      {
+        "expand_num": 3,
+        "strategy_key": "dicion_rio_de_roteamento_deter_d2e6",
+        "strategy_desc": "dicion_rio_de_roteamento_deter_d2e6",
+        "depth": 1,
+        "parent_score": 0.5295160744500846
+      },
+      {
+        "expand_num": 4,
+        "strategy_key": "firewall_de_transmuta__o_sem_n_1daf",
+        "strategy_desc": "firewall_de_transmuta__o_sem_n_1daf",
+        "depth": 1,
+        "parent_score": 0.4957055837563452
+      },
+      {
+        "expand_num": 5,
+        "strategy_key": "generalize",
+        "strategy_desc": "generalize",
+        "depth": 1,
+        "parent_score": 0.4754192893401015
+      }
+    ],
+    "level_one_nodes": [
+      {
+        "strategy": "adversarial",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "compress",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "dicion_rio_de_roteamento_deter_d2e6",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "firewall_de_transmuta__o_sem_n_1daf",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "generalize",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      }
+    ],
+    "total_expansions": 5,
+    "run": 7
+  },
+  {
+    "best_reward": 0.8,
+    "best_score": 0.46189509306260573,
+    "best_depth": 0,
+    "best_strategy": "",
+    "first_3_strategies": [
+      "adversarial",
+      "compress",
+      "dicion_rio_de_roteamento_deter_d2e6"
+    ],
+    "expansion_order": [
+      {
+        "expand_num": 1,
+        "strategy_key": "adversarial",
+        "strategy_desc": "adversarial",
+        "depth": 1,
+        "parent_score": 0.8
+      },
+      {
+        "expand_num": 2,
+        "strategy_key": "compress",
+        "strategy_desc": "compress",
+        "depth": 1,
+        "parent_score": 0.5971370558375635
+      },
+      {
+        "expand_num": 3,
+        "strategy_key": "dicion_rio_de_roteamento_deter_d2e6",
+        "strategy_desc": "dicion_rio_de_roteamento_deter_d2e6",
+        "depth": 1,
+        "parent_score": 0.5295160744500846
+      },
+      {
+        "expand_num": 4,
+        "strategy_key": "firewall_de_transmuta__o_sem_n_1daf",
+        "strategy_desc": "firewall_de_transmuta__o_sem_n_1daf",
+        "depth": 1,
+        "parent_score": 0.4957055837563452
+      },
+      {
+        "expand_num": 5,
+        "strategy_key": "generalize",
+        "strategy_desc": "generalize",
+        "depth": 1,
+        "parent_score": 0.4754192893401015
+      }
+    ],
+    "level_one_nodes": [
+      {
+        "strategy": "adversarial",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "compress",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "dicion_rio_de_roteamento_deter_d2e6",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "firewall_de_transmuta__o_sem_n_1daf",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "generalize",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      }
+    ],
+    "total_expansions": 5,
+    "run": 8
+  },
+  {
+    "best_reward": 0.8,
+    "best_score": 0.46189509306260573,
+    "best_depth": 0,
+    "best_strategy": "",
+    "first_3_strategies": [
+      "adversarial",
+      "compress",
+      "dicion_rio_de_roteamento_deter_d2e6"
+    ],
+    "expansion_order": [
+      {
+        "expand_num": 1,
+        "strategy_key": "adversarial",
+        "strategy_desc": "adversarial",
+        "depth": 1,
+        "parent_score": 0.8
+      },
+      {
+        "expand_num": 2,
+        "strategy_key": "compress",
+        "strategy_desc": "compress",
+        "depth": 1,
+        "parent_score": 0.5971370558375635
+      },
+      {
+        "expand_num": 3,
+        "strategy_key": "dicion_rio_de_roteamento_deter_d2e6",
+        "strategy_desc": "dicion_rio_de_roteamento_deter_d2e6",
+        "depth": 1,
+        "parent_score": 0.5295160744500846
+      },
+      {
+        "expand_num": 4,
+        "strategy_key": "firewall_de_transmuta__o_sem_n_1daf",
+        "strategy_desc": "firewall_de_transmuta__o_sem_n_1daf",
+        "depth": 1,
+        "parent_score": 0.4957055837563452
+      },
+      {
+        "expand_num": 5,
+        "strategy_key": "generalize",
+        "strategy_desc": "generalize",
+        "depth": 1,
+        "parent_score": 0.4754192893401015
+      }
+    ],
+    "level_one_nodes": [
+      {
+        "strategy": "adversarial",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "compress",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "dicion_rio_de_roteamento_deter_d2e6",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "firewall_de_transmuta__o_sem_n_1daf",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "generalize",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      }
+    ],
+    "total_expansions": 5,
+    "run": 9
+  }
+]

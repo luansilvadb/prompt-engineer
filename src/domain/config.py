@@ -16,6 +16,8 @@ class MCTSConfig:
     max_iterations: int
     value_lr: float
     bandit_c_param: float
+    bandit_temperature: float
+    bandit_temperature_decay: float
     semantic_sim_threshold: float
     lexical_density_min: float
     verbosity_penalty_factor: float
@@ -26,6 +28,8 @@ class MCTSConfig:
     density_multiplier_max: float
     density_threshold: float
     density_structured_bonus: float
+    reward_floor: float
+    root_median_samples: int = 1
 
     def __post_init__(self) -> None:
         if not (0.0 < self.gamma <= 1.0):
@@ -44,6 +48,10 @@ class MCTSConfig:
             raise ValueError("density_multiplier_min must be positive")
         if self.density_multiplier_max < self.density_multiplier_min:
             raise ValueError("density_multiplier_max must be >= density_multiplier_min")
+        if self.root_median_samples < 1 or self.root_median_samples % 2 != 1:
+            raise ValueError(
+                f"root_median_samples must be an odd integer >= 1, got {self.root_median_samples}"
+            )
 
 
 @dataclass(frozen=True)
@@ -75,16 +83,20 @@ def load_mcts_config() -> MCTSConfig:
         max_iterations=int(os.environ.get("MCTS_MAX_ITERATIONS", "10")),
         value_lr=float(os.environ.get("MCTS_VALUE_LR", "0.1")),
         bandit_c_param=float(os.environ.get("MCTS_BANDIT_C_PARAM", "1.41")),
+        bandit_temperature=float(os.environ.get("MCTS_BANDIT_TEMPERATURE", "2.0")),
+        bandit_temperature_decay=float(os.environ.get("MCTS_BANDIT_TEMPERATURE_DECAY", "0.95")),
         semantic_sim_threshold=float(os.environ.get("MCTS_SEMANTIC_SIM_THRESHOLD", "0.85")),
         lexical_density_min=float(os.environ.get("MCTS_LEXICAL_DENSITY_MIN", "0.35")),
         verbosity_penalty_factor=float(os.environ.get("MCTS_VERBOSITY_PENALTY_FACTOR", "0.85")),
         buzzword_threshold=int(os.environ.get("MCTS_BUZZWORD_THRESHOLD", "3")),
-        cognitivo_prior_count=int(os.environ.get("MCTS_COGNITIVO_PRIOR_COUNT", "4")),
+        cognitivo_prior_count=int(os.environ.get("MCTS_COGNITIVO_PRIOR_COUNT", "1")),
         cognitivo_prior_mean_delta=float(os.environ.get("MCTS_COGNITIVO_PRIOR_MEAN_DELTA", "0.05")),
         density_multiplier_min=float(os.environ.get("MCTS_DENSITY_MULTIPLIER_MIN", "0.5")),
         density_multiplier_max=float(os.environ.get("MCTS_DENSITY_MULTIPLIER_MAX", "1.5")),
         density_threshold=float(os.environ.get("MCTS_DENSITY_THRESHOLD", "1.0")),
         density_structured_bonus=float(os.environ.get("MCTS_DENSITY_STRUCTURED_BONUS", "0.2")),
+        reward_floor=float(os.environ.get("MCTS_REWARD_FLOOR", "0.30")),
+        root_median_samples=int(os.environ.get("MCTS_ROOT_MEDIAN_SAMPLES", "1")),
     )
 
 

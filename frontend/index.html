@@ -34,9 +34,14 @@
                     <span class="status-indicator idle" id="global-status-indicator"></span>
                     <span id="global-status-text">Pronto</span>
                 </div>
+                <span class="drift-health-badge unknown" id="drift-health-badge"
+                    title="Nenhuma medição de drift disponível">
+                    <i class="fa-solid fa-circle-question"></i> Drift: ?
+                </span>
                 <button type="button" class="btn-secondary" id="btn-train-judge"><i
                         class="fa-solid fa-graduation-cap"></i> Treinar Juiz</button>
-                <button type="button" class="btn-secondary" id="btn-check-drift" title="Mede o juiz atual contra o golden set e dispara o circuit breaker se o hard-gate cair"><i
+                <button type="button" class="btn-secondary" id="btn-check-drift"
+                    title="Mede o juiz atual contra o golden set e dispara o circuit breaker se o hard-gate cair"><i
                         class="fa-solid fa-shield-halved"></i> Verificar Drift</button>
                 <button type="button" class="btn-secondary" id="btn-open-history"><i
                         class="fa-solid fa-clock-rotate-left"></i> Histórico</button>
@@ -231,6 +236,21 @@
                         <pre class="modal-text-block monospace" id="modal-node-instruction">-</pre>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Drift Check Result -->
+    <div class="modal-overlay" id="drift-modal-overlay">
+        <div class="modal glass drift-modal-content">
+            <div class="modal-header">
+                <h3 id="drift-modal-title"><i class="fa-solid fa-shield-halved"></i> Verificação de Drift</h3>
+                <button type="button" class="btn-close-modal" id="btn-close-drift"
+                    aria-label="Fechar resultado de drift" title="Fechar resultado de drift"><i
+                        class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body" id="drift-modal-body">
+                <!-- Renderizado via DriftView.js -->
             </div>
         </div>
     </div>

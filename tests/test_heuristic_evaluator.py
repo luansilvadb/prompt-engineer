@@ -31,8 +31,13 @@ def test_layer_2_penalty():
 # ── Layer 0: Vague Buzzword Detection ────────────────────────────────────────
 
 def test_layer0_buzzword_threshold_triggers_penalty():
-    """Text with >= _BUZZWORD_THRESHOLD buzzword hits should receive the severe multiplier."""
-    # "moreover", "furthermore", "in conclusion", "pivotal", "seamlessly" = 5 EN buzzwords
+    """Text with >= buzzword_threshold hits receives progressive penalty.
+    
+    "moreover", "furthermore", "in conclusion", "pivotal", "seamlessly",
+    "robust", "paradigm", "leverage", "synergy", "landscape", "groundbreaking",
+    "cutting-edge" = ~12 EN buzzwords.
+    With threshold=3, excess=10 -> penalty = max(0.30, 1.0 - 1.0) = 0.30
+    """
     text = (
         "Moreover, this approach is pivotal. Furthermore, it seamlessly integrates all "
         "components. In conclusion, the system is robust. The paradigm shift leverages "
@@ -40,7 +45,10 @@ def test_layer0_buzzword_threshold_triggers_penalty():
     )
     result = evaluate_heuristics(text)
     assert result["prune"] is False
-    assert result["penalty_multiplier"] == 0.15
+    # Progressive penalty: ~12 hits with threshold=3 -> penalty ~0.30
+    assert 0.25 <= result["penalty_multiplier"] <= 0.35, (
+        f"Expected ~0.30, got {result['penalty_multiplier']}"
+    )
     assert "Vague Buzzwords" in result["reason"]
 
 
@@ -57,11 +65,10 @@ def test_layer0_below_threshold_passes():
         "and validate the approach against established baselines in the field."
     )
     result = evaluate_heuristics(text, buzzword_threshold=3)
-    # 2 hits < threshold=3 → Layer 0 must NOT trigger the 0.15 penalty
+    # 2 hits < threshold=3 → Layer 0 must NOT trigger penalty
     assert "Vague Buzzwords" not in result.get("reason", ""), (
         f"Layer 0 triggered unexpectedly. reason={result['reason']}"
     )
-
 
 
 def test_layer0_short_text_not_reached():
@@ -73,7 +80,7 @@ def test_layer0_short_text_not_reached():
 
 
 def test_layer0_pt_buzzwords_trigger_penalty():
-    """Portuguese buzzwords should also be detected."""
+    """Portuguese buzzwords should also be detected with progressive penalty."""
     text = (
         "Cabe ressaltar que, em suma, é importante destacar a relevância do método. "
         "No contexto atual, o sistema é de extrema importância para a comunidade. "
@@ -82,5 +89,8 @@ def test_layer0_pt_buzzwords_trigger_penalty():
     )
     result = evaluate_heuristics(text)
     assert result["prune"] is False
-    assert result["penalty_multiplier"] == 0.15
+    # Progressive penalty for ~8-9 PT buzzwords: excess ~6-7 -> penalty ~0.30-0.40
+    assert 0.25 <= result["penalty_multiplier"] <= 0.45, (
+        f"Expected ~0.30-0.40, got {result['penalty_multiplier']}"
+    )
     assert "Vague Buzzwords" in result["reason"]

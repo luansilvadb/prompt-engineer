@@ -72,7 +72,9 @@ Thumbs.db
 # Saídas de Execução e Logs do Projeto
 # ==============================================================================
 *.log
+src/outputs/logs/
 src/outputs/skills/
+src/outputs/jobs/
 drift_report*.json
 
 # ==============================================================================

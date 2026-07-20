@@ -1,0 +1,52 @@
+[
+  {
+    "run": 0,
+    "reward": 0.53,
+    "feedback": "Deterministic judge: strategy=mutador_cognitivo, reward=0.530"
+  },
+  {
+    "run": 1,
+    "reward": 0.56,
+    "feedback": "Deterministic judge: strategy=mutador_cognitivo, reward=0.560"
+  },
+  {
+    "run": 2,
+    "reward": 0.59,
+    "feedback": "Deterministic judge: strategy=mutador_cognitivo, reward=0.590"
+  },
+  {
+    "run": 3,
+    "reward": 0.62,
+    "feedback": "Deterministic judge: strategy=mutador_cognitivo, reward=0.620"
+  },
+  {
+    "run": 4,
+    "reward": 0.6500000000000001,
+    "feedback": "Deterministic judge: strategy=mutador_cognitivo, reward=0.650"
+  },
+  {
+    "run": 5,
+    "reward": 0.6799999999999999,
+    "feedback": "Deterministic judge: strategy=mutador_cognitivo, reward=0.680"
+  },
+  {
+    "run": 6,
+    "reward": 0.51,
+    "feedback": "Deterministic judge: strategy=mutador_cognitivo, reward=0.510"
+  },
+  {
+    "run": 7,
+    "reward": 0.54,
+    "feedback": "Deterministic judge: strategy=mutador_cognitivo, reward=0.540"
+  },
+  {
+    "run": 8,
+    "reward": 0.5700000000000001,
+    "feedback": "Deterministic judge: strategy=mutador_cognitivo, reward=0.570"
+  },
+  {
+    "run": 9,
+    "reward": 0.5999999999999999,
+    "feedback": "Deterministic judge: strategy=mutador_cognitivo, reward=0.600"
+  }
+]

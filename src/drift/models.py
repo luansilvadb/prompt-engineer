@@ -52,6 +52,7 @@ class GoldenProbe:
     expected: ProbeExpectation
     expected_rank_band: str  # "alto" | "medio" | "baixo"
     verifier: str
+    category: str = "general"  # "estilo" | "natural" | "neighbor" | "gptout" | "manual" | "constraint" | "negation" | "general"
 
 
 @dataclass(frozen=True)
@@ -78,6 +79,9 @@ class DriftReport:
     repetitions: int = 0
     per_probe: List[dict] = field(default_factory=list)
     low_confidence: bool = False
+    style_gap: float = 0.0                   # composite(SD1_integro) - composite(SD3_pomposo); negativo = viés estético
+    style_drift_signal: bool = False         # flag de auditoria: buzzwords pomposas em >40% dos feedbacks (NUNCA penalizador automático)
+    category_accuracy: dict = field(default_factory=dict)  # acurácia por categoria (ex: {"estilo": 0.95})
 
     def to_dict(self) -> dict:
         return {
@@ -92,6 +96,9 @@ class DriftReport:
             'mean_variance': self.mean_variance,
             'repetitions': self.repetitions,
             'low_confidence': self.low_confidence,
+            'style_gap': self.style_gap,
+            'style_drift_signal': self.style_drift_signal,
+            'category_accuracy': self.category_accuracy,
             'per_probe': self.per_probe,
             'measured_at': time.time(),
         }

@@ -49,5 +49,12 @@ export const el = {
     modalNodeScore: document.getElementById('modal-node-score'),
     modalNodeVisits: document.getElementById('modal-node-visits'),
     modalNodeCritica: document.getElementById('modal-node-critica'),
-    modalNodeInstruction: document.getElementById('modal-node-instruction')
+    modalNodeInstruction: document.getElementById('modal-node-instruction'),
+    // Drift Modal
+    driftModalOverlay: document.getElementById('drift-modal-overlay'),
+    driftModalTitle: document.getElementById('drift-modal-title'),
+    driftModalBody: document.getElementById('drift-modal-body'),
+    btnCloseDrift: document.getElementById('btn-close-drift'),
+    // Drift Health Badge
+    driftHealthBadge: document.getElementById('drift-health-badge'),
 };

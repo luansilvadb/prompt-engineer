@@ -20,7 +20,7 @@ _compile_lock = threading.Lock()
 #   "no_data"            — sem experiências de alta qualidade.
 #   "drift_rejected"     — candidato rejeitado pelo portão (não persistiu).
 #   "measurement_error"  — falha ao medir drift com golden presente.
-#   "golden_empty_open"  — golden ausente; compilação sem portão (fail-open, EC4).
+#   "golden_required"    — golden ausente; candidato DESCARTADO (fail-closed). Juiz anterior preservado.
 
 
 def _build_trainset(store: ExperienceStore, min_reward: float) -> list:
@@ -72,23 +72,32 @@ def _persist_candidate(candidate_path: Path, out_path: Path, output_dir: Path, r
 def _evaluate_drift_gate(candidate_path: Path, out_path: Path, output_dir: Path) -> str:
     """
     RN-07: Fail-closed em erro de medição
-    RN-08: Fail-open se golden vazio
+    RN-08 (revertido): Fail-CLOSED se golden vazio.
+
+    Razão: fail-open permitia persitir um juíz treinado com dados sintéticos
+    sem validação, criando um ciclo vicioso de model collapse:
+      ExperienceStore (sintético) → treina Juíz → Juíz viesado pontua
+      novas skills → mais dados sintéticos viesados → loop fechado.
+    Fail-closed interrompe o ciclo: sem golden set, sem novo juíz.
     """
     golden = GoldenSet()
     if golden.is_empty():
-        # EC4: fail-open — não trava deploy limpo, mas avisa com destaque máximo.
-        candidate_path.replace(out_path)
+        # Fail-closed: descarta candidato e preserva juíz atual.
+        try:
+            candidate_path.unlink(missing_ok=True)
+        except Exception:
+            pass
         print(
             "\n" + "=" * 72 + "\n"
-            "⚠  WARNING — PORTÃO DE DRIFT DESATIVADO (EC4: fail-open)\n"
-            "   Golden set ausente ou vazio. O candidato foi persistido SEM\n"
-            "   validação de drift. Um juiz com desvio comportamental severo\n"
-            "   pode estar ativo em produção.\n"
-            f"  Arquivo persistido: {out_path}\n"
-            "   AÇÃO RECOMENDADA: recrie o golden set e recompile o avaliador.\n"
+            "❌ PORTÃO DE DRIFT: CANDIDATO DESCARTADO (fail-closed)\n"
+            "   Golden set ausente ou vazio. O candidato NÃO foi persistido.\n"
+            "   Juíz anterior preservado para evitar model collapse.\n"
+            "   AÇÃO NECESSÁRIA: crie o golden set antes de treinar o avaliador.\n"
+            "   Use: POST /api/generate-golden ou edite manualmente\n"
+            "   src/outputs/golden/golden_set.json\n"
             + "=" * 72 + "\n"
         )
-        return "golden_empty_open"
+        return "golden_required"
 
     cfg = get_drift_thresholds()
     thresholds = DriftThresholds.from_config(cfg)
@@ -151,9 +160,9 @@ def compilar_avaliador(lm=None, min_reward: float = 0.8) -> str:
         return "no_data"
 
     try:
-        if lm:
-            dspy.settings.configure(lm=lm)
-
+        # Nota: dspy.configure() já foi chamado pelo setup() na thread do event loop.
+        # NÃO chamamos dspy.settings.configure() aqui — seria bloqueado pelo dspy
+        # por tentar reconfigurar o singleton a partir de uma thread worker diferente.
         store = ExperienceStore()
         trainset = _build_trainset(store, min_reward)
         if not trainset:

@@ -1,0 +1,36 @@
+{
+  "skill_original": "Voce e um assistente de IA. Siga estas regras:\n1. Sempre responda em portugues.\n2. Seja conciso e direto.\n3. Use formatacao markdown quando apropriado.\n4. Nunca invente informacoes.",
+  "skill_otimizada": "## Raciocinio\nPremissas: O usuario precisa de clareza.\nDeduccoes: Estrutura melhora compreensao.\nCon...",
+  "n_evaluations": 5,
+  "raw_scores": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "mean": 0.0,
+  "stdev": 0.0,
+  "median": 0.0,
+  "min": 0.0,
+  "max": 0.0,
+  "histogram_bins": {
+    "0.00-0.10": 5,
+    "0.10-0.20": 0,
+    "0.20-0.30": 0,
+    "0.30-0.40": 0,
+    "0.40-0.50": 0,
+    "0.50-0.60": 0,
+    "0.60-0.70": 0,
+    "0.70-0.80": 0,
+    "0.80-0.90": 0,
+    "0.90-1.00": 0
+  },
+  "errors": [],
+  "thresholds_used": {
+    "stable": 0.05,
+    "moderate": 0.1,
+    "high": 0.2
+  },
+  "recommendation": "Juiz estavel (sigma <= 0.05). Correcoes #3 (buzzword) e #5 (desempate) bastam. Correcao #2 (mediana) NAO e necessaria."
+}

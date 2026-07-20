@@ -196,9 +196,9 @@ def test_delta_reward_improvement_adds_bonus():
 
 
 def test_delta_reward_regression_floors_delta_to_zero():
-    # filho<pai: max(0, delta)=0 — regressão não penaliza abaixo de alpha*abs.
-    # 0.6*0.5 + 0.4*0 = 0.30
-    assert calcular_delta_reward(0.5, 0.8) == pytest.approx(0.30)
+    # filho<pai: delta=-0.3 → shaped = 0.6*0.5 + 0.4*(-0.3) = 0.30 - 0.12 = 0.18
+    # O delta negativo penaliza, sinalizando ao bandit que houve regressão.
+    assert calcular_delta_reward(0.5, 0.8) == pytest.approx(0.18)
 
 
 def test_delta_reward_equal_rewards_is_alpha_times_absolute():

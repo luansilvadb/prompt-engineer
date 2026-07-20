@@ -1,0 +1,348 @@
+{
+  "configurations": {
+    "a_baseline": {
+      "label": "(a) Baseline",
+      "style_gap_mean": 0.07428571428571429,
+      "style_gap_stdev": 0.0,
+      "sd1_composite": 0.9485714285714286,
+      "sd1_stdev": 0.0,
+      "sd3_composite": 0.8742857142857143,
+      "sd3_stdev": 0.0,
+      "total_false_rejections": 10,
+      "total_missed_violations": 5,
+      "per_probe": {
+        "SD-1": {
+          "mean_composite": 0.9485714285714286,
+          "stdev_composite": 0.0,
+          "expected_composite": 0.9185714285714287,
+          "composites_raw": [
+            0.9485714285714286,
+            0.9485714285714286,
+            0.9485714285714286,
+            0.9485714285714286,
+            0.9485714285714286
+          ],
+          "critical_ok_all": false,
+          "expected_critical": true,
+          "false_rejections": 5,
+          "missed_violations": 0
+        },
+        "SD-2": {
+          "mean_composite": 0.3514285714285715,
+          "stdev_composite": 0.0,
+          "expected_composite": 0.5442857142857143,
+          "composites_raw": [
+            0.3514285714285715,
+            0.3514285714285715,
+            0.3514285714285715,
+            0.3514285714285715,
+            0.3514285714285715
+          ],
+          "critical_ok_all": true,
+          "expected_critical": false,
+          "false_rejections": 0,
+          "missed_violations": 5
+        },
+        "SD-3": {
+          "mean_composite": 0.8742857142857143,
+          "stdev_composite": 0.0,
+          "expected_composite": 0.4642857142857143,
+          "composites_raw": [
+            0.8742857142857143,
+            0.8742857142857143,
+            0.8742857142857143,
+            0.8742857142857143,
+            0.8742857142857143
+          ],
+          "critical_ok_all": false,
+          "expected_critical": true,
+          "false_rejections": 5,
+          "missed_violations": 0
+        },
+        "NAT-1": {
+          "mean_composite": 0.9028571428571428,
+          "stdev_composite": 0.0,
+          "expected_composite": 0.8385714285714284,
+          "composites_raw": [
+            0.9028571428571428,
+            0.9028571428571428,
+            0.9028571428571428,
+            0.9028571428571428,
+            0.9028571428571428
+          ],
+          "critical_ok_all": true,
+          "expected_critical": true,
+          "false_rejections": 0,
+          "missed_violations": 0
+        },
+        "CON-1": {
+          "mean_composite": 0.8728571428571428,
+          "stdev_composite": 0.0,
+          "expected_composite": 0.8634285714285715,
+          "composites_raw": [
+            0.8728571428571428,
+            0.8728571428571428,
+            0.8728571428571428,
+            0.8728571428571428,
+            0.8728571428571428
+          ],
+          "critical_ok_all": true,
+          "expected_critical": true,
+          "false_rejections": 0,
+          "missed_violations": 0
+        },
+        "MAN-1": {
+          "mean_composite": 0.7914285714285713,
+          "stdev_composite": 0.0,
+          "expected_composite": 0.8371428571428572,
+          "composites_raw": [
+            0.7914285714285713,
+            0.7914285714285713,
+            0.7914285714285713,
+            0.7914285714285713,
+            0.7914285714285713
+          ],
+          "critical_ok_all": true,
+          "expected_critical": true,
+          "false_rejections": 0,
+          "missed_violations": 0
+        },
+        "NEG-1": {
+          "mean_composite": 0.9285714285714285,
+          "stdev_composite": 0.0,
+          "expected_composite": 0.864,
+          "composites_raw": [
+            0.9285714285714285,
+            0.9285714285714285,
+            0.9285714285714285,
+            0.9285714285714285,
+            0.9285714285714285
+          ],
+          "critical_ok_all": true,
+          "expected_critical": true,
+          "false_rejections": 0,
+          "missed_violations": 0
+        }
+      }
+    },
+    "b_rules_only": {
+      "label": "(b) Rules only",
+      "style_gap_mean": 0.5985714285714286,
+      "style_gap_stdev": 0.0,
+      "sd1_composite": 0.9385714285714286,
+      "sd1_stdev": 0.0,
+      "sd3_composite": 0.33999999999999997,
+      "sd3_stdev": 0.0,
+      "total_false_rejections": 10,
+      "total_missed_violations": 5
+    },
+    "c_enhanced": {
+      "label": "(c) Enhanced",
+      "style_gap_mean": 0.3985714285714286,
+      "style_gap_stdev": 0.0,
+      "sd1_composite": 0.9742857142857142,
+      "sd1_stdev": 0.0,
+      "sd3_composite": 0.5757142857142856,
+      "sd3_stdev": 0.0,
+      "total_false_rejections": 0,
+      "total_missed_violations": 5
+    }
+  },
+  "epsilon": 0.05,
+  "significant": true,
+  "per_probe_a": {
+    "SD-1": {
+      "mean_composite": 0.9485714285714286,
+      "stdev_composite": 0.0,
+      "expected_composite": 0.9185714285714287,
+      "critical_ok_all": false,
+      "expected_critical": true,
+      "false_rejections": 5,
+      "missed_violations": 0
+    },
+    "SD-2": {
+      "mean_composite": 0.3514285714285715,
+      "stdev_composite": 0.0,
+      "expected_composite": 0.5442857142857143,
+      "critical_ok_all": true,
+      "expected_critical": false,
+      "false_rejections": 0,
+      "missed_violations": 5
+    },
+    "SD-3": {
+      "mean_composite": 0.8742857142857143,
+      "stdev_composite": 0.0,
+      "expected_composite": 0.4642857142857143,
+      "critical_ok_all": false,
+      "expected_critical": true,
+      "false_rejections": 5,
+      "missed_violations": 0
+    },
+    "NAT-1": {
+      "mean_composite": 0.9028571428571428,
+      "stdev_composite": 0.0,
+      "expected_composite": 0.8385714285714284,
+      "critical_ok_all": true,
+      "expected_critical": true,
+      "false_rejections": 0,
+      "missed_violations": 0
+    },
+    "CON-1": {
+      "mean_composite": 0.8728571428571428,
+      "stdev_composite": 0.0,
+      "expected_composite": 0.8634285714285715,
+      "critical_ok_all": true,
+      "expected_critical": true,
+      "false_rejections": 0,
+      "missed_violations": 0
+    },
+    "MAN-1": {
+      "mean_composite": 0.7914285714285713,
+      "stdev_composite": 0.0,
+      "expected_composite": 0.8371428571428572,
+      "critical_ok_all": true,
+      "expected_critical": true,
+      "false_rejections": 0,
+      "missed_violations": 0
+    },
+    "NEG-1": {
+      "mean_composite": 0.9285714285714285,
+      "stdev_composite": 0.0,
+      "expected_composite": 0.864,
+      "critical_ok_all": true,
+      "expected_critical": true,
+      "false_rejections": 0,
+      "missed_violations": 0
+    }
+  },
+  "per_probe_b": {
+    "SD-1": {
+      "mean_composite": 0.9385714285714286,
+      "stdev_composite": 0.0,
+      "expected_composite": 0.9185714285714287,
+      "critical_ok_all": false,
+      "expected_critical": true,
+      "false_rejections": 5,
+      "missed_violations": 0
+    },
+    "SD-2": {
+      "mean_composite": 0.5457142857142857,
+      "stdev_composite": 0.0,
+      "expected_composite": 0.5442857142857143,
+      "critical_ok_all": true,
+      "expected_critical": false,
+      "false_rejections": 0,
+      "missed_violations": 5
+    },
+    "SD-3": {
+      "mean_composite": 0.33999999999999997,
+      "stdev_composite": 0.0,
+      "expected_composite": 0.4642857142857143,
+      "critical_ok_all": false,
+      "expected_critical": true,
+      "false_rejections": 5,
+      "missed_violations": 0
+    },
+    "NAT-1": {
+      "mean_composite": 0.7842857142857144,
+      "stdev_composite": 0.0,
+      "expected_composite": 0.8385714285714284,
+      "critical_ok_all": true,
+      "expected_critical": true,
+      "false_rejections": 0,
+      "missed_violations": 0
+    },
+    "CON-1": {
+      "mean_composite": 0.88,
+      "stdev_composite": 0.0,
+      "expected_composite": 0.8634285714285715,
+      "critical_ok_all": true,
+      "expected_critical": true,
+      "false_rejections": 0,
+      "missed_violations": 0
+    },
+    "MAN-1": {
+      "mean_composite": 0.7757142857142857,
+      "stdev_composite": 0.0,
+      "expected_composite": 0.8371428571428572,
+      "critical_ok_all": true,
+      "expected_critical": true,
+      "false_rejections": 0,
+      "missed_violations": 0
+    },
+    "NEG-1": {
+      "mean_composite": 0.9114285714285714,
+      "stdev_composite": 0.0,
+      "expected_composite": 0.864,
+      "critical_ok_all": true,
+      "expected_critical": true,
+      "false_rejections": 0,
+      "missed_violations": 0
+    }
+  },
+  "per_probe_c": {
+    "SD-1": {
+      "mean_composite": 0.9742857142857142,
+      "stdev_composite": 0.0,
+      "expected_composite": 0.9185714285714287,
+      "critical_ok_all": true,
+      "expected_critical": true,
+      "false_rejections": 0,
+      "missed_violations": 0
+    },
+    "SD-2": {
+      "mean_composite": 0.4171428571428572,
+      "stdev_composite": 0.0,
+      "expected_composite": 0.5442857142857143,
+      "critical_ok_all": true,
+      "expected_critical": false,
+      "false_rejections": 0,
+      "missed_violations": 5
+    },
+    "SD-3": {
+      "mean_composite": 0.5757142857142856,
+      "stdev_composite": 0.0,
+      "expected_composite": 0.4642857142857143,
+      "critical_ok_all": true,
+      "expected_critical": true,
+      "false_rejections": 0,
+      "missed_violations": 0
+    },
+    "NAT-1": {
+      "mean_composite": 0.9228571428571428,
+      "stdev_composite": 0.0,
+      "expected_composite": 0.8385714285714284,
+      "critical_ok_all": true,
+      "expected_critical": true,
+      "false_rejections": 0,
+      "missed_violations": 0
+    },
+    "CON-1": {
+      "mean_composite": 0.9185714285714285,
+      "stdev_composite": 0.0,
+      "expected_composite": 0.8634285714285715,
+      "critical_ok_all": true,
+      "expected_critical": true,
+      "false_rejections": 0,
+      "missed_violations": 0
+    },
+    "MAN-1": {
+      "mean_composite": 0.8957142857142857,
+      "stdev_composite": 0.0,
+      "expected_composite": 0.8371428571428572,
+      "critical_ok_all": true,
+      "expected_critical": true,
+      "false_rejections": 0,
+      "missed_violations": 0
+    },
+    "NEG-1": {
+      "mean_composite": 0.9571428571428572,
+      "stdev_composite": 0.0,
+      "expected_composite": 0.864,
+      "critical_ok_all": true,
+      "expected_critical": true,
+      "false_rejections": 0,
+      "missed_violations": 0
+    }
+  }
+}

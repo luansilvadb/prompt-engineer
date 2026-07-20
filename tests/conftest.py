@@ -88,6 +88,8 @@ def mock_optimizer_factory(mock_heavy_evaluators):
             value_threshold=0.3,
             value_lr=0.1,
             bandit_c_param=1.41,
+            bandit_temperature=2.0,
+            bandit_temperature_decay=0.95,
             semantic_sim_threshold=0.92,
             lexical_density_min=0.35,
             verbosity_penalty_factor=0.7,
@@ -98,6 +100,7 @@ def mock_optimizer_factory(mock_heavy_evaluators):
             density_multiplier_min=0.8,
             density_multiplier_max=1.2,
             density_structured_bonus=0.05,
+            reward_floor=0.30,
         )
         
         final_config = overrides.get('config', config)
@@ -126,3 +129,74 @@ def mock_optimizer_factory(mock_heavy_evaluators):
         return opt
     
     return _create_optimizer
+
+
+class DeterministicJudge:
+    """Juiz determinístico para experimentos de variância — isola ruído do LLM.
+
+    Retorna rewards fixos por estratégia de mutação, permitindo medir
+    a variância que vem exclusivamente do bandit e da ordem de expansão.
+    """
+
+    def __init__(self, strategy_rewards: dict = None):
+        self._rewards = strategy_rewards or {}
+        self._call_count = 0
+        self._calls: list[dict] = []
+
+    def set_reward(self, strategy_key: str, reward: float):
+        self._rewards[strategy_key] = reward
+
+    def __call__(self, skill_original: str, skill_otimizada: str, regras_adicionais: str = ""):
+        """Emula a interface do avaliador_modo_b.
+
+        Determina a estratégia inferindo-a do conteúdo da skill_otimizada
+        ou usa um fallback round-robin determinístico.
+        """
+        from src.signatures import AvaliacaoModoB
+
+        self._call_count += 1
+        idx = self._call_count
+
+        # Tenta inferir a estratégia a partir de padrões no texto
+        strategy = self._infer_strategy(skill_otimizada)
+        reward = self._rewards.get(strategy, 0.50 + (idx * 0.03) % 0.20)
+
+        self._calls.append({
+            'call_num': idx,
+            'inferred_strategy': strategy,
+            'reward': reward,
+            'skill_len': len(skill_otimizada),
+        })
+
+        defeitos = []
+        if reward < 0.4:
+            defeitos = ["Qualidade insuficiente — simulação determinística."]
+
+        resultado = AvaliacaoModoB(
+            manteve_regras_criticas=True,
+            nota_clareza=reward * 100,
+            nota_formatacao=reward * 100,
+            nota_robustez=reward * 100,
+            nota_densidade_informacional=reward * 100,
+            nota_acionabilidade=reward * 100,
+            nota_anti_fragilidade=reward * 100,
+            feedback_detalhado=f'Deterministic judge: strategy={strategy}, reward={reward:.3f}',
+            defeitos_encontrados=defeitos,
+        )
+        return resultado
+
+    def _infer_strategy(self, text: str) -> str:
+        """Infere a estratégia a partir de marcadores no texto."""
+        normalized = text.lower()
+        if '## raciocínio' in normalized and '## regras' in normalized:
+            return 'mutador_cognitivo'
+        if 'simplif' in normalized or 'simpler' in normalized:
+            return 'simplificar'
+        if 'exemplo' in normalized or 'example' in normalized:
+            return 'adicionar_exemplos'
+        if 'passo' in normalized or 'step' in normalized:
+            return 'detalhar_passos'
+        return 'default'
+
+    def get_call_log(self) -> list[dict]:
+        return list(self._calls)

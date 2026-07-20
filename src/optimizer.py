@@ -27,7 +27,7 @@ from src.domain.config import MCTSConfig
 from src.domain.events import IJobEventEmitter, NodeEventPayload
 from src.domain.store_interfaces import IExperienceStore
 from src.domain.mcts import MCTSNode
-from src.mutation_strategies.bandit_interfaces import IMutationBandit, IStrategyRegistry
+from src.domain.bandit_interfaces import IMutationBandit, IStrategyRegistry
 from src.signatures import calcular_delta_reward, MutadorCognitivoOutput, _validate_raciocinio, funcao_de_recompensa
 from src.experience_store import Experience, hash_instruction
 from src.value_estimator import ValueEstimator
@@ -68,6 +68,9 @@ class Optimizer:
         self.experience_store = experience_store
         self.value_estimator = ValueEstimator(learning_rate=config.value_lr)
         self.mutation_bandit = bandit
+
+        self._expansion_order: list[dict] = []
+        self._expand_count: int = 0
 
         strategy_stats = self.experience_store.get_strategy_stats()
         if strategy_stats:
@@ -278,6 +281,7 @@ class Optimizer:
 
         critica = leaf.feedback
         nova_instrucao = leaf.instruction
+        failed_strategies = set()
 
         for tentativa in range(3):
             if self._emitter.is_cancelled():
@@ -299,6 +303,25 @@ class Optimizer:
             if sucesso:
                 nova_instrucao = candidata
                 break
+
+            # Trocar de estratégia entre tentativas — a atual falhou
+            failed_strategies.add(strategy)
+            self._emitter.emit_log(f'    [!] Estratégia {strategy_desc} falhou. Selecionando nova estratégia...')
+            # Escolhe nova estratégia, evitando as que já falharam
+            fallback_found = False
+            for _ in range(5):
+                strategy = self.mutation_bandit.select()
+                if strategy == '__DISCOVER__':
+                    strategy = self._discover_strategy(leaf)
+                if strategy not in failed_strategies:
+                    strategy_prompt = self._strategy_registry.get_prompt(strategy)
+                    strategy_desc = self._strategy_registry.get_name(strategy)
+                    fallback_found = True
+                    break
+            if not fallback_found:
+                # Se todas as estratégias conhecidas falharam, usa a original
+                self._emitter.emit_log('    [!] Todas as estratégias falharam. Mantendo a atual.')
+                break
         else:
             self._emitter.emit_error('[!] Falha em gerar nova instrução após 3 tentativas. Usando variação mínima.')
             nova_instrucao = f'{leaf.instruction}\n '
@@ -313,6 +336,16 @@ class Optimizer:
             depth=leaf.depth + 1,
         )
         leaf.children.append(child)
+
+        self._expand_count += 1
+        self._expansion_order.append({
+            'expand_num': self._expand_count,
+            'strategy_key': strategy,
+            'strategy_desc': strategy_desc,
+            'depth': child.depth,
+            'parent_score': leaf.q_value / max(1, leaf.visits) if leaf != child else 0.0,
+        })
+
         self.notify_node(child)
         return child
 
@@ -413,9 +446,19 @@ class Optimizer:
 
         reward, feedback = self.simulation(child.instruction)
 
+        reward_before_multipliers = reward
         reward = self._apply_heuristic_multiplier(reward, heuristic_result)
         reward = self._apply_semantic_penalty(child, reward)
         reward = self._apply_density_multiplier(child, reward)
+        # RN-10: reward_floor — evita esmagamento por produto de multiplicadores.
+        # Se a skill tem qualidade intrínseca boa, o produto de penalidades
+        # não pode derrubar o reward abaixo do piso.
+        if reward < self.config.reward_floor and reward_before_multipliers >= self.config.reward_floor * 2:
+            self._emitter.emit_log(
+                f"    [Reward Floor] reward={reward:.3f} < floor={self.config.reward_floor:.2f}. "
+                f"Restaurando para {self.config.reward_floor:.2f}"
+            )
+            reward = self.config.reward_floor
 
         child.feedback = feedback
         child.last_reward = reward
@@ -488,15 +531,73 @@ class Optimizer:
                 desc = get_strategy_description(strategy)
                 self._emitter.emit_log(f'    {desc}: Δ médio={s["mean_delta"]:+.3f}, usos={int(s["count"])}')
 
-    def _select_and_log_best_node(self, root: MCTSNode) -> str:
+    def get_expansion_order(self) -> list[dict]:
+        """Retorna a ordem cronológica das expansões com estratégias e métricas."""
+        return list(self._expansion_order)
+
+    def get_level_one_nodes(self, root: MCTSNode) -> list[dict]:
+        """Retorna métricas de todos os nós de profundidade 1 (filhos diretos da raiz)."""
+        return [
+            {
+                'strategy': n.mutation_strategy,
+                'score': n.q_value / max(1, n.visits),
+                'visits': n.visits,
+                'reward': n.last_reward,
+                'depth': n.depth,
+                'instruction_len': len(n.instruction),
+            }
+            for n in root.children
+        ]
+
+    def _select_and_log_best_node(self, root: MCTSNode) -> MCTSNode:
+        """Retorna o melhor nó (por score) para uso em experimentos.
+
+        Desempate determinístico: score > visits > depth.
+        Evita dependência da ordem de inserção dos nós na árvore.
+        """
         all_nodes = self._get_all_nodes(root)
-        best_node = max(all_nodes, key=lambda n: n.q_value / max(1, n.visits))
+        best_node = max(all_nodes, key=lambda n: (
+            n.q_value / max(1, n.visits),  # score primário
+            n.visits,                       # desempate 1: mais visitas = mais confiável
+            n.depth,                        # desempate 2: mais profundo = mais otimizado
+        ))
+        return best_node
+
+    def _format_best_node(self, root: MCTSNode) -> str:
+        best_node = self._select_and_log_best_node(root)
+
+        # Reavaliar o melhor no com mediana (mesmo n_samples da raiz)
+        # para reduzir ruido do juiz LLM na skill entregue ao usuario.
+        n_samples = self.config.root_median_samples
+        if n_samples > 1 and best_node != root:
+            best_rewards = []
+            for _ in range(n_samples):
+                if self._emitter.is_cancelled():
+                    break
+                r, _ = self.simulation(best_node.instruction)
+                best_rewards.append(r)
+            if best_rewards:
+                best_rewards.sort()
+                best_node.last_reward = best_rewards[len(best_rewards) // 2]
+                self._emitter.emit_log(
+                    f'    [BestNode] {n_samples} reavaliacoes: '
+                    f'{[f"{v:.3f}" for v in best_rewards]}, '
+                    f'mediana={best_node.last_reward:.3f}'
+                )
 
         score = best_node.q_value / max(1, best_node.visits)
         if best_node == root:
-            self._emitter.emit_log(f'[+] Raiz mantida como melhor resultado (nenhuma otimização superou): score={score:.3f}, visits={best_node.visits}')
+            self._emitter.emit_log(
+                f'[!] ATENCAO: Nenhuma otimizacao superou a skill original. '
+                f'O otimizador nao encontrou melhoria significativa. '
+                f'score={score:.3f}, visits={best_node.visits}'
+            )
         else:
-            self._emitter.emit_log(f'[+] Melhor nó selecionado: score={score:.3f}, visits={best_node.visits}, strategy={get_strategy_description(best_node.mutation_strategy)}')
+            self._emitter.emit_log(
+                f'[+] Melhor no selecionado: score={score:.3f}, visits={best_node.visits}, '
+                f'strategy={get_strategy_description(best_node.mutation_strategy)}, '
+                f'depth={best_node.depth}'
+            )
 
         return best_node.instruction
 
@@ -508,8 +609,29 @@ class Optimizer:
         root = MCTSNode(self.skill_original, critica='Rascunho Inicial')
         self.notify_node(root)
 
-        self._emitter.emit_log('[*] Avaliando a instrução original (raiz)...')
-        reward, feedback = self.simulation(root.instruction)
+        n_samples = self.config.root_median_samples
+        if n_samples == 1:
+            self._emitter.emit_log('[*] Avaliando a instrucao original (raiz)...')
+            reward, feedback = self.simulation(root.instruction)
+        else:
+            self._emitter.emit_log(
+                f'[*] Avaliando a instrucao original (raiz) com mediana de {n_samples}...'
+            )
+            root_rewards = []
+            root_feedbacks = []
+            for sim_i in range(n_samples):
+                if self._emitter.is_cancelled():
+                    break
+                r, f = self.simulation(root.instruction)
+                root_rewards.append(r)
+                root_feedbacks.append(f)
+            root_rewards.sort()
+            reward = root_rewards[len(root_rewards) // 2]
+            feedback = root_feedbacks[len(root_feedbacks) // 2]
+            self._emitter.emit_log(
+                f'    [Raiz] {n_samples} avaliacoes: {[f"{v:.3f}" for v in root_rewards]}, '
+                f'mediana={reward:.3f}'
+            )
         root.feedback = feedback
         root.last_reward = reward
         self.backpropagation(root, reward)
@@ -535,4 +657,4 @@ class Optimizer:
 
         self._emitter.emit_log('\n=======================================================\n                OTIMIZAÇÃO CONCLUÍDA                   \n=======================================================\n')
 
-        return self._select_and_log_best_node(root)
+        return self._format_best_node(root)

@@ -16,7 +16,7 @@ def test_cognitivo_config_defaults(monkeypatch):
     monkeypatch.delenv('MCTS_COGNITIVO_PRIOR_COUNT', raising=False)
     monkeypatch.delenv('MCTS_COGNITIVO_PRIOR_MEAN_DELTA', raising=False)
     cfg = load_mcts_config()
-    assert cfg.cognitivo_prior_count == 4
+    assert cfg.cognitivo_prior_count == 1
     assert cfg.cognitivo_prior_mean_delta == 0.05
 
 
@@ -129,12 +129,12 @@ def test_apply_model_quirks_gemma_sets_thinking_kwargs():
     assert kwargs['timeout'] == 120
 
 
-def test_apply_model_quirks_non_gemma_is_noop():
+def test_apply_model_quirks_non_gemma_gets_default_timeout():
     kwargs = {'model': 'gpt-4o'}
     _apply_model_quirks('gpt-4o', kwargs)
     assert 'extra_body' not in kwargs
     assert 'max_tokens' not in kwargs
-    assert 'timeout' not in kwargs
+    assert kwargs['timeout'] == 90
 
 
 def test_setup_normal_model_configures_dspy(monkeypatch):

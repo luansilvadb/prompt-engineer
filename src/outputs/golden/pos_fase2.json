@@ -1,0 +1,72 @@
+{
+  "judge_label": "enhanced_pos_fase2",
+  "spearman_composite": 0.5,
+  "offset_scale": 1.8000000000000016,
+  "mae_per_dimension": [
+    {
+      "dimension": "nota_clareza",
+      "mae": 4.333333333333333
+    },
+    {
+      "dimension": "nota_formatacao",
+      "mae": 15.0
+    },
+    {
+      "dimension": "nota_robustez",
+      "mae": 21.333333333333332
+    },
+    {
+      "dimension": "nota_densidade_informacional",
+      "mae": 10.666666666666666
+    },
+    {
+      "dimension": "nota_acionabilidade",
+      "mae": 10.333333333333334
+    },
+    {
+      "dimension": "nota_anti_fragilidade",
+      "mae": 21.666666666666668
+    }
+  ],
+  "critical_rules_concordance": 1.0,
+  "critical_rules_violated": false,
+  "missed_violations": 0,
+  "false_rejections": 0,
+  "mean_variance": 0.0,
+  "repetitions": 7,
+  "low_confidence": false,
+  "per_probe": [
+    {
+      "probe_id": "SD-1",
+      "expected_composite": 0.9175384615384616,
+      "predicted_composite": 0.9730769230769231,
+      "variance": 0.0,
+      "expected_critical": true,
+      "observed_critical_all_correct": true,
+      "missed_violations": 0,
+      "false_rejections": 0
+    },
+    {
+      "probe_id": "SD-2",
+      "expected_composite": 0.5407692307692307,
+      "predicted_composite": 0.4123076923076923,
+      "variance": 0.0,
+      "expected_critical": false,
+      "observed_critical_all_correct": true,
+      "missed_violations": 0,
+      "false_rejections": 0
+    },
+    {
+      "probe_id": "SD-3",
+      "expected_composite": 0.4753846153846154,
+      "predicted_composite": 0.6023076923076923,
+      "variance": 0.0,
+      "expected_critical": true,
+      "observed_critical_all_correct": true,
+      "missed_violations": 0,
+      "false_rejections": 0
+    }
+  ],
+  "measured_at": 1784496112.450965,
+  "phase": "pos_fase2"
+}

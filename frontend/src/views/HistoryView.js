@@ -1,4 +1,5 @@
 import { el } from '../dom.js';
+import { showToast } from '../utils/toast.js';
 
 export class HistoryView {
     constructor(viewModel) {
@@ -70,7 +71,7 @@ export class HistoryView {
         });
 
         this.vm.addEventListener('error', (e) => {
-            alert(e.detail.message);
+            showToast(e.detail.message || 'Erro no histórico.', 'error');
         });
     }
 
@@ -85,7 +86,7 @@ export class HistoryView {
         jobs.forEach(job => {
             const date = job.updated_at ? new Date(job.updated_at * 1000).toLocaleString() : 'Desconhecido';
             const model = job.model_name || 'Padrão';
-            
+
             let statusClass = 'idle';
             if (job.status === 'completed') statusClass = 'completed';
             else if (job.status === 'running') statusClass = 'running';

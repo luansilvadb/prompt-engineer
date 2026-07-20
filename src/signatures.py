@@ -129,10 +129,16 @@ SCORE_WEIGHTS: tuple = (
     ('nota_clareza', 1.0),
     ('nota_formatacao', 0.8),
     ('nota_robustez', 1.2),
-    ('nota_densidade_informacional', 1.0),
-    ('nota_acionabilidade', 1.3),
+    ('nota_densidade_informacional', 1.4),  # Fase 4: aumentado de 1.0 — dimensão mais vulnerável ao viés estético
+    ('nota_acionabilidade', 1.4),           # Fase 4: aumentado de 1.3 — instruction following objetivo
     ('nota_anti_fragilidade', 1.2),
 )
+# NOTA (DESIGN.md): pesos acima são valores iniciais calibrados na Fase 4 (LLMBar).
+# Após golden set expandido para 21+ probes, reavaliar com MAE-driven adjustment:
+# weight_new = weight_old * (1 + MAE_normalized), renormalizar.
+# ANTES do ajuste automático: inspecionar manualmente dimensões com MAE no quartil superior.
+# Se ≥2 dos 3 probes com maior desvio forem erro de calibração do golden set,
+# corrigir o golden set, NÃO os pesos.
 
 
 def calcular_composite(notas) -> float:
@@ -174,8 +180,9 @@ def calcular_delta_reward(reward_filho: float, reward_pai: float, alpha: float =
     Isso estabiliza o aprendizado e dá crédito proporcional à melhoria.
     """
     delta = reward_filho - reward_pai
-    # Bônus/penalidade pelo delta, normalizado
-    shaped = alpha * reward_filho + (1 - alpha) * max(0.0, delta)
+    # Bônus/penalidade pelo delta, normalizado.
+    # Permitir delta negativo para que o bandit aprenda com pioras.
+    shaped = alpha * reward_filho + (1 - alpha) * delta
     return max(0.0, min(1.0, shaped))
 
 def funcao_de_recompensa(avaliador_modo_b, skill_original: str, skill_otimizada: str, regras_adicionais: str):

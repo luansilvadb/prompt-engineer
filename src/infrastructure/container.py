@@ -93,7 +93,11 @@ class Container:
         return self._scoring_pipeline
 
     def create_bandit(self) -> IMutationBandit:
-        return MutationBandit(c_param=self._config.bandit_c_param)
+        return MutationBandit(
+            c_param=self._config.bandit_c_param,
+            temperature=self._config.bandit_temperature,
+            temperature_decay=self._config.bandit_temperature_decay,
+        )
 
     def create_strategy_registry(self) -> IStrategyRegistry:
         return StrategyRegistry()
