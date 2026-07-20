@@ -21,7 +21,7 @@
   },
   {
     "run": 4,
-    "reward": 0.6500000000000001,
+    "reward": 0.65,
     "feedback": "Deterministic judge: strategy=mutador_cognitivo, reward=0.650"
   },
   {
@@ -36,7 +36,7 @@
   },
   {
     "run": 7,
-    "reward": 0.54,
+    "reward": 0.5400000000000001,
     "feedback": "Deterministic judge: strategy=mutador_cognitivo, reward=0.540"
   },
   {
@@ -46,7 +46,7 @@
   },
   {
     "run": 9,
-    "reward": 0.5999999999999999,
+    "reward": 0.6,
     "feedback": "Deterministic judge: strategy=mutador_cognitivo, reward=0.600"
   }
 ]

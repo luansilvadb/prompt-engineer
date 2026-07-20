@@ -137,10 +137,14 @@ class _NotaHolder:
 
 def test_score_weights_total_and_relative_robustness():
     # Robustez e acionabilidade são as dimensões mais pesadas (mais críticas).
+    # Ajuste manual provisorio (Fase 4 — DESIGN.md §7.7):
+    #   densidade_informacional 1.0→1.4, acionabilidade 1.3→1.4
     weights = dict(SCORE_WEIGHTS)
     assert weights['nota_robustez'] == 1.2
-    assert weights['nota_acionabilidade'] == 1.3
-    assert sum(w for _, w in SCORE_WEIGHTS) == pytest.approx(6.5)
+    assert weights['nota_acionabilidade'] == 1.4
+    assert weights['nota_densidade_informacional'] == 1.4
+    # Total: 1.0 + 0.8 + 1.2 + 1.4 + 1.4 + 1.2 = 7.0
+    assert sum(w for _, w in SCORE_WEIGHTS) == pytest.approx(7.0)
 
 
 def test_calcular_composite_all_max_is_one():

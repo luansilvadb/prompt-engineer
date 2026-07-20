@@ -39,11 +39,33 @@ def _resolve_max_job_duration() -> int:
 
 MAX_JOB_DURATION_SECONDS = _resolve_max_job_duration()
 
-# Timeout máximo da verificação de drift (P1-C2). Teto absoluto: o fail-fast
-# do runner (60s) já aborta antes em cascata de infra; medições legítimas com
-# golden pequeno (≤5 probes × 3 reps) cabem em 100s com folga. Se excedido,
-# retorna HTTP 504 para o cliente (frontend tem AbortController de 120s).
-DRIFT_CHECK_TIMEOUT_SECONDS = 100
+# Timeout máximo da verificação de drift (P1-C2). Calculado dinamicamente
+# considerando o paralelismo: _measure_all_probes usa ThreadPoolExecutor com
+# max_workers=4. O tempo total é O(ceil(n_probes/4) × reps × 8s) + 10s buffer.
+# Fallback: 100s se o golden set não puder ser inspecionado.
+# Ex: 11 probes, 4 workers, 3 reps → ceil(11/4)=3 × 3 × 8s + 10s = 82s.
+def _resolve_drift_check_timeout() -> int:
+    import math
+    try:
+        from pathlib import Path
+        import json
+        golden_path = Path('src/outputs/golden/golden_set.json')
+        if golden_path.exists():
+            data = json.loads(golden_path.read_text(encoding='utf-8'))
+            n_probes = len(data.get('probes', []))
+            if n_probes > 0:
+                from src.config import get_drift_thresholds
+                cfg = get_drift_thresholds()
+                reps = cfg.get('repetitions', 3)
+                max_workers = 4  # mesmo valor do ThreadPoolExecutor em metrics.py
+                probes_per_worker = math.ceil(n_probes / max_workers)
+                # 12s por chamada LLM (latência observada com o modelo atual: ~10-11s/call) + 15s buffer
+                return max(120, probes_per_worker * reps * 12 + 15)
+    except Exception:
+        pass
+    return 100
+
+DRIFT_CHECK_TIMEOUT_SECONDS = _resolve_drift_check_timeout()
 
 # ── Health Check ──────────────────────────────────────────────────────────────
 @router.get("/health")
@@ -214,6 +236,8 @@ def _format_event(event: dict) -> dict:
         return {"data": json.dumps(event["data"])}
     if event["type"] == "node":
         return {"event": "node", "data": json.dumps(event["data"])}
+    if event["type"] == "cost":
+        return {"event": "cost", "data": json.dumps(event["data"])}
     return {}
 
 

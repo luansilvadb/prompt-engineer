@@ -29,7 +29,7 @@ from src.infrastructure.dspy_impl import (
     _parse_manteve_regras,
     _parse_defeitos,
 )
-from src.infrastructure.enhanced_judge import EnhancedJudge
+from src.infrastructure.experimental.enhanced_judge import EnhancedJudge
 from src.signatures import AvaliacaoModoB, calcular_composite
 
 

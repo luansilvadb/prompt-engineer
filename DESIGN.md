@@ -134,11 +134,11 @@ A arquitetura de avaliacao e calibracao do juiz segue a metodologia do paper **L
 
 | Fase | Status | Descricao |
 |---|---|---|
-| Fase 2 — Prompting Strategies | **Concluida** | Rules (docstring) em producao. Metrics + Swap implementados mas NAO integrados (ver 7.5). |
+| Fase 2 — Prompting Strategies | **Concluida** | 5 regras (docstring) em producao. Regra (5) adicionada em 2026-07-19: "regras_adicionais sao contrato inabalavel". Metrics + Swap implementados mas NAO integrados (ver 7.5). |
 | Fase 3 — Drift Metrics | **Concluida** | style_gap, style_drift_signal, category_accuracy integrados no DriftReport. |
-| Fase 1 — Golden Set | **PARCIAL (7/21 probes, 5/6 categorias)** | Faltam NEIGHBOR e GPTOUT (categorias adversariais mais dificeis do LLMBar). As 4 categorias entregues (estilo, natural, constraint, manual, negation) sao as mais faceis. |
+| Fase 1 — Golden Set | **CONCLUIDA (11 probes, 7/7 categorias)** | NEIGHBOR e GPTOUT adicionados em 2026-07-19 (human-curated-v2, sem contaminacao circular). Cobertura completa da taxonomia LLMBar. Proximo passo: expandir para ≥15 probes na Fase 4. |
 | Fase 4 — Pesos | **Ajuste manual provisorio (nao data-driven)** | densidade_informacional 1.0→1.4, acionabilidade 1.3→1.4 por julgamento qualitativo. MAE-driven adjustment real requer golden set ≥15 probes com cobertura por categoria. |
-| Fase 5 — Testes | **Concluida** | 9/9 testes de cobertura passando. |
+| Fase 5 — Testes | **Concluida** | 48/48 testes de drift passando (incluindo 30 novos de parser manteve_regras + SD-2 scenario). |
 
 ### 7.2 Categorias de Probes
 
@@ -149,8 +149,8 @@ A arquitetura de avaliacao e calibracao do juiz segue a metodologia do paper **L
 | `constraint` | Constraint | 1 probe | CON-1 |
 | `manual` | Adversarial (Manual) | 1 probe | MAN-1 |
 | `negation` | Negation | 1 probe | NEG-1 |
-| `neighbor` | Adversarial (Neighbor) | **PENDENTE** | — |
-| `gptout` | Adversarial (GPTOut) | **PENDENTE** | — |
+| `neighbor` | Adversarial (Neighbor) | **2 probes** | NEIGHBOR-1, NEIGHBOR-2 |
+| `gptout` | Adversarial (GPTOut) | **2 probes** | GPTOUT-1, GPTOUT-2 |
 
 ### 7.3 Metricas de Drift (Fase 3 — LLMBar)
 

@@ -71,6 +71,7 @@ class Optimizer:
 
         self._expansion_order: list[dict] = []
         self._expand_count: int = 0
+        self._llm_call_count: int = 0   # contador de chamadas LLM para metricas de custo
 
         strategy_stats = self.experience_store.get_strategy_stats()
         if strategy_stats:
@@ -92,6 +93,22 @@ class Optimizer:
             f'delta={config.cognitivo_prior_mean_delta}'
         )
 
+    def _count_llm_call(self, n: int = 1) -> None:
+        """Registra chamadas LLM para metricas de custo."""
+        self._llm_call_count += n
+
+    def _emit_cost_event(self, iteration: int) -> None:
+        """Emite evento de custo apos cada iteracao MCTS."""
+        from src.domain.events import CostEventPayload
+        estimated_tokens = self._llm_call_count * 2000  # estimativa conservadora
+        self._emitter.emit_cost(CostEventPayload(
+            iteration=iteration + 1,
+            llm_calls=self._llm_call_count,
+            estimated_tokens=estimated_tokens,
+            job_id=self.job_id,
+        ))
+        self._llm_call_count = 0  # reset para proxima iteracao
+
     def selection(self, node: MCTSNode) -> MCTSNode:
         """Seleção UCB com progressive widening."""
         cfg = self.config
@@ -108,6 +125,7 @@ class Optimizer:
         if self._emitter.is_cancelled():
             return 0.0, 'Cancelado pelo usuário.'
         try:
+            self._count_llm_call()  # 1 chamada LLM (avaliador_modo_b)
             reward, feedback = funcao_de_recompensa(
                 avaliador_modo_b=self.avaliador_modo_b,
                 skill_original=self.skill_original,
@@ -185,6 +203,7 @@ class Optimizer:
             if not estrategias_conhecidas:
                 estrategias_conhecidas = "Nenhuma. Você é livre para criar a primeira heurística (Tabula Rasa)."
 
+            self._count_llm_call()  # 1 chamada LLM (strategy_discoverer)
             nova_estrat = self.strategy_discoverer(
                 skill_atual=leaf.instruction,
                 feedbacks_recentes=leaf.feedback or "Nenhum feedback ainda. Invente algo inovador.",
@@ -237,6 +256,7 @@ class Optimizer:
         critica: str
     ) -> Tuple[str, str, bool]:
         try:
+            self._count_llm_call()  # 1 chamada LLM (agent ou agent_cognitivo)
             if strategy == 'mutador_cognitivo':
                 predicao = self.agent_cognitivo(
                     instrucao_anterior=leaf.instruction,
@@ -307,7 +327,6 @@ class Optimizer:
             # Trocar de estratégia entre tentativas — a atual falhou
             failed_strategies.add(strategy)
             self._emitter.emit_log(f'    [!] Estratégia {strategy_desc} falhou. Selecionando nova estratégia...')
-            # Escolhe nova estratégia, evitando as que já falharam
             fallback_found = False
             for _ in range(5):
                 strategy = self.mutation_bandit.select()
@@ -319,7 +338,6 @@ class Optimizer:
                     fallback_found = True
                     break
             if not fallback_found:
-                # Se todas as estratégias conhecidas falharam, usa a original
                 self._emitter.emit_log('    [!] Todas as estratégias falharam. Mantendo a atual.')
                 break
         else:
@@ -384,25 +402,15 @@ class Optimizer:
         return reward * penalty
 
     def _apply_density_multiplier(self, child: MCTSNode, reward: float) -> float:
-        """
-        RN-05: Aplica multiplicador de densidade com guard clauses
-
-        Retorna reward inalterado (multiplicador 1.0) se:
-        - Threshold de densidade está desabilitado (lexical_density_min == 0.0)
-        - Parent ausente (nó raiz)
-        - Instruções têm tamanho idêntico (sem mudança estrutural)
-        """
+        """RN-05: Aplica multiplicador de densidade com guard clauses"""
         if not child.parent:
             return reward
-
         cfg = self.config
         if cfg.lexical_density_min == 0.0:
             return reward
-
         parent_instruction = child.parent.instruction
         if len(parent_instruction) == len(child.instruction):
             return reward
-
         density_mult = calculate_density_multiplier(
             child_instruction=child.instruction,
             parent_instruction=parent_instruction,
@@ -419,11 +427,7 @@ class Optimizer:
         return reward * density_mult
 
     def _run_mcts_iteration(self, root: MCTSNode) -> Tuple[bool, float]:
-        """
-        RN-06: Verifica cancelamento em 3 checkpoints obrigatórios.
-
-        Returns (should_break, reward).
-        """
+        """RN-06: Verifica cancelamento em 3 checkpoints obrigatórios."""
         cfg = self.config
         if self._emitter.is_cancelled():
             return True, 0.0
@@ -450,9 +454,6 @@ class Optimizer:
         reward = self._apply_heuristic_multiplier(reward, heuristic_result)
         reward = self._apply_semantic_penalty(child, reward)
         reward = self._apply_density_multiplier(child, reward)
-        # RN-10: reward_floor — evita esmagamento por produto de multiplicadores.
-        # Se a skill tem qualidade intrínseca boa, o produto de penalidades
-        # não pode derrubar o reward abaixo do piso.
         if reward < self.config.reward_floor and reward_before_multipliers >= self.config.reward_floor * 2:
             self._emitter.emit_log(
                 f"    [Reward Floor] reward={reward:.3f} < floor={self.config.reward_floor:.2f}. "
@@ -502,6 +503,7 @@ class Optimizer:
         self._emitter.emit_log(f'\n--- Iteração MCTS {i + 1}/{self.config.max_iterations} ---')
         try:
             should_break, iter_reward = self._run_mcts_iteration(root)
+            self._emit_cost_event(i)  # emite metricas de custo apos a iteracao
             if should_break:
                 return True, consecutive_zeros, consecutive_api_errors
 
@@ -550,24 +552,18 @@ class Optimizer:
         ]
 
     def _select_and_log_best_node(self, root: MCTSNode) -> MCTSNode:
-        """Retorna o melhor nó (por score) para uso em experimentos.
-
-        Desempate determinístico: score > visits > depth.
-        Evita dependência da ordem de inserção dos nós na árvore.
-        """
+        """Retorna o melhor nó (por score) para uso em experimentos."""
         all_nodes = self._get_all_nodes(root)
         best_node = max(all_nodes, key=lambda n: (
-            n.q_value / max(1, n.visits),  # score primário
-            n.visits,                       # desempate 1: mais visitas = mais confiável
-            n.depth,                        # desempate 2: mais profundo = mais otimizado
+            n.q_value / max(1, n.visits),
+            n.visits,
+            n.depth,
         ))
         return best_node
 
     def _format_best_node(self, root: MCTSNode) -> str:
         best_node = self._select_and_log_best_node(root)
 
-        # Reavaliar o melhor no com mediana (mesmo n_samples da raiz)
-        # para reduzir ruido do juiz LLM na skill entregue ao usuario.
         n_samples = self.config.root_median_samples
         if n_samples > 1 and best_node != root:
             best_rewards = []

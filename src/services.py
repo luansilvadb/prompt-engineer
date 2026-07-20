@@ -34,7 +34,10 @@ def _create_callbacks(job_id: str, job, loop, store: IJobStore):
         asyncio.run_coroutine_threadsafe(job.events_queue.put({'type': 'node', 'data': node_data}), loop)
         store.save_job_state(job_id, job)
 
-    return log_progress, log_error, handle_node
+    def handle_cost(cost_data: dict):
+        asyncio.run_coroutine_threadsafe(job.events_queue.put({'type': 'cost', 'data': cost_data}), loop)
+
+    return log_progress, log_error, handle_node, handle_cost
 
 def _run_bg_compiler(lm, compiler: IAvaliadorCompiler):
     try:
@@ -76,11 +79,12 @@ class OptimizationService:
         job.status = 'running'
         self.job_store.save_job_state(job_id, job)
 
-        log_progress, log_error, handle_node = _create_callbacks(job_id, job, loop, self.job_store)
+        log_progress, log_error, handle_node, handle_cost = _create_callbacks(job_id, job, loop, self.job_store)
         emitter = JobEventEmitter(
             on_log=log_progress,
             on_error=log_error,
             on_node=handle_node,
+            on_cost=handle_cost,
             is_cancelled=lambda: job.status == 'cancelled',
         )
 

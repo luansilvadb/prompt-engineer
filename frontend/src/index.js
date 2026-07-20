@@ -191,6 +191,13 @@ historyVm.addEventListener('jobDetailsLoaded', (e) => {
         activeEventSource = null;
     }
 
+    // Fechar SSE ao sair da pagina ou trocar de job
+    window.addEventListener('beforeunload', () => {
+        if (activeEventSource) {
+            activeEventSource.close();
+        }
+    });
+
     // 1. Restaurar configurações
     configVm.modelName = job.model_name || '';
     configVm.modelPrefix = job.model_prefix || '';

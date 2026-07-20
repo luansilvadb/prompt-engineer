@@ -38,11 +38,65 @@ def _spearman_rank_correlation(x: List[float], y: List[float]) -> float:
 
 
 def _measure_all_probes(runner, golden, repetitions: int) -> list:
-    measurements = []
-    for probe in golden.probes:
-        m = runner.run(probe, repetitions)
-        measurements.append((probe, m))
-    return measurements
+    """
+    Mede todas as probes em paralelo usando ThreadPoolExecutor.
+    Cada worker recebe seu próprio runner clonado (dspy.Predict não é thread-safe).
+    O paralelismo reduz o tempo total de O(n_probes × repetitions) para
+    O(repetitions) + overhead de thread, viabilizando o budget de timeout.
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    import threading
+    from loguru import logger
+
+    # max_workers semântico: até 4 threads concorrentes (balanceia throughput
+    # contra rate-limit da API). Thread-safe porque cada worker opera seu
+    # próprio runner clonado com dspy.Predict independente.
+    max_workers = min(len(golden.probes), 4)
+    lock = threading.Lock()
+    probe_index: dict[str, int] = {probe.id: idx for idx, probe in enumerate(golden.probes)}
+    results: list = [None] * len(golden.probes)
+    errors: list = []
+
+    def _measure_one(probe, idx: int):
+        try:
+            worker_runner = runner.clone()
+            m = worker_runner.run(probe, repetitions)
+            with lock:
+                results[idx] = (probe, m)
+        except Exception as e:
+            with lock:
+                errors.append((probe.id, str(e)))
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {
+            executor.submit(_measure_one, probe, idx): probe.id
+            for idx, probe in enumerate(golden.probes)
+        }
+        for future in as_completed(futures):
+            probe_id = futures[future]
+            try:
+                future.result()
+            except Exception as e:
+                errors.append((probe_id, str(e)))
+                logger.warning("Probe {} falhou em thread worker: {}", probe_id, e)
+
+    if errors:
+        failed_ids = [pid for pid, _ in errors]
+        error_msgs = '; '.join(f"{pid}: {msg[:120]}" for pid, msg in errors)
+        raise DriftMeasurementError(
+            f"Falha na medição paralela: {len(errors)}/{len(golden.probes)} probes falharam ({', '.join(failed_ids)})",
+            context={'failed_probes': failed_ids, 'errors': error_msgs},
+        )
+
+    # Remove None entries (não deve acontecer se todos os futures completaram, mas é defesa)
+    valid = [r for r in results if r is not None]
+    if len(valid) != len(golden.probes):
+        missing = len(golden.probes) - len(valid)
+        raise DriftMeasurementError(
+            f"{missing} probe(s) não retornaram resultado na medição paralela",
+            context={'expected': len(golden.probes), 'got': len(valid)},
+        )
+    return valid
 
 
 def _compute_mae_per_dimension(measurements: list, dims: List[str]) -> List[DimensionError]:

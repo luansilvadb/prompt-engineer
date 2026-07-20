@@ -50,8 +50,38 @@ class GoldenSet:
                 expected_rank_band=pd['expected_rank_band'],
                 verifier=pd.get('verifier', ''),
                 category=pd.get('category', 'general'),
+                generator_model=pd.get('generator_model', ''),
+                verification_hints=pd.get('verification_hints', []),
             ))
         return probes
+
+    def _validate_circular_contamination(self):
+        """
+        A2 — Validação de contaminação circular: emite warning se probes
+        gerados por LLM (NEIGHBOR, GPTOUT) não declaram modelo diferente
+        do juiz atual. Probes gerados pelo mesmo modelo que avalia geram
+        viés de autoavaliação (DESIGN.md §7.6).
+
+        Consulta MODEL_NAME do ambiente (config.py usa os.environ, não um objeto settings).
+        """
+        import os
+        judge_model = os.environ.get('MODEL_NAME', 'unknown')
+
+        for p in self.probes:
+            gen = p.generator_model
+            if not gen:
+                continue
+            # Human-curated probes são seguros — sem risco de contaminação
+            if gen.startswith('human-curated'):
+                continue
+            # LLM-generated probe — verificar separação de modelos
+            if judge_model and gen == judge_model:
+                print(f"[!] A2 — CONTAMINAÇÃO CIRCULAR: probe {p.id} foi gerado por {gen}, "
+                      f"mesmo modelo do juiz atual ({judge_model}). Métricas de drift podem ser "
+                      f"superestimadas (viés de autoavaliação). Considere regenerar com outro modelo.")
+            else:
+                print(f"[*] A2 — OK: probe {p.id} usa generator_model={gen}, "
+                      f"juiz atual={judge_model}.")
 
     def _load(self):
         path = self._store_path()
@@ -67,6 +97,7 @@ class GoldenSet:
             self.curated_at = data.get('curated_at', '')
             self.probes = self._parse_golden_json(data)
             print(f"[*] Golden set v{self.version} carregado: {len(self.probes)} probes.")
+            self._validate_circular_contamination()
         except Exception as e:
             print(f"[!] Erro ao carregar golden set ({e}). Operando sem âncora.")
             self.probes = []
@@ -99,6 +130,8 @@ class GoldenSet:
                     'expected_rank_band': p.expected_rank_band,
                     'verifier': p.verifier,
                     'category': p.category,
+                    'generator_model': p.generator_model,
+                    'verification_hints': p.verification_hints,
                 }
                 for p in self.probes
             ],

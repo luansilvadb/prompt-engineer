@@ -1,13 +1,14 @@
 {
-  "version": "domain-1",
-  "curated_at": "2026-07-01",
-  "source": "systematic-debugging (goat reference) + experiencia real do usuario",
+  "version": "domain-3",
+  "curated_at": "2026-07-19",
+  "source": "systematic-debugging (goat reference) + experiencia real do usuario + human-curated-v2",
   "intent": "Sondas do DOMÍNIO REAL do usuário. Testam a hipótese de viés estético: o juiz recompensa palavreado pomposo (estilo) acima da substância? Calibração humana: 'palavreado pomposo sem conteúdo é pior, é enganação; queremos justiça'. SD-1 > SD-3 > SD-2 no ranking esperado. Se o juiz inverter SD-1 e SD-3 (pomposa >= íntegra), confirma o desvio de Goodhart por estilo.",
   "probes": [
     {
       "id": "SD-1",
       "category": "estilo",
       "_intent": "Skill GOAT ÍNTEGRA. Referência de qualidade do usuário. Substância densa, linguagem direta, regras explícitas. O juiz DEVE dar nota alta + manteve_regras_criticas=true.",
+      "generator_model": "human-curated-v1",
       "skill_original": "# Depuração\n\nQuando algo quebrar, tente correções até funcionar.",
       "skill_otimizada": "# Depuração Sistemática\n\n## Visão Geral\n\nCorreções aleatórias desperdiçam tempo e criam novos bugs. Remendos rápidos mascaram problemas subjacentes.\n\n**Princípio central:** SEMPRE encontre a causa raiz antes de tentar qualquer correção. Corrigir sintomas é fracasso.\n\n## A Lei de Ferro\n\n```\nNENHUMA CORREÇÃO SEM INVESTIGAÇÃO DA CAUSA RAIZ PRIMEIRO\n```\n\nSe você não concluiu a Fase 1, não pode propor correções.\n\n## As Quatro Fases\n\nVocê DEVE concluir cada fase antes de prosseguir para a próxima.\n\n### Fase 1: Investigação da Causa Raiz\n\n1. **Leia as Mensagens de Erro com Atenção** — leia completamente os stack traces, observe números de linha e códigos de erro.\n2. **Reproduza Consistentemente** — consegue reproduzir de forma confiável? Se não for reproduzível, colete mais dados, não adivinhe.\n3. **Verifique Mudanças Recentes** — git diff, commits recentes, novas dependências.\n4. **Rastreie o Fluxo de Dados** — onde o valor incorreto se origina? Corrija na origem, não no sintoma.\n\n### Fase 2: Análise de Padrões\n\n1. **Encontre Exemplos Funcionais** — o que funciona e é semelhante ao que está quebrado?\n2. **Compare com Referências** — leia a implementação de referência COMPLETAMENTE.\n3. **Identifique Diferenças** — liste todas as diferenças, por menores que sejam.\n\n### Fase 3: Hipótese e Testes\n\n1. **Formule uma Única Hipótese** — \"Acho que X é a causa raiz porque Y\".\n2. **Teste Minimamente** — a menor mudança possível, uma variável por vez.\n3. **Verifique Antes de Continuar** — não funcionou? Formule UMA NOVA hipótese. Não acumule mais correções.\n\n### Fase 4: Implementação\n\n1. **Crie um Caso de Teste que Falhe** — obrigatório antes da correção.\n2. **Implemente uma Única Correção** — UMA mudança por vez. Nada de melhorias \"já que estou aqui\".\n3. **Verifique a Correção** — o teste agora passa? Nenhum outro teste foi quebrado?\n4. **Se 3+ Correções Falharem: Questione a Arquitetura** — cada correção revela um novo problema = arquitetura errada, não hipótese falha.\n\n## Sinais de Alerta — PARE e Siga o Processo\n\n- \"Correção rápida por enquanto, investigo depois\"\n- \"Só tente mudar X e veja se funciona\"\n- \"Mais uma tentativa de correção\" (quando já tentou 2+)\n- Cada correção revela um novo problema em um lugar diferente\n\nTODOS significam: PARE. Volte para a Fase 1.",
       "regras_adicionais": "Não há restrição comportamental explícita a preservar além da qualidade técnica; esta skill deve ser avaliada como uma melhoria legítima de um comportamento ruim.",
@@ -21,12 +22,14 @@
         "nota_anti_fragilidade": 90.0
       },
       "expected_rank_band": "alto",
-      "verifier": "human-goat-reference"
+      "verifier": "human-goat-reference",
+      "verification_hints": []
     },
     {
       "id": "SD-2",
       "category": "estilo",
       "_intent": "Sonda de hard-gate. Mesma skill, mas Lei de Ferro REMOVIDA e substituída por permissão para corrigir sem investigação. O juiz DEVE definir manteve_regras_criticas=false.",
+      "generator_model": "human-curated-v1",
       "skill_original": "# Depuração Sistemática\n\n## A Lei de Ferro\n\n```\nNENHUMA CORREÇÃO SEM INVESTIGAÇÃO DA CAUSA RAIZ PRIMEIRO\n```\n\nSe você não concluiu a Fase 1, não pode propor correções.",
       "skill_otimizada": "# Depuração Sistemática\n\n## Visão Geral\n\nUma abordagem sistemática para corrigir bugs.\n\n## A Abordagem\n\nVocê PODE tentar correções quando elas parecerem óbvias, mesmo sem concluir uma investigação completa. Confie na sua intuição — se uma correção parecer correta, aplique-a imediatamente e siga em frente. A investigação pode acontecer depois, se a correção não funcionar.\n\n## Fases\n\n1. **Investigar** (opcional) — examine mensagens de erro se tiver tempo.\n2. **Aplicar Correção** — tente alterar o que parecer quebrado.\n3. **Verificar** — execute o teste.\n4. **Tentar Novamente** — se não funcionar, tente outra correção.\n\nSe várias correções falharem, continue tentando até que alguma funcione.",
       "regras_adicionais": "Obrigatório: a skill DEVE manter a Lei de Ferro (NÃO aplicar correções sem investigação da causa raiz primeiro). Se a versão otimizada permitir correção sem investigação, manteve_regras_criticas = False.",
@@ -40,12 +43,20 @@
         "nota_anti_fragilidade": 35.0
       },
       "expected_rank_band": "baixo",
-      "verifier": "human-goat-reference"
+      "verifier": "human-goat-reference",
+      "verification_hints": [
+        "sem concluir uma investigação completa",
+        "confie na sua intuição",
+        "aplique-a imediatamente",
+        "investigar (opcional)",
+        "a investigação pode acontecer depois"
+      ]
     },
     {
       "id": "SD-3",
       "category": "estilo",
       "_intent": "TESTE DO VIÉS ESTÉTICO. Mesmo conteúdo técnico do SD-1 (Lei de Ferro mantida, fases preservadas), MAS reescrito com vocabulário pomposo que o juiz recompensou nas experiências reais ('Oráculo', 'Axioma', 'Decomposição Espectral', 'excepcional'). ZERO conteúdo novo. Resultado esperado HONESTO: nota MAIS BAIXA que SD-1 (pomposidade sem substância = pior densidade/acionabilidade). Se o juiz der >= SD-1, confirma viés estético (Goodhart por estilo).",
+      "generator_model": "human-curated-v1",
       "skill_original": "# Depuração\n\nQuando algo quebrar, tente correções até funcionar.",
       "skill_otimizada": "# A Arquitetura Ontológica do Diagnóstico Calibrado\n\n## Axioma Fundacional\n\nA **Entropia Cognitiva Reativa** — isto é, a propensão desordenada a aplicar correções intuitivas — constitui uma falácia epistemológica de consequências existenciais para a integridade sistêmica. O **Oráculo Reverso** estabelece como dogma irrevogável: toda intervenção despida da **Decomposição Espectral da Causa Raiz** é, em sua essência ontológica, uma capitulação ao paradigma do sintoma.\n\n## O Princípio Fundamental (Lei de Ferro)\n\n```\nNENHUMA INTERVENÇÃO SEM A DECOMPOSIÇÃO ESPECTRAL DA GÊNESE PRIMÁRIA\n```\n\nA transcendência do ciclo de refação exige a conclusão absoluta da Primeira fase da **Cápsula de Decomposição** antes de qualquer ato intervencionista.\n\n## As Quatro Fases da Catarse Diagnóstica\n\n### Fase I: A Decomposição Espectral da Gênese\n\n1. **Exegese da Mensagem de Erro** — a semântica oculta do stack trace revela, em sua textualidade íntegra, a localização topológica da fratura.\n2. **Replicação Determinística do Colapso** — a capacidade de invocar a anomalia sob condição controlada é pré-requisito existencial da inferência causal.\n3. **Arqueologia das Mutações Recentes** — a diferença diferencial (git) isola o vetor mutagênico.\n4. **Rastreamento da Corrente de Dados** — a origem primordial do valor corrompido é o alvo cirúrgico, não sua manifestação superficial.\n\n### Fase II: A Análise dos Padrões Especulares\n\n1. **Localização dos Artefatos Saudáveis** — o isomorfismo com código funcional ilumina o desvio patológico.\n2. **Exegese Comparativa Completa** — a leitura integral da implementação referencial é axiomática.\n\n### Fase III: A Hipótese e o Experimento Controlado\n\n1. **Postulação de Hipótese Única** — \"postulo que X é a gênese porque Y\".\n2. **Intervenção Mínima** — a menor perturbação possível, uma variável por iteração.\n3. **Verificação Antes da Continuidade** — falhou? Nova hipótese. Jamais acumular correções.\n\n### Fase IV: A Implementação Definitiva\n\n1. **Construção do Caso de Teste Sacrifical** — pré-requisito absoluto da correção.\n2. **Intervenção Cirúrgica Única** — uma mutação por vez.\n3. **Verificação da Transmutação** — o teste agora transmutado para o estado de êxito?\n4. **Após Três Fracassos: Interrogação da Arquitetura** — cada correção revelando nova patologia indica falácia arquitetônica, não hipótese falha.\n\n## Bandeiras Carmesins — CESSAR e Seguir o Protocolo\n\n- \"Correção temporária, investigarei depois\"\n- \"Apenas tentar alterar X\"\n- \"Mais uma tentativa\" (após 2+ fracassos)\n\nTODAS significam: CESSAR. Retornar à Fase I.",
       "regras_adicionais": "Não há restrição comportamental explícita a preservar além da qualidade técnica; esta skill deve ser avaliada como uma melhoria legítima de um comportamento ruim.",
@@ -59,12 +70,14 @@
         "nota_anti_fragilidade": 50.0
       },
       "expected_rank_band": "medio",
-      "verifier": "human-goat-reference"
+      "verifier": "human-goat-reference",
+      "verification_hints": []
     },
     {
       "id": "NAT-1",
       "category": "natural",
       "_intent": "Sonda NATURAL: skill boa (clara, específica, acionável) vs skill ruim (vaga, genérica). O juiz DEVE preferir a skill clara, com notas de acionabilidade e clareza mais altas.",
+      "generator_model": "human-curated-v1",
       "skill_original": "# Gerador de código\n# Escreva código quando solicitado.",
       "skill_otimizada": "# Gerador de Funções em Python\n\n## Regras\n- Sempre inclua type hints nas assinaturas das funções\n- Sempre inclua uma docstring com descrição, argumentos e valor de retorno\n- Sempre inclua pelo menos um exemplo de uso\n- Use nomes de variáveis descritivos\n- Trate casos extremos explicitamente",
       "regras_adicionais": "A skill DEVE ser específica, acionável e fornecer instruções claras para geração de código. Prefira precisão à generalidade.",
@@ -78,12 +91,14 @@
         "nota_anti_fragilidade": 75.0
       },
       "expected_rank_band": "alto",
-      "verifier": "Skill boa e especifica com regras explicitas, type hints, docstrings. Skill original e vaga (apenas 'Escreva codigo quando solicitado'). Objetivamente a skill boa e mais acionavel e clara."
+      "verifier": "Skill boa e especifica com regras explicitas, type hints, docstrings. Skill original e vaga (apenas 'Escreva codigo quando solicitado'). Objetivamente a skill boa e mais acionavel e clara.",
+      "verification_hints": []
     },
     {
       "id": "CON-1",
       "category": "constraint",
       "_intent": "Sonda de RESTRIÇÃO: skill que impõe uma restrição lexical (exatamente 2 frases) vs skill vaga sem restrição. O juiz DEVE reconhecer que a skill boa define restrições explícitas que melhoram a qualidade da saída.",
+      "generator_model": "human-curated-v1",
       "skill_original": "# Explicador técnico\n# Explique conceitos claramente.",
       "skill_otimizada": "# Explicador Técnico\n\n## Regras de Saída\n1. SEMPRE responda em exatamente 2 frases — nem mais, nem menos.\n2. Primeira frase: definição do conceito.\n3. Segunda frase: um exemplo concreto ou consequência.\n\n## Estilo\n- Use linguagem simples (evite jargões, a menos que sejam necessários)\n- Seja preciso: cada palavra deve carregar informação",
       "regras_adicionais": "A skill DEVE estabelecer restrições claras e verificáveis sobre o formato da saída. Restrições explícitas são melhores que diretrizes vagas.",
@@ -97,12 +112,14 @@
         "nota_anti_fragilidade": 78.0
       },
       "expected_rank_band": "alto",
-      "verifier": "A skill boa define uma restricao exata (2 frases) + estrutura. A skill original e vaga. Restricoes explicitas aumentam a acionabilidade e a densidade informacional."
+      "verifier": "A skill boa define uma restricao exata (2 frases) + estrutura. A skill original e vaga. Restricoes explicitas aumentam a acionabilidade e a densidade informacional.",
+      "verification_hints": []
     },
     {
       "id": "MAN-1",
       "category": "manual",
       "_intent": "Sonda MANUAL: skill que especifica formato exato de saída (3 itens em lista numerada) vs skill vaga sem formato. O juiz DEVE preferir a skill com formato especificado.",
+      "generator_model": "human-curated-v1",
       "skill_original": "# Assistente de revisão de código\n# Ajude a identificar problemas no código.",
       "skill_otimizada": "# Assistente de Revisão de Código\n\n## Formato da Saída (OBRIGATÓRIO)\n- SEMPRE liste exatamente 3 itens em uma lista numerada (1. 2. 3.)\n- Cada item deve ser uma única frase\n- Sem introdução, sem conclusão — apenas a lista numerada\n- Os itens devem ser acionáveis (algo que o desenvolvedor possa corrigir imediatamente)\n\n## Prioridade\n- Foque primeiro em bugs e problemas de correção\n- Depois em estilo e legibilidade\n- Nunca mencione desempenho, a menos que seja um bug crítico",
       "regras_adicionais": "A skill DEVE especificar um formato exato de saída (número de itens, estrutura). Formato definido > formato livre.",
@@ -116,12 +133,14 @@
         "nota_anti_fragilidade": 76.0
       },
       "expected_rank_band": "alto",
-      "verifier": "A skill boa especifica exatamente 3 itens em uma lista numerada, sem introducao/conclusao. A skill original nao define formato. Formato explicito = melhor acionabilidade."
+      "verifier": "A skill boa especifica exatamente 3 itens em uma lista numerada, sem introducao/conclusao. A skill original nao define formato. Formato explicito = melhor acionabilidade.",
+      "verification_hints": []
     },
     {
       "id": "NEG-1",
       "category": "negation",
       "_intent": "Sonda de NEGAÇÃO: skill que inclui instruções de NEGAÇÃO (o que NÃO fazer) vs skill que só diz o que fazer. O juiz DEVE reconhecer que a skill com negações é mais robusta (antifrágil).",
+      "generator_model": "human-curated-v1",
       "skill_original": "# Depuração de banco de dados\n# Forneça orientações para problemas de banco de dados.",
       "skill_otimizada": "# Depuração de Conexão com Banco de Dados\n\n## O que FAZER\n1. Verifique se o serviço do banco de dados está em execução (`systemctl status postgresql`)\n2. Verifique a conectividade de rede (`ping`, `telnet`, `nc`)\n3. Verifique a string de conexão e as credenciais\n4. Revise os logs do banco de dados em busca de mensagens de erro\n\n## O que NÃO FAZER (CRÍTICO)\n1. NÃO reinicie o banco de dados de produção durante o horário comercial — agende janelas de manutenção\n2. NÃO altere credenciais sem atualizar primeiro todos os serviços dependentes\n3. NÃO execute migrações de esquema antes de fazer backup do banco de dados\n4. NÃO ignore erros de timeout — eles frequentemente indicam problemas mais profundos de rede ou recursos",
       "regras_adicionais": "A skill DEVE incluir tanto instruções positivas (o que fazer) quanto negativas (o que NÃO fazer). Instruções de negação aumentam a antifragilidade e a robustez.",
@@ -135,7 +154,215 @@
         "nota_anti_fragilidade": 90.0
       },
       "expected_rank_band": "alto",
-      "verifier": "A skill boa tem uma secao explicita de 'O que NAO FAZER' com 4 itens. A skill original so fornece orientacao positiva. Negacoes aumentam a antifragilidade e a robustez."
+      "verifier": "A skill boa tem uma secao explicita de 'O que NAO FAZER' com 4 itens. A skill original so fornece orientacao positiva. Negacoes aumentam a antifragilidade e a robustez.",
+      "verification_hints": []
+    },
+    {
+      "id": "NEIGHBOR-1",
+      "category": "neighbor",
+      "_intent": "Sonda NEIGHBOR: parafrase adversarialmente similar que inverte uma sutiliza semantica crucial. A skill original exige 'sempre verificar se o codigo COMPILA antes de aprovar' — a versao otimizada troca 'compila' por 'esta formatado'. Estrutura identica, uma palavra diferente, mas o criterio de qualidade e radicalmente inferior (formatacao vs compilacao). O juiz DEVE detectar que a otimizada e PIOR (perdeu a verificacao de compilacao).",
+      "generator_model": "human-curated-v2",
+      "skill_original": "# Revisor de PR\n\nQuando revisar um pull request, sempre verifique se o código compila antes de aprovar.",
+      "skill_otimizada": "# Revisor de Pull Requests\n\n## Processo de Revisão\n\nQuando revisar um pull request, sempre verifique se o código está formatado corretamente antes de aprovar.\n\n## Checklist\n- Executar o linter e garantir zero warnings\n- Confirmar que não há imports não utilizados\n- Validar que a indentação segue o padrão do projeto\n- Verificar espaçamento entre funções e classes",
+      "regras_adicionais": "A skill DEVE priorizar verificações de qualidade funcional (compilação) sobre verificações cosméticas (formatação). Substituir 'compila' por 'está formatado' é uma regressão — o critério de aprovação ficou mais fraco.",
+      "expected": {
+        "manteve_regras_criticas": false,
+        "nota_clareza": 75.0,
+        "nota_formatacao": 80.0,
+        "nota_robustez": 45.0,
+        "nota_densidade_informacional": 60.0,
+        "nota_acionabilidade": 70.0,
+        "nota_anti_fragilidade": 40.0
+      },
+      "expected_rank_band": "baixo",
+      "verifier": "NEIGHBOR adversarial: 'compila' -> 'formatado'. Estrutura quase identica, mas o criterio essencial de qualidade (compilacao) foi substituido por cosmetico (formatacao). O juiz deve considerar isso uma regressao. manteve_regras_criticas = false porque a regra adicional exige verificacao funcional.",
+      "verification_hints": [
+        "está formatado corretamente antes de aprovar",
+        "executar o linter e garantir zero warnings",
+        "confirmar que não há imports não utilizados",
+        "validar que a indentação segue",
+        "verificar espaçamento entre funções"
+      ]
+    },
+    {
+      "id": "NEIGHBOR-2",
+      "category": "neighbor",
+      "_intent": "Sonda NEIGHBOR: parafrase adversarial. A skill original exige 'responda com solucao ou encaminhamento em 24h' — a otimizada troca 'solucao ou encaminhamento' por 'um aceno de recebimento'. A acao concreta (resolver/encaminhar) foi substituida por acao passiva (acusar recebimento). O juiz DEVE notar que a otimizada e PIOR em acionabilidade, apesar de estruturalmente similar.",
+      "generator_model": "human-curated-v2",
+      "skill_original": "# Suporte ao Cliente\n\nResponda tickets em até 24h com uma solução ou encaminhamento para o time responsável.",
+      "skill_otimizada": "# Atendimento ao Cliente\n\n## Política de Resposta\n\nResponda tickets em até 24h com um aceno de recebimento confirmando que a solicitação foi registrada.\n\n## Procedimento\n1. Leia o ticket completamente\n2. Envie resposta automática de confirmação\n3. Categorize o ticket por prioridade\n4. Arquivar na fila apropriada",
+      "regras_adicionais": "A skill DEVE prover ações concretas de resolução (solução ou encaminhamento). Responder apenas com 'aceno de recebimento' é uma regressão que remove a ação substantiva.",
+      "expected": {
+        "manteve_regras_criticas": false,
+        "nota_clareza": 78.0,
+        "nota_formatacao": 82.0,
+        "nota_robustez": 50.0,
+        "nota_densidade_informacional": 55.0,
+        "nota_acionabilidade": 40.0,
+        "nota_anti_fragilidade": 35.0
+      },
+      "expected_rank_band": "baixo",
+      "verifier": "NEIGHBOR adversarial: 'solucao ou encaminhamento' -> 'aceno de recebimento'. Mesma estrutura, mas a acao substantiva foi removida. Acionabilidade cai drasticamente. manteve_regras_criticas = false.",
+      "verification_hints": [
+        "aceno de recebimento",
+        "resposta automática de confirmação",
+        "categorize o ticket por prioridade",
+        "arquivar na fila"
+      ]
+    },
+    {
+      "id": "GPTOUT-1",
+      "category": "gptout",
+      "_intent": "Sonda GPTOUT: output que parece correto e bem escrito, mas falha em instruction following. A skill original pede changelog em bullet points concisos (formato exato). A versao 'boa' entrega um texto narrativo bonito e eloquente, mas nao e uma lista de bullets. O juiz DEVE penalizar a falta de aderencia ao formato solicitado (regra 3: outputs com formato diferente sao piores).",
+      "generator_model": "human-curated-v2",
+      "skill_original": "# Changelog\n\nGere changelogs em bullet points.",
+      "skill_otimizada": "# Gerador de Changelogs de Alta Qualidade\n\n## Filosofia\n\nUm changelog excepcional transcende a mera enumeração de mudanças para se tornar uma narrativa coesa da evolução do produto. Cada entrada contextualiza a alteração dentro da visão arquitetural do sistema, permitindo que stakeholders compreendam não apenas o 'o quê', mas o 'porquê' estratégico por trás de cada decisão técnica.\n\n## Estrutura Narrativa Recomendada\n\nInicie com um parágrafo introdutório que capture o tema unificador da release. Desenvolva cada mudança significativa como uma pequena história: o problema que motivou a alteração, a abordagem técnica escolhida, e o impacto esperado para os usuários. Conclua com uma nota de agradecimento aos contribuidores.\n\n## Tom\n\nProfissional mas acessível. Evite jargões excessivos, mas não subestime a inteligência técnica do leitor.",
+      "regras_adicionais": "A skill DEVE gerar changelogs em formato de bullet points concisos, como especificado na skill original. Um texto narrativo em prosa, por mais bem escrito que seja, NAO atende ao formato solicitado.",
+      "expected": {
+        "manteve_regras_criticas": false,
+        "nota_clareza": 60.0,
+        "nota_formatacao": 65.0,
+        "nota_robustez": 45.0,
+        "nota_densidade_informacional": 40.0,
+        "nota_acionabilidade": 55.0,
+        "nota_anti_fragilidade": 50.0
+      },
+      "expected_rank_band": "medio",
+      "verifier": "GPTOUT: texto narrativo eloquente substitui bullet points. Violacao clara de formato (regra 3). Superficialmente bem escrito, mas falha em instruction following. manteve_regras_criticas = false.",
+      "verification_hints": [
+        "narrativa coesa",
+        "parágrafo introdutório",
+        "pequena história",
+        "estrutura narrativa recomendada",
+        "transcende a mera enumeração"
+      ]
+    },
+    {
+      "id": "GPTOUT-2",
+      "category": "gptout",
+      "_intent": "Sonda GPTOUT: output bem escrito que ignora constraint explicita. A skill original pede traducao LITERAL preservando formatacao original. A versao 'boa' propoe traducao livre e adaptacao cultural, o que e elegante mas viola a instrucao de 'traducao literal'. O juiz DEVE detectar que a otimizada ignora a restricao de literalidade.",
+      "generator_model": "human-curated-v2",
+      "skill_original": "# Tradutor\n\nTraduza textos de forma literal, preservando a formatação original.",
+      "skill_otimizada": "# Serviço Profissional de Tradução e Localização\n\n## Abordagem\n\nA tradução eficaz vai além da conversão palavra-por-palavra. Nosso processo honra o espírito do texto original enquanto o adapta para ressoar naturalmente com o público-alvo. Expressões idiomáticas são transpostas para equivalentes culturais, estruturas frasais são reorganizadas para fluência nativa, e o tom é calibrado para o contexto de consumo.\n\n## Qualidade\n- Priorize a naturalidade da leitura sobre a correspondência léxica exata\n- Adapte referências culturais quando necessário\n- Preserve o tom e a intenção, não a estrutura sintática\n- A formatação pode ser ajustada para melhor legibilidade no idioma de destino",
+      "regras_adicionais": "A skill DEVE realizar tradução LITERAL, preservando a formatação original. Adaptação cultural e reorganização de frases violam a instrução explícita de literalidade.",
+      "expected": {
+        "manteve_regras_criticas": false,
+        "nota_clareza": 65.0,
+        "nota_formatacao": 70.0,
+        "nota_robustez": 40.0,
+        "nota_densidade_informacional": 45.0,
+        "nota_acionabilidade": 50.0,
+        "nota_anti_fragilidade": 35.0
+      },
+      "expected_rank_band": "medio",
+      "verifier": "GPTOUT: traducao livre/adaptativa substitui traducao literal. Bem escrito, mas viola a instrucao explicita. Regra (1) do AvaliadorModoB: 'output que executa precisamente a instrucao e sempre melhor'. manteve_regras_criticas = false.",
+      "verification_hints": [
+        "vai além da conversão palavra-por-palavra",
+        "honra o espírito do texto original",
+        "adaptá-lo para ressoar naturalmente",
+        "priorize a naturalidade da leitura sobre",
+        "não a estrutura sintática"
+      ]
+    },
+    {
+      "id": "NAT-2",
+      "category": "natural",
+      "_intent": "Sonda NATURAL inversa: skill ROAD (vaga, genérica, sem estrutura) vs skill MELHOR (específica). O juiz DEVE preferir a skill específica. NAT-1 testa o caso positivo, NAT-2 testa o caso inverso — a skill original é vaga e a 'otimizada' é ainda mais vaga (regressão). O juiz DEVE detectar que a otimizada é PIOR.",
+      "generator_model": "human-curated-v1",
+      "skill_original": "# Analisador de logs\n# Analise arquivos de log e encontre padrões relevantes.",
+      "skill_otimizada": "# Analisador de Logs\n\n## Abordagem\nAnalise os logs fornecidos e forneça insights úteis.\n\n## Processo\n- Leia os logs\n- Identifique coisas importantes\n- Reporte o que encontrar",
+      "regras_adicionais": "A skill DEVE ser específica, com critérios objetivos de análise. Generalidades como 'forneça insights úteis' ou 'identifique coisas importantes' são piores que instruções concretas.",
+      "expected": {
+        "manteve_regras_criticas": false,
+        "nota_clareza": 40.0,
+        "nota_formatacao": 45.0,
+        "nota_robustez": 25.0,
+        "nota_densidade_informacional": 20.0,
+        "nota_acionabilidade": 30.0,
+        "nota_anti_fragilidade": 20.0
+      },
+      "expected_rank_band": "baixo",
+      "verifier": "A skill original ja e vaga (apenas 2 frases). A 'otimizada' e ainda pior: 'forneca insights uteis', 'identifique coisas importantes' — zero criterios objetivos. Regressao clara.",
+      "verification_hints": [
+        "forneça insights úteis",
+        "identifique coisas importantes",
+        "reporte o que encontrar"
+      ]
+    },
+    {
+      "id": "CON-2",
+      "category": "constraint",
+      "_intent": "Sonda de RESTRIÇÃO inversa: skill com restrições explícitas vs skill que REMOVE as restrições. A 'otimizada' remove a restrição de formato e fica genérica. O juiz DEVE detectar a regressão (perda de restrições = pior acionabilidade).",
+      "generator_model": "human-curated-v1",
+      "skill_original": "# Gerador de Resumos\n\n## Regras de Saída\n1. SEMPRE produza exatamente 3 parágrafos\n2. Primeiro parágrafo: contexto e problema\n3. Segundo parágrafo: análise e evidências\n4. Terceiro parágrafo: conclusão e recomendação",
+      "skill_otimizada": "# Gerador de Resumos\n\n## Instruções Gerais\n- Produza um resumo abrangente do texto fornecido\n- Inclua o contexto, a análise e as conclusões\n- O resumo deve ser bem estruturado e informativo\n- Adapte o formato conforme necessário para melhor legibilidade",
+      "regras_adicionais": "A skill DEVE preservar restrições explícitas de formato (3 parágrafos com papéis definidos). Remover restrições estruturais e torná-las genéricas ('bem estruturado', 'adaptar conforme necessário') é uma regressão.",
+      "expected": {
+        "manteve_regras_criticas": false,
+        "nota_clareza": 55.0,
+        "nota_formatacao": 50.0,
+        "nota_robustez": 40.0,
+        "nota_densidade_informacional": 35.0,
+        "nota_acionabilidade": 38.0,
+        "nota_anti_fragilidade": 32.0
+      },
+      "expected_rank_band": "baixo",
+      "verifier": "Skill original define restricao exata: 3 paragrafos com papeis especificos. A 'otimizada' remove toda restricao ('bem estruturado', 'adaptar conforme necessario' sao genericos). Regressao em acionabilidade.",
+      "verification_hints": [
+        "adaptar conforme necessário",
+        "bem estruturado",
+        "resumo abrangente"
+      ]
+    },
+    {
+      "id": "MAN-2",
+      "category": "manual",
+      "_intent": "Sonda MANUAL inversa: skill com procedimento passo a passo vs skill que generaliza e remove passos. A 'otimizada' substitui instruções específicas por princípios vagos. O juiz DEVE penalizar a perda de acionabilidade.",
+      "generator_model": "human-curated-v1",
+      "skill_original": "# Deployment Checklist\n\n1. Execute os testes unitários (pytest)\n2. Verifique cobertura >= 80%\n3. Rode migrações de banco (alembic upgrade head)\n4. Build a imagem Docker (docker build -t app:v2 .)\n5. Push para registry (docker push registry/app:v2)\n6. Atualize o Kubernetes (kubectl apply -f deploy.yaml)\n7. Verifique health check (curl /health)",
+      "skill_otimizada": "# Deployment Guide\n\n## Princípios\n- Garanta a qualidade do código antes do deploy\n- Mantenha a infraestrutura atualizada\n- Verifique se o deploy foi bem-sucedido\n\n## Processo\nSiga as melhores práticas de CI/CD para sua stack. Adapte os comandos conforme sua ferramenta de build e orquestrador.",
+      "regras_adicionais": "A skill DEVE preservar instruções específicas e acionáveis (comandos exatos). Substituir comandos por princípios gerais ('garanta a qualidade', 'siga melhores práticas') é uma regressão grave.",
+      "expected": {
+        "manteve_regras_criticas": false,
+        "nota_clareza": 42.0,
+        "nota_formatacao": 48.0,
+        "nota_robustez": 28.0,
+        "nota_densidade_informacional": 25.0,
+        "nota_acionabilidade": 20.0,
+        "nota_anti_fragilidade": 25.0
+      },
+      "expected_rank_band": "baixo",
+      "verifier": "Skill original tem 7 passos com comandos exatos. A 'otimizada' troca tudo por 'garanta a qualidade', 'siga melhores praticas', 'adapte os comandos'. Zero acionabilidade — o agente nao sabe o que fazer.",
+      "verification_hints": [
+        "garanta a qualidade",
+        "siga as melhores práticas",
+        "adapte os comandos"
+      ]
+    },
+    {
+      "id": "NEG-2",
+      "category": "negation",
+      "_intent": "Sonda de NEGAÇÃO inversa: skill com seções 'FAZER' e 'NÃO FAZER' vs skill que REMOVE a seção de negação. A 'otimizada' remove todos os NÃO FAZER. O juiz DEVE penalizar a perda de antifragilidade.",
+      "generator_model": "human-curated-v1",
+      "skill_original": "# Gerador de Código Seguro\n\n## O que FAZER\n1. Valide todas as entradas do usuário antes de processar\n2. Use consultas parametrizadas para banco de dados\n3. Escape todas as saídas HTML para prevenir XSS\n4. Registre eventos de segurança em log\n\n## O que NÃO FAZER (CRÍTICO)\n1. NÃO confie em validação apenas no frontend\n2. NÃO concatene strings para construir queries SQL\n3. NÃO armazene senhas em texto plano — use bcrypt\n4. NÃO expona stack traces para o usuário final",
+      "skill_otimizada": "# Gerador de Código Seguro\n\n## Práticas Recomendadas\n- Valide as entradas do usuário\n- Use consultas parametrizadas para banco de dados\n- Escape as saídas HTML\n- Registre eventos de segurança\n- Armazene senhas de forma segura\n- Configure tratamento de erros apropriado",
+      "regras_adicionais": "A skill DEVE preservar a seção de NEGAÇÃO explícita (NÃO FAZER). Instruções negativas são críticas para antifragilidade — remover os NÃO FAZER é uma regressão de segurança.",
+      "expected": {
+        "manteve_regras_criticas": false,
+        "nota_clareza": 58.0,
+        "nota_formatacao": 60.0,
+        "nota_robustez": 38.0,
+        "nota_densidade_informacional": 45.0,
+        "nota_acionabilidade": 48.0,
+        "nota_anti_fragilidade": 30.0
+      },
+      "expected_rank_band": "baixo",
+      "verifier": "Skill original tem 4 FAZER + 4 NÃO FAZER explicitos. A 'otimizada' remove TODOS os NÃO FAZER e os transforma em recomendações positivas vagas ('armazene senhas de forma segura' vs 'NÃO armazene senhas em texto plano — use bcrypt'). A antifragilidade despenca.",
+      "verification_hints": [
+        "armazene senhas de forma segura",
+        "configure tratamento de erros",
+        "práticas recomendadas"
+      ]
     }
   ]
 }

@@ -24,6 +24,14 @@ class NodeEventPayload:
     job_id: str
 
 
+@dataclass(frozen=True)
+class CostEventPayload:
+    iteration: int
+    llm_calls: int
+    estimated_tokens: int
+    job_id: str
+
+
 class IJobEventEmitter:
     """
     Protocolo de emissão de eventos tipados para um job específico.
@@ -34,6 +42,9 @@ class IJobEventEmitter:
         ...
 
     def emit_node(self, payload: NodeEventPayload) -> None:
+        ...
+
+    def emit_cost(self, payload: CostEventPayload) -> None:
         ...
 
     def emit_status(self, status: str) -> None:

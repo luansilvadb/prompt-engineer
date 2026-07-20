@@ -53,6 +53,12 @@ class GoldenProbe:
     expected_rank_band: str  # "alto" | "medio" | "baixo"
     verifier: str
     category: str = "general"  # "estilo" | "natural" | "neighbor" | "gptout" | "manual" | "constraint" | "negation" | "general"
+    generator_model: str = ""  # Modelo usado para gerar o probe (ex: "human-curated-v2", "gpt-4o"). Vazio = desconhecido.
+    verification_hints: list[str] = None  # Frases/padrões que confirmam violação de regra (p/ safety net determinística)
+
+    def __post_init__(self):
+        if self.verification_hints is None:
+            object.__setattr__(self, 'verification_hints', [])
 
 
 @dataclass(frozen=True)

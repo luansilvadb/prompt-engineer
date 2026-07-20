@@ -36,6 +36,27 @@ def _classify_exception(exc: Exception) -> tuple:
     return ('parse', None)
 
 
+def _apply_verification_hints(skill_otimizada: str, regras_adicionais: str, hints: list[str]) -> bool | None:
+    """
+    Safety net determinística: verifica se a skill_otimizada contém padrões
+    textuais que confirmam violação de regras. Complementa o LLM, não substitui.
+    
+    Retorna:
+      - True: violação CONFIRMADA por hint textual (força manteve_regras_criticas=False)
+      - None: sem evidência textual conclusiva (confia no LLM)
+    
+    Domain: cada hint é uma frase ou padrão que, se encontrado na skill_otimizada,
+    constitui evidência objetiva de violação das regras_adicionais.
+    """
+    if not hints:
+        return None
+    text = (skill_otimizada + ' ' + regras_adicionais).lower()
+    for hint in hints:
+        if hint.lower() in text:
+            return True
+    return None
+
+
 def _abort_fail_fast(consecutive_infra: int, elapsed: float, probe_id: str, label: str) -> None:
     """Levanta DriftMeasurementError se os critérios de fail-fast forem atingidos."""
     reason = None
@@ -68,11 +89,14 @@ class JudgeProbeRunner:
         self.label = label
         self._judge = dspy.Predict(AvaliadorDeSkillSignature)
         self._judge_modo_b = dspy.Predict(AvaliadorModoBSignature)
+        self._model_path_modo_a: str | None = None
+        self._model_path_modo_b: str | None = None
 
     def load_candidate(self, path: str) -> None:
         """Carrega few-shot compilado NESTA instância apenas (Modo A)."""
         try:
             self._judge.load(path)
+            self._model_path_modo_a = path
         except Exception as e:
             raise DriftMeasurementError(
                 f"Falha ao carregar juiz candidato de {path}",
@@ -83,6 +107,7 @@ class JudgeProbeRunner:
         """Carrega few-shot compilado NESTA instância apenas (Modo B)."""
         try:
             self._judge_modo_b.load(path)
+            self._model_path_modo_b = path
         except Exception as e:
             raise DriftMeasurementError(
                 f"Falha ao carregar juiz candidato (Modo B) de {path}",
@@ -92,10 +117,12 @@ class JudgeProbeRunner:
     def as_zero(self) -> None:
         """Juiz zerado (sem few-shot) — baseline de drift-zero garantida por construção (Modo A)."""
         self._judge = dspy.Predict(AvaliadorDeSkillSignature)
+        self._model_path_modo_a = None
 
     def as_zero_modo_b(self) -> None:
         """Juiz zerado (sem few-shot) — baseline de drift-zero garantida por construção (Modo B)."""
         self._judge_modo_b = dspy.Predict(AvaliadorModoBSignature)
+        self._model_path_modo_b = None
 
     def _run_with_fail_fast(self, probe: GoldenProbe, repetitions: int, invoke_fn, modo: str) -> ProbeMeasurement:
         """
@@ -117,6 +144,50 @@ class JudgeProbeRunner:
                 )
                 predicao = dspy.Prediction(skill_otimizada=probe.skill_otimizada)
                 avaliacao = invoke_fn(exemplo, predicao)
+                
+                # ── Safety net determinística ──────────────────────────────────
+                # Se o probe espera violação de regras críticas, aplica verificação
+                # textual como camada complementar ao LLM (A1 — hard-gate SD-2).
+                if not probe.expected.manteve_regras_criticas and probe.verification_hints:
+                    confirmed = _apply_verification_hints(
+                        probe.skill_otimizada,
+                        probe.regras_adicionais,
+                        probe.verification_hints,
+                    )
+                    if confirmed and avaliacao.manteve_regras_criticas:
+                        # LLM falhou em detectar violação, mas safety net confirma.
+                        # Força manteve_regras_criticas=False (fail-safe).
+                        from src.signatures import AvaliacaoModoB
+                        if isinstance(avaliacao, AvaliacaoModoB):
+                            avaliacao = AvaliacaoModoB(
+                                manteve_regras_criticas=False,
+                                defeitos_encontrados=avaliacao.defeitos_encontrados + [
+                                    "[SafetyNet] Violação confirmada por verificação textual determinística."
+                                ],
+                                nota_clareza=avaliacao.nota_clareza,
+                                nota_formatacao=avaliacao.nota_formatacao,
+                                nota_robustez=avaliacao.nota_robustez,
+                                nota_densidade_informacional=avaliacao.nota_densidade_informacional,
+                                nota_acionabilidade=avaliacao.nota_acionabilidade,
+                                nota_anti_fragilidade=avaliacao.nota_anti_fragilidade,
+                                feedback_detalhado=avaliacao.feedback_detalhado,
+                            )
+                        else:
+                            # Modo A: Avaliacao base — não tem defeitos_encontrados,
+                            # mas podemos forçar manteve_regras_criticas=False
+                            from src.signatures import Avaliacao
+                            avaliacao = Avaliacao(
+                                manteve_regras_criticas=False,
+                                nota_clareza=avaliacao.nota_clareza,
+                                nota_formatacao=avaliacao.nota_formatacao,
+                                nota_robustez=avaliacao.nota_robustez,
+                                nota_densidade_informacional=avaliacao.nota_densidade_informacional,
+                                nota_acionabilidade=avaliacao.nota_acionabilidade,
+                                nota_anti_fragilidade=avaliacao.nota_anti_fragilidade,
+                                feedback_detalhado=avaliacao.feedback_detalhado,
+                            )
+                # ── Fim safety net ─────────────────────────────────────────────
+                
                 measurement.samples.append(avaliacao)
                 consecutive_infra = 0  # sucesso reseta a contagem consecutiva
                 first_infra_at = None
@@ -145,6 +216,18 @@ class JudgeProbeRunner:
 
     def run_modo_b(self, probe: GoldenProbe, repetitions: int) -> ProbeMeasurement:
         return self._run_with_fail_fast(probe, repetitions, lambda ex, pred: _invoke_judge_modo_b_with(self._judge_modo_b, ex, pred), 'b')
+
+    def clone(self) -> 'JudgeProbeRunner':
+        """
+        Cria um runner independente com o mesmo estado (mesmo modelo carregado ou zerado).
+        Essencial para paralelismo: cada thread deve ter sua própria instância de dspy.Predict.
+        """
+        cloned = JudgeProbeRunner(self.label)
+        if self._model_path_modo_a is not None:
+            cloned.load_candidate(self._model_path_modo_a)
+        if self._model_path_modo_b is not None:
+            cloned.load_candidate_modo_b(self._model_path_modo_b)
+        return cloned
 
     def run(self, probe: GoldenProbe, repetitions: int, modo: str = 'b') -> ProbeMeasurement:
         """Por padrão, toda avaliação usa o Modo B (D-03)."""

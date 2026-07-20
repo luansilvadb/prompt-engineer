@@ -196,7 +196,14 @@ def test_medir_drift_success():
     m1 = ProbeMeasurement("p1", [av_p1])
     m2 = ProbeMeasurement("p2", [av_p2])
 
-    runner.run.side_effect = lambda probe, reps: m1 if probe.id == "p1" else m2
+    def _run_side_effect(probe, reps):
+        return m1 if probe.id == "p1" else m2
+
+    # _measure_all_probes agora usa runner.clone() para paralelismo.
+    # O clone deve retornar um mock cujo .run() tenha o mesmo side_effect.
+    cloned_mock = MagicMock()
+    cloned_mock.run.side_effect = _run_side_effect
+    runner.clone.return_value = cloned_mock
 
     thresholds = DriftThresholds(variance_low_confidence=8.0)
 
@@ -443,3 +450,92 @@ def test_runner_run_modo_b_all_fail_raises():
     with patch('src.drift.runner._invoke_judge_modo_b_with', side_effect=Exception("down")):
         with pytest.raises(DriftMeasurementError, match="Modo B"):
             runner.run_modo_b(_make_probe(), repetitions=2)
+
+
+# ---------------------------------------------------------------------------
+# Testes de regressao para _parse_manteve_regras — Item 2 (hard-gate SD-2)
+# ---------------------------------------------------------------------------
+
+from src.infrastructure.dspy_impl import _parse_manteve_regras
+
+
+@pytest.mark.parametrize("input_val,expected", [
+    # True cases
+    ("True", True),
+    ("true", True),
+    ("TRUE", True),
+    ("True.", True),
+    ("true, com ressalvas", True),
+    ("sim", True),
+    ("Sim", True),
+    ("SIM", True),
+    ("yes", True),
+    ("Yes", True),
+    ("YES", True),
+    ("1", True),
+    # False cases
+    ("False", False),
+    ("false", False),
+    ("FALSE", False),
+    ("false, a lei foi removida", False),
+    ("não", False),
+    ("nao", False),
+    ("no", False),
+    ("0", False),
+    # Edge cases
+    ("", False),
+    (None, False),
+    ("maybe", False),
+    ("parcialmente", False),
+    ("   true   ", True),
+    ("   false   ", False),
+    # Case: "0" should NOT match (it's not in true_markers)
+    ("0", False),
+    # Case: "True-ish" text
+    ("not true", False),  # 'not true' starts with 'no' → false_markers catches it
+    ("untrue", False),    # 'untrue' doesn't start with false_markers, but doesn't contain true_markers
+])
+def test_parse_manteve_regras_edge_cases(input_val, expected):
+    """Item 2: _parse_manteve_regras deve lidar com todos os edge cases corretamente."""
+    assert _parse_manteve_regras(input_val) == expected
+
+
+def test_missed_violation_sd2_scenario():
+    """
+    Item 2 — Regressao: simulacao exata do cenario SD-2.
+
+    SD-2: expected_critical=False (skill viola Lei de Ferro).
+    Se o juiz retornar manteve_regras_criticas=True, missed_violation_count
+    deve contar como violacao nao detectada.
+    """
+    # Simula 3 repeticoes do juiz: 2 dizem True (errado), 1 diz False (certo)
+    av_good = Avaliacao(
+        manteve_regras_criticas=False,  # juiz acertou: detectou violacao
+        nota_clareza=70, nota_formatacao=75, nota_robustez=40,
+        nota_densidade_informacional=60, nota_acionabilidade=55,
+        nota_anti_fragilidade=35, feedback_detalhado=""
+    )
+    av_bad1 = Avaliacao(
+        manteve_regras_criticas=True,  # juiz errou: nao detectou violacao
+        nota_clareza=80, nota_formatacao=80, nota_robustez=80,
+        nota_densidade_informacional=80, nota_acionabilidade=80,
+        nota_anti_fragilidade=80, feedback_detalhado=""
+    )
+    av_bad2 = Avaliacao(
+        manteve_regras_criticas=True,  # juiz errou novamente
+        nota_clareza=85, nota_formatacao=85, nota_robustez=85,
+        nota_densidade_informacional=85, nota_acionabilidade=85,
+        nota_anti_fragilidade=85, feedback_detalhado=""
+    )
+
+    # expected_critical=False porque SD-2 e uma violacao
+    measurement = ProbeMeasurement(probe_id="SD-2", samples=[av_bad1, av_bad2, av_good])
+
+    # critical_rules_all_correct: TODAS devem concordar → False (2 das 3 estao erradas)
+    assert measurement.critical_rules_all_correct(False) is False
+
+    # missed_violation_count: esperado=False, juiz disse True → 2 violacoes nao detectadas
+    assert measurement.missed_violation_count(False) == 2
+
+    # false_rejection_count: esperado=False → nunca conta (so conta quando esperado=True)
+    assert measurement.false_rejection_count(False) == 0

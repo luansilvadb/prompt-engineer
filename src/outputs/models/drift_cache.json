@@ -1,54 +1,56 @@
 {
   "judge_label": "atual",
-  "spearman_composite": 0.8928571428571429,
-  "offset_scale": 3.0775510204081535,
+  "spearman_composite": 0.8535714285714285,
+  "offset_scale": -3.0622222222222217,
   "mae_per_dimension": [
     {
       "dimension": "nota_clareza",
-      "mae": 4.142857142857143
+      "mae": 7.888888888888889
     },
     {
       "dimension": "nota_formatacao",
-      "mae": 12.142857142857142
+      "mae": 15.0
     },
     {
       "dimension": "nota_robustez",
-      "mae": 12.142857142857142
+      "mae": 14.333333333333334
     },
     {
       "dimension": "nota_densidade_informacional",
-      "mae": 8.857142857142858
+      "mae": 11.977777777777778
     },
     {
       "dimension": "nota_acionabilidade",
-      "mae": 7.571428571428571
+      "mae": 12.733333333333334
     },
     {
       "dimension": "nota_anti_fragilidade",
-      "mae": 13.285714285714286
+      "mae": 14.222222222222223
     }
   ],
   "critical_rules_concordance": 1.0,
   "critical_rules_violated": false,
   "missed_violations": 0,
   "false_rejections": 0,
-  "mean_variance": 0.0,
+  "mean_variance": 0.5432375906258556,
   "repetitions": 3,
   "low_confidence": false,
-  "style_gap": 0.4485714285714284,
+  "style_gap": 0.47714285714285704,
   "style_drift_signal": false,
   "category_accuracy": {
     "estilo": 1.0,
     "natural": 1.0,
     "constraint": 1.0,
     "manual": 1.0,
-    "negation": 1.0
+    "negation": 1.0,
+    "neighbor": 1.0,
+    "gptout": 1.0
   },
   "per_probe": [
     {
       "probe_id": "SD-1",
       "expected_composite": 0.9185714285714287,
-      "predicted_composite": 0.9657142857142855,
+      "predicted_composite": 0.9399999999999998,
       "variance": 0.0,
       "expected_critical": true,
       "observed_critical_all_correct": true,
@@ -58,7 +60,7 @@
     {
       "probe_id": "SD-2",
       "expected_composite": 0.5442857142857143,
-      "predicted_composite": 0.5871428571428571,
+      "predicted_composite": 0.33428571428571424,
       "variance": 0.0,
       "expected_critical": false,
       "observed_critical_all_correct": true,
@@ -68,7 +70,7 @@
     {
       "probe_id": "SD-3",
       "expected_composite": 0.4642857142857143,
-      "predicted_composite": 0.5171428571428571,
+      "predicted_composite": 0.4628571428571428,
       "variance": 0.0,
       "expected_critical": true,
       "observed_critical_all_correct": true,
@@ -78,7 +80,7 @@
     {
       "probe_id": "NAT-1",
       "expected_composite": 0.8385714285714284,
-      "predicted_composite": 0.8985714285714285,
+      "predicted_composite": 0.8357142857142856,
       "variance": 0.0,
       "expected_critical": true,
       "observed_critical_all_correct": true,
@@ -88,7 +90,7 @@
     {
       "probe_id": "CON-1",
       "expected_composite": 0.8634285714285715,
-      "predicted_composite": 0.9585714285714284,
+      "predicted_composite": 0.9742857142857143,
       "variance": 0.0,
       "expected_critical": true,
       "observed_critical_all_correct": true,
@@ -98,7 +100,7 @@
     {
       "probe_id": "MAN-1",
       "expected_composite": 0.8371428571428572,
-      "predicted_composite": 0.7471428571428572,
+      "predicted_composite": 0.9057142857142857,
       "variance": 0.0,
       "expected_critical": true,
       "observed_critical_all_correct": true,
@@ -108,14 +110,94 @@
     {
       "probe_id": "NEG-1",
       "expected_composite": 0.864,
-      "predicted_composite": 0.8714285714285713,
+      "predicted_composite": 0.9271428571428572,
       "variance": 0.0,
       "expected_critical": true,
       "observed_critical_all_correct": true,
       "missed_violations": 0,
       "false_rejections": 0
+    },
+    {
+      "probe_id": "NEIGHBOR-1",
+      "expected_composite": 0.6042857142857143,
+      "predicted_composite": 0.5914285714285714,
+      "variance": 0.0,
+      "expected_critical": false,
+      "observed_critical_all_correct": true,
+      "missed_violations": 0,
+      "false_rejections": 0
+    },
+    {
+      "probe_id": "NEIGHBOR-2",
+      "expected_composite": 0.5408571428571428,
+      "predicted_composite": 0.6433333333333334,
+      "variance": 1.9529615861342764,
+      "expected_critical": false,
+      "observed_critical_all_correct": true,
+      "missed_violations": 0,
+      "false_rejections": 0
+    },
+    {
+      "probe_id": "GPTOUT-1",
+      "expected_composite": 0.5128571428571429,
+      "predicted_composite": 0.2414285714285714,
+      "variance": 0.0,
+      "expected_critical": false,
+      "observed_critical_all_correct": true,
+      "missed_violations": 0,
+      "false_rejections": 0
+    },
+    {
+      "probe_id": "GPTOUT-2",
+      "expected_composite": 0.4914285714285714,
+      "predicted_composite": 0.3761904761904762,
+      "variance": 5.38748023761179,
+      "expected_critical": false,
+      "observed_critical_all_correct": true,
+      "missed_violations": 0,
+      "false_rejections": 0
+    },
+    {
+      "probe_id": "NAT-2",
+      "expected_composite": 0.2857142857142857,
+      "predicted_composite": 0.19999999999999998,
+      "variance": 0.0,
+      "expected_critical": false,
+      "observed_critical_all_correct": true,
+      "missed_violations": 0,
+      "false_rejections": 0
+    },
+    {
+      "probe_id": "CON-2",
+      "expected_composite": 0.40514285714285714,
+      "predicted_composite": 0.39142857142857146,
+      "variance": 0.8081220356417679,
+      "expected_critical": false,
+      "observed_critical_all_correct": true,
+      "missed_violations": 0,
+      "false_rejections": 0
+    },
+    {
+      "probe_id": "MAN-2",
+      "expected_composite": 0.29571428571428576,
+      "predicted_composite": 0.22285714285714286,
+      "variance": 0.0,
+      "expected_critical": false,
+      "observed_critical_all_correct": true,
+      "missed_violations": 0,
+      "false_rejections": 0
+    },
+    {
+      "probe_id": "NEG-2",
+      "expected_composite": 0.4539999999999999,
+      "predicted_composite": 0.41428571428571426,
+      "variance": 0.0,
+      "expected_critical": false,
+      "observed_critical_all_correct": true,
+      "missed_violations": 0,
+      "false_rejections": 0
     }
   ],
-  "measured_at": 1784506172.9120574,
+  "measured_at": 1784517378.8397963,
   "judge_config_hash": "zero"
 }

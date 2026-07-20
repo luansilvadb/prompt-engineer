@@ -15,7 +15,7 @@ from src.drift.models import DriftThresholds, DriftReport, DimensionError, Probe
 from src.drift.runner import JudgeProbeRunner
 from src.drift.metrics import medir_drift
 from src.infrastructure.dspy_impl import DSPyAvaliadorModoB
-from src.infrastructure.enhanced_judge import EnhancedJudge
+from src.infrastructure.experimental.enhanced_judge import EnhancedJudge
 import dspy
 
 

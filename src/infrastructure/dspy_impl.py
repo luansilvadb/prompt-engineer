@@ -92,8 +92,9 @@ class AvaliadorDeSkillSignature(dspy.Signature):
 
 class AvaliadorModoBSignature(dspy.Signature):
     """
-    Avalia se uma skill otimizada para agentes de IA é estruturalmente superior à original (Modo B - Caça-Defeitos).
-    Analisa as mesmas 6 dimensões, mas obrigatoriamente enumera contradições e defeitos primeiro.
+    Avalia se uma skill otimizada para agentes de IA e estruturalmente superior a original.
+    Analisa 6 dimensoes: clareza, formatacao, robustez, densidade informacional,
+    acionabilidade e anti-fragilidade. Enumere contradicoes e defeitos primeiro.
 
     REGRAS DE AVALIACAO (OBRIGATORIO seguir):
     (1) PRIORIZE instruction following sobre estilo superficial.
@@ -104,8 +105,11 @@ class AvaliadorModoBSignature(dspy.Signature):
         espectral', 'oraculo' sem necessidade tecnica sao ruido, nao qualidade.
     (3) Outputs com MAIS ou MENOS conteudo que o solicitado sao piores,
         independente da qualidade do conteudo extra.
-    (4) Output (a) e Output (b) sao igualmente provaveis de ser o melhor.
-        Nao favoreca o primeiro output apresentado.
+    (4) REGRAS ADICIONAIS SAO CONTRATO INABALAVEL. O campo regras_adicionais
+        contem restricoes que DEVEM ser preservadas na skill_otimizada.
+        Se a skill_otimizada violar QUALQUER restricao das regras_adicionais,
+        manteve_regras_criticas DEVE ser False. Nao ha excecoes nem
+        interpretacoes criativas — a violacao e binaria e inegociavel.
     """
     skill_original: str = dspy.InputField()
     skill_otimizada: str = dspy.InputField()
@@ -173,8 +177,42 @@ class DSPyMutadorCognitivoAgent(IMutadorCognitivoAgent):
         )
 
 def _parse_manteve_regras(manteve_str: str) -> bool:
+    """Parse do campo manteve_regras_criticas do juiz.
+
+    Estrategia defensiva: so retorna True se a string contiver marcadores
+    explicitos de afirmacao. Qualquer outra resposta (False, vazia, None,
+    texto ambíguo) e tratada como False.
+
+    Edge cases cobertos:
+    - "True", "true", "TRUE" → True
+    - "true, com ressalvas" → True (contem 'true')
+    - "False", "false", "FALSE" → False
+    - "false, a lei foi removida" → False (nao contem 'true')
+    - "" (vazio) → False
+    - None → False
+    - "1" → True
+    - "0" → False
+    - "sim", "Sim", "SIM" → True
+    - "não", "nao", "no" → False
+    - "yes", "Yes", "YES" → True
+    """
+    if manteve_str is None:
+        return False
     manteve_str = str(manteve_str).strip().lower()
-    return 'true' in manteve_str or 'sim' in manteve_str or 'yes' in manteve_str or manteve_str == '1'
+    if not manteve_str:
+        return False
+    # Marcadores que indicam FALSO explicitamente — checados primeiro
+    # para evitar que "false" contenha substrings de "true"
+    false_markers = ['false', 'não', 'nao', 'no', '0']
+    if any(m == manteve_str or manteve_str.startswith(m) for m in false_markers):
+        return False
+    # Negacao composta: "untrue", "un-true", "antitrue" etc.
+    # "untrue" contem 'true' como substring mas significa o oposto
+    if manteve_str.startswith('un') and 'true' in manteve_str:
+        return False
+    # Marcadores que indicam VERDADEIRO
+    true_markers = ['true', 'sim', 'yes', '1']
+    return any(m in manteve_str for m in true_markers)
 
 
 def _parse_defeitos(defeitos_raw) -> list[str]:
