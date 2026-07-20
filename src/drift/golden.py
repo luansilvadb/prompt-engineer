@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 from typing import List
 
+from loguru import logger
 from src.drift.models import ProbeExpectation, GoldenProbe
 
 GOLDEN_DIR = Path('src/outputs/golden')
@@ -31,10 +32,10 @@ class GoldenSet:
                 try:
                     import shutil
                     shutil.copy2(frozen_path, path)
-                    print(f"[+] Golden set padrão restaurado localmente com sucesso em {path}")
+                    logger.info("[+] Golden set padão restaurado localmente com sucesso em {}", path)
                 except Exception as e:
                     path = frozen_path
-                    print(f"[!] Falha ao criar golden set localmente: {e}. Usando do executável diretamente.")
+                    logger.warning("[!] Falha ao criar golden set localmente: {}. Usando do executável diretamente.", e)
         return path
 
     def _parse_golden_json(self, data: dict) -> List[GoldenProbe]:
@@ -63,8 +64,9 @@ class GoldenSet:
         viés de autoavaliação (DESIGN.md §7.6).
 
         Consulta MODEL_NAME do ambiente (config.py usa os.environ, não um objeto settings).
+        BUG-6 fix: usa loguru logger em vez de print() para que os logs
+        cheguem ao sistema SSE e ao arquivo de log do job.
         """
-        import os
         judge_model = os.environ.get('MODEL_NAME', 'unknown')
 
         for p in self.probes:
@@ -76,19 +78,21 @@ class GoldenSet:
                 continue
             # LLM-generated probe — verificar separação de modelos
             if judge_model and gen == judge_model:
-                print(f"[!] A2 — CONTAMINAÇÃO CIRCULAR: probe {p.id} foi gerado por {gen}, "
-                      f"mesmo modelo do juiz atual ({judge_model}). Métricas de drift podem ser "
-                      f"superestimadas (viés de autoavaliação). Considere regenerar com outro modelo.")
+                logger.warning(
+                    "[!] A2 — CONTAMINAÇÃO CIRCULAR: probe {} foi gerado por {}, "
+                    "mesmo modelo do juiz atual ({}). Métricas de drift podem ser "
+                    "superestimadas (viés de autoavaliação). Considere regenerar com outro modelo.",
+                    p.id, gen, judge_model,
+                )
             else:
-                print(f"[*] A2 — OK: probe {p.id} usa generator_model={gen}, "
-                      f"juiz atual={judge_model}.")
+                logger.info("[*] A2 — OK: probe {} usa generator_model={}, juiz atual={}.", p.id, gen, judge_model)
 
     def _load(self):
         path = self._store_path()
         if not path.exists():
             path = self._restore_frozen_golden(path)
         if not path.exists():
-            print(f"[!] Golden set ausente em {path}. Portão operará em fail-open.")
+            logger.warning("[!] Golden set ausente em {}. Portão operará em fail-open.", path)
             return
         try:
             with open(path, 'r', encoding='utf-8') as f:
@@ -96,10 +100,10 @@ class GoldenSet:
             self.version = data.get('version', '')
             self.curated_at = data.get('curated_at', '')
             self.probes = self._parse_golden_json(data)
-            print(f"[*] Golden set v{self.version} carregado: {len(self.probes)} probes.")
+            logger.info("[*] Golden set v{} carregado: {} probes.", self.version, len(self.probes))
             self._validate_circular_contamination()
         except Exception as e:
-            print(f"[!] Erro ao carregar golden set ({e}). Operando sem âncora.")
+            logger.error("[!] Erro ao carregar golden set ({}). Operando sem âncora.", e)
             self.probes = []
 
     def is_empty(self) -> bool:

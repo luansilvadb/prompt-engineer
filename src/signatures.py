@@ -203,7 +203,9 @@ def funcao_de_recompensa(avaliador_modo_b, skill_original: str, skill_otimizada:
         score = _calculate_score(resultado)
 
         if resultado.defeitos_encontrados:
-            penalty = len(resultado.defeitos_encontrados) * 0.1
+            # BUG-4 fix: teto de 0.5 evita colapso catastrófico por defeitos cosméticos.
+            # Sem teto, 6 defeitos leves → penalty=0.6 e score 0.80 vira 0.20.
+            penalty = min(len(resultado.defeitos_encontrados) * 0.1, 0.5)
             score = max(0.0, score - penalty)
 
             bullet_points = "\\n".join(f"- {d}" for d in resultado.defeitos_encontrados)

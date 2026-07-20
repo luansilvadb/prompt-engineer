@@ -360,25 +360,39 @@ def test_golden_set_parse_handles_missing_optional_fields(tmp_path):
 
 
 @patch('src.drift.golden.GOLDEN_DIR', None)
-def test_golden_set_load_malformed_json_falls_back_to_empty(tmp_path, capsys):
-    """JSON corrompido → fail-open: probes=[] sem lançar (mensagem de aviso)."""
+def test_golden_set_load_malformed_json_falls_back_to_empty(tmp_path):
+    """JSON corrompido → fail-open: probes=[] sem lançar (mensagem de aviso via logger)."""
+    from loguru import logger
+    import io
     golden_dir = tmp_path / 'golden'
     golden_dir.mkdir(parents=True, exist_ok=True)
     (golden_dir / 'golden_set.json').write_text('{ NOT VALID JSON !!!', encoding='utf-8')
-    with patch('src.drift.golden.GOLDEN_DIR', golden_dir):
-        gs = GoldenSet()
+    log_output = io.StringIO()
+    sink_id = logger.add(log_output, format="{message}")
+    try:
+        with patch('src.drift.golden.GOLDEN_DIR', golden_dir):
+            gs = GoldenSet()
+    finally:
+        logger.remove(sink_id)
     assert gs.probes == []
     assert gs.is_empty()
-    assert 'Erro ao carregar golden set' in capsys.readouterr().out
+    assert 'Erro ao carregar golden set' in log_output.getvalue()
 
 
 @patch('src.drift.golden.GOLDEN_DIR', None)
-def test_golden_set_load_missing_file_is_empty_fail_open(tmp_path, capsys):
-    """Arquivo ausente → fail-open (probes=[]), mensagem explícita."""
-    with patch('src.drift.golden.GOLDEN_DIR', tmp_path / 'absent'):
-        gs = GoldenSet()
+def test_golden_set_load_missing_file_is_empty_fail_open(tmp_path):
+    """Arquivo ausente → fail-open (probes=[]), mensagem explícita via logger."""
+    from loguru import logger
+    import io
+    log_output = io.StringIO()
+    sink_id = logger.add(log_output, format="{message}")
+    try:
+        with patch('src.drift.golden.GOLDEN_DIR', tmp_path / 'absent'):
+            gs = GoldenSet()
+    finally:
+        logger.remove(sink_id)
     assert gs.is_empty()
-    assert 'Golden set ausente' in capsys.readouterr().out
+    assert 'Golden set ausente' in log_output.getvalue()
 
 
 # --- JudgeProbeRunner error paths ------------------------------------------

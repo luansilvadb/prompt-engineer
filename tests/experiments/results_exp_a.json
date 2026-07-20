@@ -7,7 +7,7 @@
     "first_3_strategies": [
       "mutador_cognitivo",
       "__DISCOVER__",
-      "__DISCOVER__"
+      "mutador_cognitivo"
     ],
     "expansion_order": [
       {
@@ -26,109 +26,17 @@
       },
       {
         "expand_num": 3,
-        "strategy_key": "__DISCOVER__",
-        "strategy_desc": "Descoberta Aut\u00f4noma de Reflexo (Tabula Rasa)",
+        "strategy_key": "mutador_cognitivo",
+        "strategy_desc": "Mutador Cognitivo",
         "depth": 1,
         "parent_score": 0.5801827411167513
       },
       {
         "expand_num": 4,
-        "strategy_key": "mutador_cognitivo",
-        "strategy_desc": "Mutador Cognitivo",
-        "depth": 1,
-        "parent_score": 0.5337055837563451
-      },
-      {
-        "expand_num": 5,
         "strategy_key": "__DISCOVER__",
         "strategy_desc": "Descoberta Aut\u00f4noma de Reflexo (Tabula Rasa)",
         "depth": 1,
-        "parent_score": 0.5362192893401014
-      }
-    ],
-    "level_one_nodes": [
-      {
-        "strategy": "mutador_cognitivo",
-        "score": 0.5750253807106599,
-        "visits": 1,
-        "reward": 0.8950253807106598,
-        "depth": 1,
-        "instruction_len": 197
-      },
-      {
-        "strategy": "__DISCOVER__",
-        "score": 0.4150253807106599,
-        "visits": 1,
-        "reward": 0.7350253807106599,
-        "depth": 1,
-        "instruction_len": 197
-      },
-      {
-        "strategy": "__DISCOVER__",
-        "score": 0.4150253807106599,
-        "visits": 1,
-        "reward": 0.7350253807106599,
-        "depth": 1,
-        "instruction_len": 197
-      },
-      {
-        "strategy": "mutador_cognitivo",
-        "score": 0.5750253807106599,
-        "visits": 1,
-        "reward": 0.8950253807106598,
-        "depth": 1,
-        "instruction_len": 197
-      },
-      {
-        "strategy": "__DISCOVER__",
-        "score": 0.4150253807106599,
-        "visits": 1,
-        "reward": 0.7350253807106599,
-        "depth": 1,
-        "instruction_len": 197
-      }
-    ],
-    "total_expansions": 5,
-    "run": 0
-  },
-  {
-    "best_reward": 0.8950253807106598,
-    "best_score": 0.5750253807106599,
-    "best_depth": 1,
-    "best_strategy": "mutador_cognitivo",
-    "first_3_strategies": [
-      "mutador_cognitivo",
-      "__DISCOVER__",
-      "__DISCOVER__"
-    ],
-    "expansion_order": [
-      {
-        "expand_num": 1,
-        "strategy_key": "mutador_cognitivo",
-        "strategy_desc": "Mutador Cognitivo",
-        "depth": 1,
-        "parent_score": 0.8
-      },
-      {
-        "expand_num": 2,
-        "strategy_key": "__DISCOVER__",
-        "strategy_desc": "Descoberta Aut\u00f4noma de Reflexo (Tabula Rasa)",
-        "depth": 1,
-        "parent_score": 0.6731370558375634
-      },
-      {
-        "expand_num": 3,
-        "strategy_key": "__DISCOVER__",
-        "strategy_desc": "Descoberta Aut\u00f4noma de Reflexo (Tabula Rasa)",
-        "depth": 1,
-        "parent_score": 0.5801827411167513
-      },
-      {
-        "expand_num": 4,
-        "strategy_key": "mutador_cognitivo",
-        "strategy_desc": "Mutador Cognitivo",
-        "depth": 1,
-        "parent_score": 0.5337055837563451
+        "parent_score": 0.5717055837563452
       },
       {
         "expand_num": 5,
@@ -156,18 +64,18 @@
         "instruction_len": 197
       },
       {
-        "strategy": "__DISCOVER__",
-        "score": 0.4150253807106599,
-        "visits": 1,
-        "reward": 0.7350253807106599,
-        "depth": 1,
-        "instruction_len": 197
-      },
-      {
         "strategy": "mutador_cognitivo",
         "score": 0.5750253807106599,
         "visits": 1,
         "reward": 0.8950253807106598,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "__DISCOVER__",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
         "depth": 1,
         "instruction_len": 197
       },
@@ -181,7 +89,7 @@
       }
     ],
     "total_expansions": 5,
-    "run": 1
+    "run": 0
   },
   {
     "best_reward": 0.8950253807106598,
@@ -224,8 +132,8 @@
       },
       {
         "expand_num": 5,
-        "strategy_key": "__DISCOVER__",
-        "strategy_desc": "Descoberta Aut\u00f4noma de Reflexo (Tabula Rasa)",
+        "strategy_key": "mutador_cognitivo",
+        "strategy_desc": "Mutador Cognitivo",
         "depth": 1,
         "parent_score": 0.5362192893401014
       }
@@ -264,16 +172,16 @@
         "instruction_len": 197
       },
       {
-        "strategy": "__DISCOVER__",
-        "score": 0.4150253807106599,
+        "strategy": "mutador_cognitivo",
+        "score": 0.5750253807106599,
         "visits": 1,
-        "reward": 0.7350253807106599,
+        "reward": 0.8950253807106598,
         "depth": 1,
         "instruction_len": 197
       }
     ],
     "total_expansions": 5,
-    "run": 2
+    "run": 1
   },
   {
     "best_reward": 0.8950253807106598,
@@ -352,6 +260,98 @@
         "score": 0.5750253807106599,
         "visits": 1,
         "reward": 0.8950253807106598,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "mutador_cognitivo",
+        "score": 0.5750253807106599,
+        "visits": 1,
+        "reward": 0.8950253807106598,
+        "depth": 1,
+        "instruction_len": 197
+      }
+    ],
+    "total_expansions": 5,
+    "run": 2
+  },
+  {
+    "best_reward": 0.8950253807106598,
+    "best_score": 0.5750253807106599,
+    "best_depth": 1,
+    "best_strategy": "mutador_cognitivo",
+    "first_3_strategies": [
+      "mutador_cognitivo",
+      "__DISCOVER__",
+      "__DISCOVER__"
+    ],
+    "expansion_order": [
+      {
+        "expand_num": 1,
+        "strategy_key": "mutador_cognitivo",
+        "strategy_desc": "Mutador Cognitivo",
+        "depth": 1,
+        "parent_score": 0.8
+      },
+      {
+        "expand_num": 2,
+        "strategy_key": "__DISCOVER__",
+        "strategy_desc": "Descoberta Aut\u00f4noma de Reflexo (Tabula Rasa)",
+        "depth": 1,
+        "parent_score": 0.6731370558375634
+      },
+      {
+        "expand_num": 3,
+        "strategy_key": "__DISCOVER__",
+        "strategy_desc": "Descoberta Aut\u00f4noma de Reflexo (Tabula Rasa)",
+        "depth": 1,
+        "parent_score": 0.5801827411167513
+      },
+      {
+        "expand_num": 4,
+        "strategy_key": "__DISCOVER__",
+        "strategy_desc": "Descoberta Aut\u00f4noma de Reflexo (Tabula Rasa)",
+        "depth": 1,
+        "parent_score": 0.5337055837563451
+      },
+      {
+        "expand_num": 5,
+        "strategy_key": "mutador_cognitivo",
+        "strategy_desc": "Mutador Cognitivo",
+        "depth": 1,
+        "parent_score": 0.5058192893401015
+      }
+    ],
+    "level_one_nodes": [
+      {
+        "strategy": "mutador_cognitivo",
+        "score": 0.5750253807106599,
+        "visits": 1,
+        "reward": 0.8950253807106598,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "__DISCOVER__",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "__DISCOVER__",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "__DISCOVER__",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
         "depth": 1,
         "instruction_len": 197
       },
@@ -408,8 +408,8 @@
       },
       {
         "expand_num": 5,
-        "strategy_key": "__DISCOVER__",
-        "strategy_desc": "Descoberta Aut\u00f4noma de Reflexo (Tabula Rasa)",
+        "strategy_key": "mutador_cognitivo",
+        "strategy_desc": "Mutador Cognitivo",
         "depth": 1,
         "parent_score": 0.5058192893401015
       }
@@ -448,10 +448,10 @@
         "instruction_len": 197
       },
       {
-        "strategy": "__DISCOVER__",
-        "score": 0.4150253807106599,
+        "strategy": "mutador_cognitivo",
+        "score": 0.5750253807106599,
         "visits": 1,
-        "reward": 0.7350253807106599,
+        "reward": 0.8950253807106598,
         "depth": 1,
         "instruction_len": 197
       }
@@ -467,7 +467,7 @@
     "first_3_strategies": [
       "mutador_cognitivo",
       "__DISCOVER__",
-      "mutador_cognitivo"
+      "__DISCOVER__"
     ],
     "expansion_order": [
       {
@@ -486,8 +486,8 @@
       },
       {
         "expand_num": 3,
-        "strategy_key": "mutador_cognitivo",
-        "strategy_desc": "Mutador Cognitivo",
+        "strategy_key": "__DISCOVER__",
+        "strategy_desc": "Descoberta Aut\u00f4noma de Reflexo (Tabula Rasa)",
         "depth": 1,
         "parent_score": 0.5801827411167513
       },
@@ -496,14 +496,14 @@
         "strategy_key": "__DISCOVER__",
         "strategy_desc": "Descoberta Aut\u00f4noma de Reflexo (Tabula Rasa)",
         "depth": 1,
-        "parent_score": 0.5717055837563452
+        "parent_score": 0.5337055837563451
       },
       {
         "expand_num": 5,
-        "strategy_key": "__DISCOVER__",
-        "strategy_desc": "Descoberta Aut\u00f4noma de Reflexo (Tabula Rasa)",
+        "strategy_key": "mutador_cognitivo",
+        "strategy_desc": "Mutador Cognitivo",
         "depth": 1,
-        "parent_score": 0.5362192893401014
+        "parent_score": 0.5058192893401015
       }
     ],
     "level_one_nodes": [
@@ -524,102 +524,10 @@
         "instruction_len": 197
       },
       {
-        "strategy": "mutador_cognitivo",
-        "score": 0.5750253807106599,
-        "visits": 1,
-        "reward": 0.8950253807106598,
-        "depth": 1,
-        "instruction_len": 197
-      },
-      {
         "strategy": "__DISCOVER__",
         "score": 0.4150253807106599,
         "visits": 1,
         "reward": 0.7350253807106599,
-        "depth": 1,
-        "instruction_len": 197
-      },
-      {
-        "strategy": "__DISCOVER__",
-        "score": 0.4150253807106599,
-        "visits": 1,
-        "reward": 0.7350253807106599,
-        "depth": 1,
-        "instruction_len": 197
-      }
-    ],
-    "total_expansions": 5,
-    "run": 5
-  },
-  {
-    "best_reward": 0.8950253807106598,
-    "best_score": 0.5750253807106599,
-    "best_depth": 1,
-    "best_strategy": "mutador_cognitivo",
-    "first_3_strategies": [
-      "mutador_cognitivo",
-      "__DISCOVER__",
-      "mutador_cognitivo"
-    ],
-    "expansion_order": [
-      {
-        "expand_num": 1,
-        "strategy_key": "mutador_cognitivo",
-        "strategy_desc": "Mutador Cognitivo",
-        "depth": 1,
-        "parent_score": 0.8
-      },
-      {
-        "expand_num": 2,
-        "strategy_key": "__DISCOVER__",
-        "strategy_desc": "Descoberta Aut\u00f4noma de Reflexo (Tabula Rasa)",
-        "depth": 1,
-        "parent_score": 0.6731370558375634
-      },
-      {
-        "expand_num": 3,
-        "strategy_key": "mutador_cognitivo",
-        "strategy_desc": "Mutador Cognitivo",
-        "depth": 1,
-        "parent_score": 0.5801827411167513
-      },
-      {
-        "expand_num": 4,
-        "strategy_key": "__DISCOVER__",
-        "strategy_desc": "Descoberta Aut\u00f4noma de Reflexo (Tabula Rasa)",
-        "depth": 1,
-        "parent_score": 0.5717055837563452
-      },
-      {
-        "expand_num": 5,
-        "strategy_key": "mutador_cognitivo",
-        "strategy_desc": "Mutador Cognitivo",
-        "depth": 1,
-        "parent_score": 0.5362192893401014
-      }
-    ],
-    "level_one_nodes": [
-      {
-        "strategy": "mutador_cognitivo",
-        "score": 0.5750253807106599,
-        "visits": 1,
-        "reward": 0.8950253807106598,
-        "depth": 1,
-        "instruction_len": 197
-      },
-      {
-        "strategy": "__DISCOVER__",
-        "score": 0.4150253807106599,
-        "visits": 1,
-        "reward": 0.7350253807106599,
-        "depth": 1,
-        "instruction_len": 197
-      },
-      {
-        "strategy": "mutador_cognitivo",
-        "score": 0.5750253807106599,
-        "visits": 1,
-        "reward": 0.8950253807106598,
         "depth": 1,
         "instruction_len": 197
       },
@@ -641,191 +549,7 @@
       }
     ],
     "total_expansions": 5,
-    "run": 6
-  },
-  {
-    "best_reward": 0.8950253807106598,
-    "best_score": 0.5750253807106599,
-    "best_depth": 1,
-    "best_strategy": "mutador_cognitivo",
-    "first_3_strategies": [
-      "mutador_cognitivo",
-      "__DISCOVER__",
-      "mutador_cognitivo"
-    ],
-    "expansion_order": [
-      {
-        "expand_num": 1,
-        "strategy_key": "mutador_cognitivo",
-        "strategy_desc": "Mutador Cognitivo",
-        "depth": 1,
-        "parent_score": 0.8
-      },
-      {
-        "expand_num": 2,
-        "strategy_key": "__DISCOVER__",
-        "strategy_desc": "Descoberta Aut\u00f4noma de Reflexo (Tabula Rasa)",
-        "depth": 1,
-        "parent_score": 0.6731370558375634
-      },
-      {
-        "expand_num": 3,
-        "strategy_key": "mutador_cognitivo",
-        "strategy_desc": "Mutador Cognitivo",
-        "depth": 1,
-        "parent_score": 0.5801827411167513
-      },
-      {
-        "expand_num": 4,
-        "strategy_key": "__DISCOVER__",
-        "strategy_desc": "Descoberta Aut\u00f4noma de Reflexo (Tabula Rasa)",
-        "depth": 1,
-        "parent_score": 0.5717055837563452
-      },
-      {
-        "expand_num": 5,
-        "strategy_key": "mutador_cognitivo",
-        "strategy_desc": "Mutador Cognitivo",
-        "depth": 1,
-        "parent_score": 0.5362192893401014
-      }
-    ],
-    "level_one_nodes": [
-      {
-        "strategy": "mutador_cognitivo",
-        "score": 0.5750253807106599,
-        "visits": 1,
-        "reward": 0.8950253807106598,
-        "depth": 1,
-        "instruction_len": 197
-      },
-      {
-        "strategy": "__DISCOVER__",
-        "score": 0.4150253807106599,
-        "visits": 1,
-        "reward": 0.7350253807106599,
-        "depth": 1,
-        "instruction_len": 197
-      },
-      {
-        "strategy": "mutador_cognitivo",
-        "score": 0.5750253807106599,
-        "visits": 1,
-        "reward": 0.8950253807106598,
-        "depth": 1,
-        "instruction_len": 197
-      },
-      {
-        "strategy": "__DISCOVER__",
-        "score": 0.4150253807106599,
-        "visits": 1,
-        "reward": 0.7350253807106599,
-        "depth": 1,
-        "instruction_len": 197
-      },
-      {
-        "strategy": "mutador_cognitivo",
-        "score": 0.5750253807106599,
-        "visits": 1,
-        "reward": 0.8950253807106598,
-        "depth": 1,
-        "instruction_len": 197
-      }
-    ],
-    "total_expansions": 5,
-    "run": 7
-  },
-  {
-    "best_reward": 0.8950253807106598,
-    "best_score": 0.5750253807106599,
-    "best_depth": 1,
-    "best_strategy": "mutador_cognitivo",
-    "first_3_strategies": [
-      "mutador_cognitivo",
-      "__DISCOVER__",
-      "mutador_cognitivo"
-    ],
-    "expansion_order": [
-      {
-        "expand_num": 1,
-        "strategy_key": "mutador_cognitivo",
-        "strategy_desc": "Mutador Cognitivo",
-        "depth": 1,
-        "parent_score": 0.8
-      },
-      {
-        "expand_num": 2,
-        "strategy_key": "__DISCOVER__",
-        "strategy_desc": "Descoberta Aut\u00f4noma de Reflexo (Tabula Rasa)",
-        "depth": 1,
-        "parent_score": 0.6731370558375634
-      },
-      {
-        "expand_num": 3,
-        "strategy_key": "mutador_cognitivo",
-        "strategy_desc": "Mutador Cognitivo",
-        "depth": 1,
-        "parent_score": 0.5801827411167513
-      },
-      {
-        "expand_num": 4,
-        "strategy_key": "__DISCOVER__",
-        "strategy_desc": "Descoberta Aut\u00f4noma de Reflexo (Tabula Rasa)",
-        "depth": 1,
-        "parent_score": 0.5717055837563452
-      },
-      {
-        "expand_num": 5,
-        "strategy_key": "mutador_cognitivo",
-        "strategy_desc": "Mutador Cognitivo",
-        "depth": 1,
-        "parent_score": 0.5362192893401014
-      }
-    ],
-    "level_one_nodes": [
-      {
-        "strategy": "mutador_cognitivo",
-        "score": 0.5750253807106599,
-        "visits": 1,
-        "reward": 0.8950253807106598,
-        "depth": 1,
-        "instruction_len": 197
-      },
-      {
-        "strategy": "__DISCOVER__",
-        "score": 0.4150253807106599,
-        "visits": 1,
-        "reward": 0.7350253807106599,
-        "depth": 1,
-        "instruction_len": 197
-      },
-      {
-        "strategy": "mutador_cognitivo",
-        "score": 0.5750253807106599,
-        "visits": 1,
-        "reward": 0.8950253807106598,
-        "depth": 1,
-        "instruction_len": 197
-      },
-      {
-        "strategy": "__DISCOVER__",
-        "score": 0.4150253807106599,
-        "visits": 1,
-        "reward": 0.7350253807106599,
-        "depth": 1,
-        "instruction_len": 197
-      },
-      {
-        "strategy": "mutador_cognitivo",
-        "score": 0.5750253807106599,
-        "visits": 1,
-        "reward": 0.8950253807106598,
-        "depth": 1,
-        "instruction_len": 197
-      }
-    ],
-    "total_expansions": 5,
-    "run": 8
+    "run": 5
   },
   {
     "best_reward": 0.8950253807106598,
@@ -868,8 +592,8 @@
       },
       {
         "expand_num": 5,
-        "strategy_key": "mutador_cognitivo",
-        "strategy_desc": "Mutador Cognitivo",
+        "strategy_key": "__DISCOVER__",
+        "strategy_desc": "Descoberta Aut\u00f4noma de Reflexo (Tabula Rasa)",
         "depth": 1,
         "parent_score": 0.5362192893401014
       }
@@ -908,10 +632,286 @@
         "instruction_len": 197
       },
       {
+        "strategy": "__DISCOVER__",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      }
+    ],
+    "total_expansions": 5,
+    "run": 6
+  },
+  {
+    "best_reward": 0.8950253807106598,
+    "best_score": 0.5750253807106599,
+    "best_depth": 1,
+    "best_strategy": "mutador_cognitivo",
+    "first_3_strategies": [
+      "mutador_cognitivo",
+      "__DISCOVER__",
+      "__DISCOVER__"
+    ],
+    "expansion_order": [
+      {
+        "expand_num": 1,
+        "strategy_key": "mutador_cognitivo",
+        "strategy_desc": "Mutador Cognitivo",
+        "depth": 1,
+        "parent_score": 0.8
+      },
+      {
+        "expand_num": 2,
+        "strategy_key": "__DISCOVER__",
+        "strategy_desc": "Descoberta Aut\u00f4noma de Reflexo (Tabula Rasa)",
+        "depth": 1,
+        "parent_score": 0.6731370558375634
+      },
+      {
+        "expand_num": 3,
+        "strategy_key": "__DISCOVER__",
+        "strategy_desc": "Descoberta Aut\u00f4noma de Reflexo (Tabula Rasa)",
+        "depth": 1,
+        "parent_score": 0.5801827411167513
+      },
+      {
+        "expand_num": 4,
+        "strategy_key": "__DISCOVER__",
+        "strategy_desc": "Descoberta Aut\u00f4noma de Reflexo (Tabula Rasa)",
+        "depth": 1,
+        "parent_score": 0.5337055837563451
+      },
+      {
+        "expand_num": 5,
+        "strategy_key": "mutador_cognitivo",
+        "strategy_desc": "Mutador Cognitivo",
+        "depth": 1,
+        "parent_score": 0.5058192893401015
+      }
+    ],
+    "level_one_nodes": [
+      {
         "strategy": "mutador_cognitivo",
         "score": 0.5750253807106599,
         "visits": 1,
         "reward": 0.8950253807106598,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "__DISCOVER__",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "__DISCOVER__",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "__DISCOVER__",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "mutador_cognitivo",
+        "score": 0.5750253807106599,
+        "visits": 1,
+        "reward": 0.8950253807106598,
+        "depth": 1,
+        "instruction_len": 197
+      }
+    ],
+    "total_expansions": 5,
+    "run": 7
+  },
+  {
+    "best_reward": 0.8950253807106598,
+    "best_score": 0.5750253807106599,
+    "best_depth": 1,
+    "best_strategy": "mutador_cognitivo",
+    "first_3_strategies": [
+      "mutador_cognitivo",
+      "__DISCOVER__",
+      "__DISCOVER__"
+    ],
+    "expansion_order": [
+      {
+        "expand_num": 1,
+        "strategy_key": "mutador_cognitivo",
+        "strategy_desc": "Mutador Cognitivo",
+        "depth": 1,
+        "parent_score": 0.8
+      },
+      {
+        "expand_num": 2,
+        "strategy_key": "__DISCOVER__",
+        "strategy_desc": "Descoberta Aut\u00f4noma de Reflexo (Tabula Rasa)",
+        "depth": 1,
+        "parent_score": 0.6731370558375634
+      },
+      {
+        "expand_num": 3,
+        "strategy_key": "__DISCOVER__",
+        "strategy_desc": "Descoberta Aut\u00f4noma de Reflexo (Tabula Rasa)",
+        "depth": 1,
+        "parent_score": 0.5801827411167513
+      },
+      {
+        "expand_num": 4,
+        "strategy_key": "mutador_cognitivo",
+        "strategy_desc": "Mutador Cognitivo",
+        "depth": 1,
+        "parent_score": 0.5337055837563451
+      },
+      {
+        "expand_num": 5,
+        "strategy_key": "__DISCOVER__",
+        "strategy_desc": "Descoberta Aut\u00f4noma de Reflexo (Tabula Rasa)",
+        "depth": 1,
+        "parent_score": 0.5362192893401014
+      }
+    ],
+    "level_one_nodes": [
+      {
+        "strategy": "mutador_cognitivo",
+        "score": 0.5750253807106599,
+        "visits": 1,
+        "reward": 0.8950253807106598,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "__DISCOVER__",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "__DISCOVER__",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "mutador_cognitivo",
+        "score": 0.5750253807106599,
+        "visits": 1,
+        "reward": 0.8950253807106598,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "__DISCOVER__",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      }
+    ],
+    "total_expansions": 5,
+    "run": 8
+  },
+  {
+    "best_reward": 0.8950253807106598,
+    "best_score": 0.5750253807106599,
+    "best_depth": 1,
+    "best_strategy": "mutador_cognitivo",
+    "first_3_strategies": [
+      "mutador_cognitivo",
+      "__DISCOVER__",
+      "mutador_cognitivo"
+    ],
+    "expansion_order": [
+      {
+        "expand_num": 1,
+        "strategy_key": "mutador_cognitivo",
+        "strategy_desc": "Mutador Cognitivo",
+        "depth": 1,
+        "parent_score": 0.8
+      },
+      {
+        "expand_num": 2,
+        "strategy_key": "__DISCOVER__",
+        "strategy_desc": "Descoberta Aut\u00f4noma de Reflexo (Tabula Rasa)",
+        "depth": 1,
+        "parent_score": 0.6731370558375634
+      },
+      {
+        "expand_num": 3,
+        "strategy_key": "mutador_cognitivo",
+        "strategy_desc": "Mutador Cognitivo",
+        "depth": 1,
+        "parent_score": 0.5801827411167513
+      },
+      {
+        "expand_num": 4,
+        "strategy_key": "__DISCOVER__",
+        "strategy_desc": "Descoberta Aut\u00f4noma de Reflexo (Tabula Rasa)",
+        "depth": 1,
+        "parent_score": 0.5717055837563452
+      },
+      {
+        "expand_num": 5,
+        "strategy_key": "__DISCOVER__",
+        "strategy_desc": "Descoberta Aut\u00f4noma de Reflexo (Tabula Rasa)",
+        "depth": 1,
+        "parent_score": 0.5362192893401014
+      }
+    ],
+    "level_one_nodes": [
+      {
+        "strategy": "mutador_cognitivo",
+        "score": 0.5750253807106599,
+        "visits": 1,
+        "reward": 0.8950253807106598,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "__DISCOVER__",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "mutador_cognitivo",
+        "score": 0.5750253807106599,
+        "visits": 1,
+        "reward": 0.8950253807106598,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "__DISCOVER__",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
+        "depth": 1,
+        "instruction_len": 197
+      },
+      {
+        "strategy": "__DISCOVER__",
+        "score": 0.4150253807106599,
+        "visits": 1,
+        "reward": 0.7350253807106599,
         "depth": 1,
         "instruction_len": 197
       }

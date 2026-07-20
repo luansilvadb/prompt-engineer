@@ -71,7 +71,8 @@ class Optimizer:
 
         self._expansion_order: list[dict] = []
         self._expand_count: int = 0
-        self._llm_call_count: int = 0   # contador de chamadas LLM para metricas de custo
+        self._llm_call_count: int = 0    # contador de chamadas LLM da iteração atual
+        self._total_llm_calls: int = 0   # acumulado cumulativo da sessão inteira (BUG-2 fix)
 
         strategy_stats = self.experience_store.get_strategy_stats()
         if strategy_stats:
@@ -96,6 +97,7 @@ class Optimizer:
     def _count_llm_call(self, n: int = 1) -> None:
         """Registra chamadas LLM para metricas de custo."""
         self._llm_call_count += n
+        self._total_llm_calls += n  # BUG-2 fix: acumulador cumulativo nunca é zerado
 
     def _emit_cost_event(self, iteration: int) -> None:
         """Emite evento de custo apos cada iteracao MCTS."""
@@ -107,7 +109,7 @@ class Optimizer:
             estimated_tokens=estimated_tokens,
             job_id=self.job_id,
         ))
-        self._llm_call_count = 0  # reset para proxima iteracao
+        self._llm_call_count = 0  # reset apenas o contador da iteração atual
 
     def selection(self, node: MCTSNode) -> MCTSNode:
         """Seleção UCB com progressive widening."""
@@ -338,12 +340,15 @@ class Optimizer:
                     fallback_found = True
                     break
             if not fallback_found:
-                self._emitter.emit_log('    [!] Todas as estratégias falharam. Mantendo a atual.')
-                break
+                # BUG-1 fix: sem nova estratégia disponível e a atual já falhou.
+                # Retornar leaf evita criar filho idêntico ao pai (instrucao=leaf.instruction).
+                self._emitter.emit_log('    [!] Todas as estratégias falharam. Retornando nó pai sem expansão.')
+                return leaf
         else:
-            self._emitter.emit_error('[!] Falha em gerar nova instrução após 3 tentativas. Usando variação mínima.')
-            nova_instrucao = f'{leaf.instruction}\n '
-            critica = 'Fallback automático.'
+            # BUG-1 fix: todas as 3 tentativas usadas sem sucesso.
+            # Retorna o próprio nó pai sem criar filho inútil.
+            self._emitter.emit_error('[!] Falha em gerar nova instrução após 3 tentativas. Retornando nó pai sem expansão.')
+            return leaf
 
         child = MCTSNode(
             nova_instrucao,
@@ -552,9 +557,21 @@ class Optimizer:
         ]
 
     def _select_and_log_best_node(self, root: MCTSNode) -> MCTSNode:
-        """Retorna o melhor nó (por score) para uso em experimentos."""
+        """Retorna o melhor nó (por score) para uso em experimentos.
+
+        BUG-3 fix: raiz (depth=0) é excluída da competição. A raiz representa
+        a skill original — se ela fosse selecionada significaria que nenhum filho
+        superou o ponto de partida. Esse caso já é tratado separadamente em
+        _format_best_node via `if best_node == root`. Excluir aqui evita
+        que o gamma-discount diluído da raiz (que acumula muitas visitas)
+        vença por volume em runs curtos (≤ 5 iterações).
+        """
         all_nodes = self._get_all_nodes(root)
-        best_node = max(all_nodes, key=lambda n: (
+        # BUG-3 fix: filtra a raiz; se só existir a raiz, retorna ela como fallback
+        candidate_nodes = [n for n in all_nodes if n.depth > 0]
+        if not candidate_nodes:
+            return root  # fallback: nenhum filho gerado ainda
+        best_node = max(candidate_nodes, key=lambda n: (
             n.q_value / max(1, n.visits),
             n.visits,
             n.depth,
