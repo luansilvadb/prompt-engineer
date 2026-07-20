@@ -185,9 +185,9 @@ def _parse_manteve_regras(manteve_str: str) -> bool:
 
     Edge cases cobertos:
     - "True", "true", "TRUE" → True
-    - "true, com ressalvas" → True (contem 'true')
+    - "true, com ressalvas" → True
     - "False", "false", "FALSE" → False
-    - "false, a lei foi removida" → False (nao contem 'true')
+    - "false, a lei foi removida" → False
     - "" (vazio) → False
     - None → False
     - "1" → True
@@ -201,18 +201,26 @@ def _parse_manteve_regras(manteve_str: str) -> bool:
     manteve_str = str(manteve_str).strip().lower()
     if not manteve_str:
         return False
-    # Marcadores que indicam FALSO explicitamente — checados primeiro
-    # para evitar que "false" contenha substrings de "true"
-    false_markers = ['false', 'não', 'nao', 'no', '0']
-    if any(m == manteve_str or manteve_str.startswith(m) for m in false_markers):
+
+    # Marcadores de início direto (se começar dizendo 'false', é False)
+    if manteve_str.startswith('false') or manteve_str.startswith('falso'):
         return False
-    # Negacao composta: "untrue", "un-true", "antitrue" etc.
-    # "untrue" contem 'true' como substring mas significa o oposto
-    if manteve_str.startswith('un') and 'true' in manteve_str:
+    
+    if manteve_str.startswith('true') or manteve_str.startswith('verdadeiro') or manteve_str.startswith('sim') or manteve_str.startswith('yes'):
+        return True
+
+    # Usar regex para buscar palavras completas (evita que '1' na frase 'Fase 1' valide como True)
+    import re
+    matches = re.findall(r'\b(false|falso|não|nao|true|verdadeiro|sim|yes)\b', manteve_str)
+    
+    if not matches:
         return False
-    # Marcadores que indicam VERDADEIRO
-    true_markers = ['true', 'sim', 'yes', '1']
-    return any(m in manteve_str for m in true_markers)
+        
+    first_marker = matches[0]
+    if first_marker in ['false', 'falso', 'não', 'nao']:
+        return False
+        
+    return True
 
 
 def _parse_defeitos(defeitos_raw) -> list[str]:

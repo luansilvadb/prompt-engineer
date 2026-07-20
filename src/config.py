@@ -1,15 +1,18 @@
 import os
+import sys
 import dspy
 import litellm
 from pathlib import Path
 from dotenv import load_dotenv
 
 def _get_env_path() -> Path:
-    """Caminho absoluto para o .env do projeto (src/outputs/.env).
-    
-    Baseado em __file__ para funcionar em qualquer CWD e em builds PyInstaller.
-    """
-    return Path(__file__).resolve().parent / 'outputs' / '.env'
+    """Retorna o caminho para o arquivo .env, suportando execução local e PyInstaller."""
+    if getattr(sys, 'frozen', False):
+        # Build PyInstaller: o .env deve ficar na mesma pasta do executável
+        return Path(sys.executable).parent / '.env'
+    else:
+        # Dev local: .env fica na raiz do projeto (acima da pasta src)
+        return Path(__file__).resolve().parent.parent / '.env'
 
 def _resolve_api_key(api_key: str = None) -> str:
     return api_key or os.environ.get("API_KEY") or os.environ.get("NVIDIA_API_KEY") or os.environ.get("OPENAI_API_KEY", "sk-1234")
@@ -57,11 +60,10 @@ def setup(model_name=None, model_prefix=None, api_base=None, api_key=None):
     }
 
     _apply_model_quirks(final_model_name, kwargs)
-    # num_retries=0: desativa o retry automático do dspy (default=3).
-    # Com retries, 1 chamada LLM travada custa (1+3)×timeout=360s em vez de 90s,
-    # estourando o budget por iteração do MCTS. O runner.py já tem fail-fast
-    # próprio com 3 tentativas no nível do optimizer — retry duplo é perigoso.
-    lm = dspy.LM(**kwargs, num_retries=0)
+    # Com retries, 1 chamada LLM travada custa mais caro, porém 1 retry (default) ajuda com
+    # rate limits ou erros transientes sem estourar o budget do MCTS excessivamente.
+    dspy_num_retries = int(os.environ.get("DSPY_NUM_RETRIES", "1"))
+    lm = dspy.LM(**kwargs, num_retries=dspy_num_retries)
     try:
         dspy.configure(lm=lm)
     except RuntimeError:
