@@ -202,8 +202,13 @@ def _parse_manteve_regras(manteve_str: str) -> bool:
     if not manteve_str:
         return False
 
+    if manteve_str == '1':
+        return True
+    if manteve_str == '0':
+        return False
+
     # Marcadores de início direto (se começar dizendo 'false', é False)
-    if manteve_str.startswith('false') or manteve_str.startswith('falso'):
+    if manteve_str.startswith('false') or manteve_str.startswith('falso') or manteve_str.startswith('not') or manteve_str.startswith('un'):
         return False
     
     if manteve_str.startswith('true') or manteve_str.startswith('verdadeiro') or manteve_str.startswith('sim') or manteve_str.startswith('yes'):
@@ -211,13 +216,13 @@ def _parse_manteve_regras(manteve_str: str) -> bool:
 
     # Usar regex para buscar palavras completas (evita que '1' na frase 'Fase 1' valide como True)
     import re
-    matches = re.findall(r'\b(false|falso|não|nao|true|verdadeiro|sim|yes)\b', manteve_str)
+    matches = re.findall(r'\b(false|falso|não|nao|not|no|true|verdadeiro|sim|yes)\b', manteve_str)
     
     if not matches:
         return False
         
     first_marker = matches[0]
-    if first_marker in ['false', 'falso', 'não', 'nao']:
+    if first_marker in ['false', 'falso', 'não', 'nao', 'not', 'no']:
         return False
         
     return True

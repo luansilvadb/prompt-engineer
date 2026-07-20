@@ -18,10 +18,10 @@ def wait_for_port(port, host='127.0.0.1', timeout=10.0):
     start_time = time.time()
     while True:
         try:
-            with socket.create_connection((host, port), timeout=0.5):
+            with socket.create_connection((host, port), timeout=0.1):
                 return True
         except OSError:
-            time.sleep(0.1)
+            time.sleep(0.05)
             if time.time() - start_time > timeout:
                 return False
 
@@ -40,20 +40,22 @@ class APIServer(threading.Thread):
 
 if __name__ == '__main__':
     port = get_free_port()
-    
-    # Start the FastAPI server in a separate thread
     api_thread = APIServer(port)
     api_thread.start()
 
-    # Poll until the server is ready instead of a blind sleep
+    print(f"Waiting for port {port}...")
     if not wait_for_port(port):
-        print(f"Failed to start API server on port {port}.")
+        print("Failed to start API server.")
         sys.exit(1)
-
-    # Create and start the webview window pointing to our local server
-    window = webview.create_window('Skill Optimizer', f'http://127.0.0.1:{port}', width=1280, height=720, maximized=True)
     
-    # Register graceful shutdown
-    window.events.closed += lambda: api_thread.stop()
+    print("Server started successfully.")
     
-    webview.start()
+    # Simulating webview logic by stopping server after 2 seconds
+    time.sleep(2)
+    print("Stopping server...")
+    api_thread.stop()
+    api_thread.join(timeout=3)
+    if api_thread.is_alive():
+        print("Server thread did not stop in time.")
+    else:
+        print("Server stopped gracefully.")
