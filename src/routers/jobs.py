@@ -10,11 +10,10 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from loguru import logger
 
-from src.schemas import OtimizacaoRequestDTO
+from src.schemas import OtimizacaoRequestDTO, ConfigRequestDTO, ConfigResponseDTO
 from src.state import JobState, jobs
 import src.store as job_store
-from src.teleprompter import compilar_avaliador
-from src.config import setup
+from src.config import _get_env_path
 
 # ── Router ────────────────────────────────────────────────────────────────────
 router = APIRouter(prefix="/api", tags=["Jobs"])
@@ -38,34 +37,6 @@ def _resolve_max_job_duration() -> int:
         return 30 * 60
 
 MAX_JOB_DURATION_SECONDS = _resolve_max_job_duration()
-
-# Timeout máximo da verificação de drift (P1-C2). Calculado dinamicamente
-# considerando o paralelismo: _measure_all_probes usa ThreadPoolExecutor com
-# max_workers=4. O tempo total é O(ceil(n_probes/4) × reps × 8s) + 10s buffer.
-# Fallback: 100s se o golden set não puder ser inspecionado.
-# Ex: 11 probes, 4 workers, 3 reps → ceil(11/4)=3 × 3 × 8s + 10s = 82s.
-def _resolve_drift_check_timeout() -> int:
-    import math
-    try:
-        from pathlib import Path
-        import json
-        golden_path = Path('src/outputs/golden/golden_set.json')
-        if golden_path.exists():
-            data = json.loads(golden_path.read_text(encoding='utf-8'))
-            n_probes = len(data.get('probes', []))
-            if n_probes > 0:
-                from src.config import get_drift_thresholds
-                cfg = get_drift_thresholds()
-                reps = cfg.get('repetitions', 3)
-                max_workers = 4  # mesmo valor do ThreadPoolExecutor em metrics.py
-                probes_per_worker = math.ceil(n_probes / max_workers)
-                # 12s por chamada LLM (latência observada com o modelo atual: ~10-11s/call) + 15s buffer
-                return max(120, probes_per_worker * reps * 12 + 15)
-    except Exception:
-        pass
-    return 100
-
-DRIFT_CHECK_TIMEOUT_SECONDS = _resolve_drift_check_timeout()
 
 # ── Health Check ──────────────────────────────────────────────────────────────
 @router.get("/health")
@@ -325,124 +296,65 @@ async def stream_progress(job_id: str):
     return EventSourceResponse(_live_event_generator(job))
 
 
-# ── Judge ─────────────────────────────────────────────────────────────────────
-@router.post("/train-judge")
-async def train_judge():
-    # setup() deve rodar na thread do event loop — dspy.configure() só pode ser
-    # chamado pela thread que fez a configuração inicial. Passar o lm como
-    # argumento evita reconfigurar o singleton dentro da thread worker.
-    lm = setup()
+# ── Config (Desktop .env persistence) ────────────────────────────────────────
 
-    def _run():
-        try:
-            status = compilar_avaliador(lm=lm)
-            return status
-        except Exception as e:
-            logger.opt(exception=True).error("Falha ao treinar juiz")
-            return str(e)
+from dotenv import load_dotenv as _reload_dotenv
 
-    result = await asyncio.to_thread(_run)
-    if result == "compiled":
-        return {"status": "success", "message": "Avaliador recompilado e validado contra o golden set."}
-    elif result == "golden_required":
-        raise HTTPException(
-            status_code=428,
-            detail="Golden set ausente. Candidato descartado para evitar model collapse. Crie o golden set antes de treinar o avaliador."
-        )
-    elif result == "drift_rejected":
-        raise HTTPException(status_code=422, detail="Candidato rejeitado pelo portão de drift. Juiz atual preservado.")
-    elif result == "measurement_error":
-        raise HTTPException(status_code=500, detail="Falha ao medir drift (golden presente). Candidato descartado (fail-closed).")
-    elif result == "no_data":
-        raise HTTPException(status_code=400, detail="Falta histórico positivo (score > 0.8) ou treinamento em andamento.")
-    else:
-        raise HTTPException(status_code=500, detail=f"Erro: {result}")
+_ENV_PATH = _get_env_path()
 
-
-@router.post("/check-drift")
-async def check_drift():
-    from src.config import get_drift_thresholds
-    from src.drift.models import DriftThresholds
-    from src.drift.circuit_breaker import verificar_juiz_atual, _execute_circuit_breaker, _has_api_key
-    from src.drift.cache import save_drift_cache
-    from src.drift.history import append_drift_report
-    from pathlib import Path
-
-    # Pre-flight (P1-C5): distinção no endpoint entre 'no_golden' e 'no_api_key'.
-    # Mapeia para status distintos para o frontend exibir mensagem específica.
-    golden_path = Path('src/outputs/golden/golden_set.json')
-    has_golden = golden_path.exists() and golden_path.stat().st_size > 0
-    if not has_golden:
-        return {"status": "no_golden", "message": "Golden set ausente; nada a medir."}
-    if not _has_api_key():
-        model_path = Path('src/outputs/models/avaliador_modo_b_otimizado.json')
-        if not model_path.exists():
-            return {
-                "status": "no_api_key",
-                "message": "Nenhuma API key configurada e juiz não treinado. Configure API_KEY/OPENAI_API_KEY/NVIDIA_API_KEY no .env.",
-            }
-
-    # setup() na thread do event loop — mesmo motivo de train_judge.
-    setup()
-
-    def _run():
-        try:
-            cfg = get_drift_thresholds()
-            thresholds = DriftThresholds.from_config(cfg)
-            report = verificar_juiz_atual(thresholds, cfg["repetitions"])
-            if report is None:
-                return {"status": "no_golden", "message": "Golden set ausente; nada a medir."}
-
-            decision = _execute_circuit_breaker(report)
-            save_drift_cache(report)
-            append_drift_report(
-                report,
-                triggered_cb=not decision.accept,
-                cb_reason=decision.reason if not decision.accept else None,
-            )
-            return {
-                "status": "ok",
-                "report": report.to_dict(),
-                "circuit_breaker": {"accept": decision.accept, "reason": decision.reason},
-            }
-        except Exception as e:
-            logger.opt(exception=True).error("Falha ao verificar drift")
-            return {"status": "error", "message": str(e)}
-
-    # P1-C2: teto absoluto de tempo. Se excedido, retorna 504 (frontend tem
-    # AbortController de 120s como última linha de defesa). O fail-fast do
-    # runner (60s) já deve abortar antes em cascata de infra.
-    try:
-        result = await asyncio.wait_for(asyncio.to_thread(_run), timeout=DRIFT_CHECK_TIMEOUT_SECONDS)
-    except asyncio.TimeoutError:
-        logger.warning("check-drift excedeu timeout de {}s", DRIFT_CHECK_TIMEOUT_SECONDS)
-        raise HTTPException(
-            status_code=504,
-            detail=f"Verificação de drift excedeu o tempo máximo de {DRIFT_CHECK_TIMEOUT_SECONDS}s. Tente novamente.",
-        )
-
-    if result.get("status") == "error":
-        raise HTTPException(status_code=500, detail=result["message"])
+def _read_dotenv() -> dict[str, str]:
+    """Lê chave=valor do .env, retorna dict. Linhas vazias/comentários ignorados."""
+    result: dict[str, str] = {}
+    if not _ENV_PATH.exists():
+        return result
+    for line in _ENV_PATH.read_text(encoding='utf-8').splitlines():
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+        if '=' in line:
+            key, _, value = line.partition('=')
+            result[key.strip()] = value.strip().strip('"').strip("'")
     return result
 
+def _write_dotenv(updates: dict[str, str]) -> None:
+    """Atualiza/insere/remove chaves no .env preservando o restante do arquivo."""
+    _ENV_PATH.parent.mkdir(parents=True, exist_ok=True)
+    current = _read_dotenv()
+    for k, v in updates.items():
+        if v == '':
+            current.pop(k, None)
+        else:
+            current[k] = v
+    lines = [f'{k}={v}' for k, v in current.items()]
+    _ENV_PATH.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+    # Recarregar os.environ para refletir mudanças imediatamente
+    _reload_dotenv(_ENV_PATH, override=True)
 
-@router.get("/drift-history")
-async def drift_history(limit: int = 50):
-    from src.drift.history import load_drift_history
+@router.get("/config", response_model=ConfigResponseDTO)
+async def get_config():
+    env = _read_dotenv()
+    has_key = bool(env.get('API_KEY'))
+    return ConfigResponseDTO(
+        modelName=env.get('MODEL_NAME', ''),
+        modelPrefix=env.get('MODEL_PREFIX', ''),
+        apiBase=env.get('API_BASE', ''),
+        hasApiKey=has_key,
+    )
 
-    entries = load_drift_history()
-    return {
-        "status": "ok",
-        "total": len(entries),
-        "entries": entries[:limit],
-    }
+@router.post("/config")
+async def save_config(body: ConfigRequestDTO):
+    updates: dict[str, str] = {}
+    mapping = [
+        ('modelName', 'MODEL_NAME'),
+        ('modelPrefix', 'MODEL_PREFIX'),
+        ('apiBase', 'API_BASE'),
+        ('apiKey', 'API_KEY'),
+    ]
+    for attr, env_key in mapping:
+        value = getattr(body, attr, None)
+        if value is not None:
+            updates[env_key] = value
 
+    _write_dotenv(updates)
 
-@router.get("/drift-status")
-async def drift_status():
-    from src.drift.cache import load_drift_cache
-
-    cache = load_drift_cache()
-    if cache is None:
-        return {"status": "no_cache", "message": "Nenhuma medição de drift disponível."}
-    return {"status": "ok", "report": cache.to_dict()}
+    return {"status": "ok", "message": "Configurações salvas no .env"}

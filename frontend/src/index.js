@@ -3,13 +3,10 @@ import { ConfigViewModel } from './viewmodels/ConfigViewModel.js';
 import { TreeViewModel } from './viewmodels/TreeViewModel.js';
 import { ConsoleViewModel } from './viewmodels/ConsoleViewModel.js';
 import { HistoryViewModel } from './viewmodels/HistoryViewModel.js';
-import { JudgeViewModel } from './viewmodels/JudgeViewModel.js';
-
 import { ConfigView } from './views/ConfigView.js';
 import { TreeView } from './views/TreeView.js';
 import { ConsoleView } from './views/ConsoleView.js';
 import { HistoryView } from './views/HistoryView.js';
-import { JudgeView } from './views/JudgeView.js';
 
 import { connectSSE } from './sse.js';
 import { parseMarkdown, computeDiff } from './utils.js';
@@ -21,14 +18,11 @@ const configVm = new ConfigViewModel();
 const treeVm = new TreeViewModel();
 const consoleVm = new ConsoleViewModel();
 const historyVm = new HistoryViewModel();
-const judgeVm = new JudgeViewModel();
-
 // ── Inicializar Views ───────────────────────────────────────────────────────
 const configView = new ConfigView(configVm);
 const treeView = new TreeView(treeVm);
 const consoleView = new ConsoleView(consoleVm);
 const historyView = new HistoryView(historyVm);
-const judgeView = new JudgeView(judgeVm);
 
 // ── Estado de orquestração local ────────────────────────────────────────────
 let activeEventSource = null;
@@ -39,7 +33,7 @@ let stateOptimizedSkill = '';
 // ── Mensagem inicial no console ─────────────────────────────────────────────
 consoleVm.addLogsInstant(['[*] Aguardando início do processo...']);
 
-// ── Carregar configurações do localStorage ──────────────────────────────────
+// ── Carregar configurações do .env (via API) ───────────────────────────────
 configVm.loadFromStorage();
 
 // ── Health Check: polling a cada 30s ────────────────────────────────────────
@@ -58,12 +52,6 @@ async function checkApiHealth() {
 }
 checkApiHealth();
 setInterval(checkApiHealth, 30000);
-
-// ── Iniciar polling do badge de drift (a cada 60s) ─────────────────────────
-judgeVm.fetchDriftStatus();
-setInterval(() => {
-    judgeVm.fetchDriftStatus();
-}, 60000);
 
 // ── Funções globais de UI ───────────────────────────────────────────────────
 export function updateStatus(status, text) {
@@ -91,11 +79,6 @@ export function setUIRunning(running) {
         el.progressBarFill.style.width = '100%';
     }
 }
-
-// ── Escuta por mudanças de status vindas da JudgeView ───────────────────────
-judgeView.addEventListener('statusChanged', (e) => {
-    updateStatus(e.detail.status, e.detail.text);
-});
 
 // ── Tabs do painel de resultados ────────────────────────────────────────────
 el.tabBtnOptimized.addEventListener('click', () => {
@@ -149,11 +132,6 @@ function closeAllModals() {
     // Fecha modal de detalhe de nó
     if (el.nodeModal && el.nodeModal.style.display === 'flex') {
         el.nodeModal.style.display = 'none';
-    }
-    // Fecha modal de drift
-    const driftOverlay = document.getElementById('drift-modal-overlay');
-    if (driftOverlay && driftOverlay.style.display === 'flex') {
-        driftOverlay.style.display = 'none';
     }
     // Fecha modal de histórico
     const historyModal = document.getElementById('history-modal');

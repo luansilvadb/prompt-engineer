@@ -75,6 +75,7 @@ Thumbs.db
 src/outputs/logs/
 src/outputs/skills/
 src/outputs/jobs/
+src/outputs/.env
 drift_report*.json
 
 # ==============================================================================

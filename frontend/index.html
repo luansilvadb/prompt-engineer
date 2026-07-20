@@ -34,15 +34,6 @@
                     <span class="status-indicator idle" id="global-status-indicator"></span>
                     <span id="global-status-text">Pronto</span>
                 </div>
-                <span class="drift-health-badge unknown" id="drift-health-badge"
-                    title="Nenhuma medição de drift disponível">
-                    <i class="fa-solid fa-circle-question"></i> Drift: ?
-                </span>
-                <button type="button" class="btn-secondary" id="btn-train-judge"><i
-                        class="fa-solid fa-graduation-cap"></i> Treinar Juiz</button>
-                <button type="button" class="btn-secondary" id="btn-check-drift"
-                    title="Mede o juiz atual contra o golden set e dispara o circuit breaker se o hard-gate cair"><i
-                        class="fa-solid fa-shield-halved"></i> Verificar Drift</button>
                 <button type="button" class="btn-secondary" id="btn-open-history"><i
                         class="fa-solid fa-clock-rotate-left"></i> Histórico</button>
             </div>
@@ -56,18 +47,27 @@
                 <div class="panel glass">
                     <div class="panel-header">
                         <h2><i class="fa-solid fa-sliders"></i> Configuração do Agente</h2>
-                        <button type="button" class="btn-toggle" id="btn-toggle-config" aria-expanded="true"
-                            aria-controls="config-fields" aria-label="Recolher painel de configuração"
-                            title="Recolher painel de configuração"><i class="fa-solid fa-chevron-up"></i></button>
+                        <div class="panel-header-actions">
+                            <span class="save-indicator" id="save-indicator" style="display: none;">
+                                <i class="fa-solid fa-check"></i> Salvo
+                            </span>
+                            <button type="button" class="btn-icon" id="btn-save-config" title="Salvar configurações"
+                                aria-label="Salvar configurações">
+                                <i class="fa-solid fa-floppy-disk"></i>
+                            </button>
+                            <button type="button" class="btn-toggle" id="btn-toggle-config" aria-expanded="true"
+                                aria-controls="config-fields" aria-label="Recolher painel de configuração"
+                                title="Recolher painel de configuração"><i class="fa-solid fa-chevron-up"></i></button>
+                        </div>
                     </div>
                     <div class="panel-body" id="config-fields">
                         <div class="form-group">
                             <label for="model-name">Modelo de IA <small>(LiteLLM Target)</small></label>
-                            <input type="text" id="model-name" placeholder="ex: minimax-m2.7, gemma-4" value="glm-5.2">
+                            <input type="text" id="model-name" placeholder="ex: minimax-m2.7, gemma-4">
                         </div>
                         <div class="form-group">
                             <label for="model-prefix">Prefixo do Provedor <small>(Opcional)</small></label>
-                            <input type="text" id="model-prefix" placeholder="ex: nvidia_nim" value="zhipu">
+                            <input type="text" id="model-prefix" placeholder="ex: nvidia_nim">
                         </div>
                         <div class="form-group">
                             <label for="api-base">API Base URL <small>(Opcional)</small></label>
@@ -236,21 +236,6 @@
                         <pre class="modal-text-block monospace" id="modal-node-instruction">-</pre>
                     </div>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal for Drift Check Result -->
-    <div class="modal-overlay" id="drift-modal-overlay">
-        <div class="modal glass drift-modal-content">
-            <div class="modal-header">
-                <h3 id="drift-modal-title"><i class="fa-solid fa-shield-halved"></i> Verificação de Drift</h3>
-                <button type="button" class="btn-close-modal" id="btn-close-drift"
-                    aria-label="Fechar resultado de drift" title="Fechar resultado de drift"><i
-                        class="fa-solid fa-xmark"></i></button>
-            </div>
-            <div class="modal-body" id="drift-modal-body">
-                <!-- Renderizado via DriftView.js -->
             </div>
         </div>
     </div>

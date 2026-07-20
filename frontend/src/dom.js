@@ -5,6 +5,8 @@ export const el = {
     apiKey: document.getElementById('api-key'),
     btnToggleKey: document.getElementById('btn-toggle-key-visibility'),
     btnToggleConfig: document.getElementById('btn-toggle-config'),
+    btnSaveConfig: document.getElementById('btn-save-config'),
+    saveIndicator: document.getElementById('save-indicator'),
     configFields: document.getElementById('config-fields'),
     newRuleInput: document.getElementById('new-rule-input'),
     btnAddRule: document.getElementById('btn-add-rule'),
@@ -34,8 +36,6 @@ export const el = {
     globalStatusText: document.getElementById('global-status-text'),
     // History Modal
     btnOpenHistory: document.getElementById('btn-open-history'),
-    btnTrainJudge: document.getElementById('btn-train-judge'),
-    btnCheckDrift: document.getElementById('btn-check-drift'),
     btnCloseHistory: document.getElementById('btn-close-history'),
     historyModal: document.getElementById('history-modal'),
     historyTableBody: document.getElementById('history-table-body'),
@@ -50,11 +50,4 @@ export const el = {
     modalNodeVisits: document.getElementById('modal-node-visits'),
     modalNodeCritica: document.getElementById('modal-node-critica'),
     modalNodeInstruction: document.getElementById('modal-node-instruction'),
-    // Drift Modal
-    driftModalOverlay: document.getElementById('drift-modal-overlay'),
-    driftModalTitle: document.getElementById('drift-modal-title'),
-    driftModalBody: document.getElementById('drift-modal-body'),
-    btnCloseDrift: document.getElementById('btn-close-drift'),
-    // Drift Health Badge
-    driftHealthBadge: document.getElementById('drift-health-badge'),
 };

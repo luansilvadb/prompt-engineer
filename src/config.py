@@ -1,7 +1,15 @@
 import os
 import dspy
 import litellm
+from pathlib import Path
 from dotenv import load_dotenv
+
+def _get_env_path() -> Path:
+    """Caminho absoluto para o .env do projeto (src/outputs/.env).
+    
+    Baseado em __file__ para funcionar em qualquer CWD e em builds PyInstaller.
+    """
+    return Path(__file__).resolve().parent / 'outputs' / '.env'
 
 def _resolve_api_key(api_key: str = None) -> str:
     return api_key or os.environ.get("API_KEY") or os.environ.get("NVIDIA_API_KEY") or os.environ.get("OPENAI_API_KEY", "sk-1234")
@@ -30,7 +38,7 @@ def _apply_model_quirks(model_name: str, kwargs: dict) -> None:
         kwargs["timeout"] = 90
 
 def setup(model_name=None, model_prefix=None, api_base=None, api_key=None):
-    load_dotenv()
+    load_dotenv(_get_env_path())
     os.environ['LITELLM_LOG'] = 'DEBUG' # Habilita logs reais de debug do litellm
     litellm.drop_params = True
 
@@ -73,7 +81,7 @@ def get_drift_thresholds() -> dict:
     - variance_low_confidence: variância por probe acima disto = baixa confiança.
     - repetitions: quantas vezes cada probe é medido (LLM é estocástico).
     """
-    load_dotenv()
+    load_dotenv(_get_env_path())
     return {
         'spearman_floor': float(os.environ.get('DRIFT_SPEARMAN_FLOOR', '0.8')),
         'spearman_regression_margin': float(os.environ.get('DRIFT_SPEARMAN_REGRESSION_MARGIN', '0.05')),

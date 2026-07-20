@@ -1303,195 +1303,78 @@ textarea:focus {
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   Drift Health Badge (header)
+   Panel Header Actions (Salvar Configurações)
    ══════════════════════════════════════════════════════════════════ */
 
-.drift-health-badge {
+.panel-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-icon {
+    background: none;
+    border: 1px solid var(--border-glass);
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 13px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    transition: var(--transition-snappy);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.btn-icon:hover {
+    color: var(--color-primary);
+    border-color: var(--border-active);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.btn-icon:active {
+    transform: scale(0.95);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+/* Save Indicator "Salvo ✓" */
+.save-indicator {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 4px 12px;
-    border-radius: 6px;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: var(--transition-snappy);
-    border: 1px solid var(--border-glass);
-}
-
-.drift-health-badge:hover {
-    border-color: var(--border-active);
-}
-
-.drift-health-badge.ok {
-    color: var(--color-success);
-    border-color: rgba(23, 201, 100, 0.25);
-    background: rgba(23, 201, 100, 0.06);
-}
-
-.drift-health-badge.warning {
-    color: var(--color-warning);
-    border-color: rgba(245, 166, 35, 0.25);
-    background: rgba(245, 166, 35, 0.06);
-}
-
-.drift-health-badge.danger {
-    color: var(--color-danger);
-    border-color: rgba(243, 18, 96, 0.25);
-    background: rgba(243, 18, 96, 0.06);
-}
-
-.drift-health-badge.unknown {
-    color: var(--text-muted);
-}
-
-/* ══════════════════════════════════════════════════════════════════
-   Drift Modal Content
-   ══════════════════════════════════════════════════════════════════ */
-
-.drift-modal-content {
-    max-width: 640px;
-    width: 90%;
-}
-
-.drift-status {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 14px 18px;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 600;
-    margin-bottom: 20px;
-}
-
-.drift-status-ok {
-    color: var(--color-success);
-    background: rgba(23, 201, 100, 0.08);
-    border: 1px solid rgba(23, 201, 100, 0.2);
-}
-
-.drift-status-warning {
-    color: var(--color-warning);
-    background: rgba(245, 166, 35, 0.08);
-    border: 1px solid rgba(245, 166, 35, 0.2);
-}
-
-.drift-status-danger {
-    color: var(--color-danger);
-    background: rgba(243, 18, 96, 0.08);
-    border: 1px solid rgba(243, 18, 96, 0.2);
-}
-
-.drift-metrics-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-    margin-bottom: 20px;
-}
-
-.drift-metric {
-    background: var(--bg-surface);
-    border: 1px solid var(--border-glass);
-    border-radius: 8px;
-    padding: 12px;
-    text-align: center;
-}
-
-.drift-metric-label {
-    display: block;
+    gap: 4px;
     font-size: 11px;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 6px;
-}
-
-.drift-metric-value {
-    display: block;
-    font-size: 16px;
-    font-weight: 700;
-    font-family: var(--font-mono);
-    color: var(--text-main);
-}
-
-.drift-metric-value.good {
-    color: var(--color-success);
-}
-
-.drift-metric-value.warn {
-    color: var(--color-warning);
-}
-
-.drift-metric-value.bad {
-    color: var(--color-danger);
-}
-
-.drift-timestamp {
-    font-size: 11px;
-    font-weight: 400;
-    color: var(--text-muted);
-}
-
-.drift-section {
-    margin-bottom: 16px;
-}
-
-.drift-section h4 {
-    font-size: 13px;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 8px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.drift-mae-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12px;
-}
-
-.drift-mae-table th,
-.drift-mae-table td {
-    padding: 8px 12px;
-    text-align: left;
-    border-bottom: 1px solid var(--border-glass);
-}
-
-.drift-mae-table th {
-    color: var(--text-muted);
     font-weight: 600;
-    text-transform: uppercase;
+    color: var(--color-success);
+    white-space: nowrap;
+    user-select: none;
+}
+
+.save-indicator i {
     font-size: 10px;
-    letter-spacing: 0.5px;
 }
 
-.drift-mae-table td {
-    font-family: var(--font-mono);
-    color: var(--text-main);
+/* Animações do save indicator */
+@keyframes saveIndicatorFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-4px) scale(0.9);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
 }
 
-.drift-decision {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 12px 16px;
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 500;
-}
+@keyframes saveIndicatorFadeOut {
+    from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
 
-.drift-decision.accept {
-    color: var(--color-success);
-    background: rgba(23, 201, 100, 0.06);
-    border: 1px solid rgba(23, 201, 100, 0.15);
-}
-
-.drift-decision.reject {
-    color: var(--color-danger);
-    background: rgba(243, 18, 96, 0.06);
-    border: 1px solid rgba(243, 18, 96, 0.15);
+    to {
+        opacity: 0;
+        transform: translateY(2px) scale(0.95);
+    }
 }
