@@ -338,3 +338,89 @@ el.btnStopOpt.addEventListener('click', async () => {
         showToast('Erro ao enviar sinal de interrupção.', 'error');
     }
 });
+
+// ── Auditoria de Contexto (7 Critérios) ──────────────────────────────────────
+el.btnAuditSkill?.addEventListener('click', async () => {
+    const skillText = el.originalSkillInput?.value?.strip ? el.originalSkillInput.value.strip() : el.originalSkillInput.value;
+    if (!skillText || skillText.trim().length === 0) {
+        showToast('Por favor, informe uma skill no campo de Skill Original para auditar.', 'error');
+        return;
+    }
+
+    el.auditModal.style.display = 'flex';
+    el.auditModalBody.innerHTML = `
+        <div style="text-align: center; padding: 30px;">
+            <i class="fa-solid fa-spinner fa-spin fa-2x"></i>
+            <p style="margin-top: 12px; color: var(--text-secondary);">Auditando contexto nos 7 critérios de Engenharia de Contexto...</p>
+        </div>
+    `;
+
+    try {
+        const res = await fetch('/api/audit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ skillText: skillText.trim() }),
+        });
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        const gradeColor = data.grade === 'Strong' ? '#10b981' : data.grade === 'Adequate' ? '#f59e0b' : '#ef4444';
+        const gradeBadge = `<span style="background: ${gradeColor}22; color: ${gradeColor}; border: 1px solid ${gradeColor}; padding: 4px 12px; border-radius: 12px; font-weight: 700; font-size: 0.9em;">${data.grade} (${data.overall_score}/10)</span>`;
+
+        let rowsHtml = data.criteria.map(c => `
+            <tr>
+                <td style="padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.08); font-weight: 600;">${c.label_pt}</td>
+                <td style="padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.08); text-align: center;">
+                    <span style="font-weight: 700; color: ${c.score >= 8 ? '#10b981' : c.score >= 5 ? '#f59e0b' : '#ef4444'};">${c.score}/10</span>
+                </td>
+                <td style="padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.08); font-size: 0.9em; color: var(--text-secondary);">${c.key_finding}</td>
+            </tr>
+        `).join('');
+
+        let risksHtml = data.predicted_risks.map(r => `<li style="margin-bottom: 4px; color: #f87171;"><i class="fa-solid fa-triangle-exclamation" style="margin-right: 6px;"></i>${r}</li>`).join('');
+        let fixesHtml = data.top_fixes.map(f => `<li style="margin-bottom: 4px; color: #34d399;"><i class="fa-solid fa-lightbulb" style="margin-right: 6px;"></i>${f}</li>`).join('');
+
+        el.auditModalBody.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; background: rgba(255,255,255,0.03); padding: 12px 16px; border-radius: 8px;">
+                <div>
+                    <h4 style="margin: 0; font-size: 1.1em;">Score Geral de Contexto</h4>
+                    <small style="color: var(--text-secondary);">Fundamentado na escala empírica Bousetouane (2026)</small>
+                </div>
+                <div>${gradeBadge}</div>
+            </div>
+
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; text-align: left;">
+                <thead>
+                    <tr style="border-bottom: 2px solid rgba(255,255,255,0.1); color: var(--text-secondary); font-size: 0.85em; text-transform: uppercase;">
+                        <th style="padding: 8px 10px;">Critério</th>
+                        <th style="padding: 8px 10px; text-align: center;">Nota</th>
+                        <th style="padding: 8px 10px;">Achado Principal</th>
+                    </tr>
+                </thead>
+                <tbody>${rowsHtml}</tbody>
+            </table>
+
+            <div style="margin-bottom: 16px; background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); padding: 12px; border-radius: 8px;">
+                <h4 style="margin-top: 0; margin-bottom: 8px; font-size: 0.95em; color: #f87171;"><i class="fa-solid fa-shield-virus"></i> Riscos Comportamentais Previstos</h4>
+                <ul style="margin: 0; padding-left: 16px; font-size: 0.9em; list-style: none;">${risksHtml}</ul>
+            </div>
+
+            <div style="background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.2); padding: 12px; border-radius: 8px;">
+                <h4 style="margin-top: 0; margin-bottom: 8px; font-size: 0.95em; color: #34d399;"><i class="fa-solid fa-wand-magic-sparkles"></i> Top 3 Correções de Maior Alavancagem</h4>
+                <ul style="margin: 0; padding-left: 16px; font-size: 0.9em; list-style: none;">${fixesHtml}</ul>
+            </div>
+        `;
+    } catch (err) {
+        el.auditModalBody.innerHTML = `
+            <div style="text-align: center; padding: 20px; color: #ef4444;">
+                <i class="fa-solid fa-circle-exclamation fa-2x"></i>
+                <p style="margin-top: 10px;">Erro ao auditar contexto: ${err.message}</p>
+            </div>
+        `;
+    }
+});
+
+el.btnCloseAudit?.addEventListener('click', () => {
+    el.auditModal.style.display = 'none';
+});

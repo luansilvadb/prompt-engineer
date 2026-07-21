@@ -11,7 +11,7 @@ from slowapi.util import get_remote_address
 from loguru import logger
 
 from dotenv import load_dotenv as _reload_dotenv
-from src.schemas import OtimizacaoRequestDTO, ConfigRequestDTO, ConfigResponseDTO
+from src.schemas import OtimizacaoRequestDTO, ConfigRequestDTO, ConfigResponseDTO, AuditRequestDTO, CompileRequestDTO
 from src.state import JobState, jobs
 import src.store as job_store
 from src.config import _get_env_path
@@ -51,7 +51,18 @@ async def health_check():
     }
 
 
+# ── Audit ─────────────────────────────────────────────────────────────────────
+@router.post("/audit")
+@limiter.limit("20/minute")
+async def audit_skill_endpoint(request: Request, body: AuditRequestDTO):
+    """Executa auditoria pré-flight instantânea do contexto nos 7 critérios empíricos."""
+    from src.context_audit import audit_context_heuristics
+    report = audit_context_heuristics(body.skillText)
+    return report.to_dict()
+
+
 # ── Métricas Simplificadas ────────────────────────────────────────────────────
+
 _request_metrics: list[dict] = []  # Em produção, substituir por Prometheus
 
 
@@ -379,4 +390,24 @@ async def get_drift_status():
             "critical_rules_violated": report.critical_rules_violated if report else None,
         } if report else None,
     }
+
+
+@router.post("/compile")
+@limiter.limit("2/minute")
+async def compile_evaluator_endpoint(request: Request, body: CompileRequestDTO, background_tasks: BackgroundTasks):
+    """Compila os agentes usando DSPy Optimizers (BootstrapFewShot, MIPROv2, GEPA) com memórias passadas."""
+    from src.teleprompter import compilar_avaliador
+    
+    def _do_compile():
+        compilar_avaliador(
+            min_reward=body.minReward or 0.8,
+            optimizer_type=body.optimizerType or "bootstrap"
+        )
+
+    background_tasks.add_task(_do_compile)
+    return {
+        "status": "ok",
+        "message": f"Compilação DSPy ({body.optimizerType}) iniciada em background.",
+    }
+
 

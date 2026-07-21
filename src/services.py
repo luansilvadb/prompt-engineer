@@ -139,6 +139,13 @@ class OptimizationService:
                 job.status = 'error'
                 self.job_store.save_job_state(job_id, job)
 
+    def audit_skill(self, skill_text: str) -> dict:
+        """Executa auditoria pré-flight dos 7 critérios de contexto."""
+        from src.context_audit import audit_context_heuristics
+        report = audit_context_heuristics(skill_text)
+        return report.to_dict()
+
+
 def execute_optimization_task(
     job_id: str,
     loop,

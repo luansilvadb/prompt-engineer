@@ -24,3 +24,7 @@ class ConfigResponseDTO(BaseModel):
 class CompileRequestDTO(BaseModel):
     optimizerType: Optional[str] = "bootstrap"
     minReward: Optional[float] = 0.8
+
+class AuditRequestDTO(BaseModel):
+    skillText: str
+

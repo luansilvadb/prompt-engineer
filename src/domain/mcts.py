@@ -201,24 +201,28 @@ class TranspositionTable:
         """
         Normaliza chaves de instrução para evitar duplicatas por variações superficiais
         de formatação, espaços, quebras de linha e cercas markdown.
+        Swiechowski et al. Sec 3.4 (Transposition Tables & DAGs).
         """
         if not key:
             return ""
         normalized = key.replace("\r\n", "\n").strip()
         # Remove cercas markdown (ex: ```markdown ... ``` ou ``` ... ```)
-        if normalized.startswith("```"):
-            lines = normalized.splitlines()
-            if len(lines) >= 2 and lines[0].startswith("```"):
-                lines = lines[1:]
-            if lines and lines[-1].strip() == "```":
-                lines = lines[:-1]
-            normalized = "\n".join(lines).strip()
-        
-        # Normalizar múltiplos espaços/linhas em branco consecutivos
-        import re
-        normalized = re.sub(r'\n{3,}', '\n\n', normalized)
         lines = [line.rstrip() for line in normalized.splitlines()]
-        return "\n".join(lines).strip()
+        while lines and not lines[0].strip():
+            lines.pop(0)
+        while lines and not lines[-1].strip():
+            lines.pop()
+        
+        if lines and lines[0].startswith("```"):
+            lines.pop(0)
+        if lines and lines and lines[-1].strip() == "```":
+            lines.pop()
+
+        # Normalizar múltiplos espaços/linhas em branco consecutivos
+        clean_text = "\n".join(lines).strip()
+        import re
+        clean_text = re.sub(r'\n{3,}', '\n\n', clean_text)
+        return clean_text
 
     @property
     def hits(self) -> int:

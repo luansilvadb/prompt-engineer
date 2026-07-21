@@ -52,4 +52,10 @@ export const el = {
     modalNodeVisits: document.getElementById('modal-node-visits'),
     modalNodeCritica: document.getElementById('modal-node-critica'),
     modalNodeInstruction: document.getElementById('modal-node-instruction'),
+    // Audit Modal
+    btnAuditSkill: document.getElementById('btn-audit-skill'),
+    auditModal: document.getElementById('audit-modal'),
+    btnCloseAudit: document.getElementById('btn-close-audit'),
+    auditModalBody: document.getElementById('audit-modal-body'),
 };
+

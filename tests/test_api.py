@@ -73,3 +73,13 @@ def test_get_drift_status():
     assert "golden_count" in data
     assert "is_golden_empty" in data
 
+def test_audit_skill_endpoint():
+    payload = {"skillText": "Você é um assistente. Seja útil."}
+    response = client.post("/api/audit", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert "overall_score" in data
+    assert "grade" in data
+    assert len(data["criteria"]) == 7
+
+
