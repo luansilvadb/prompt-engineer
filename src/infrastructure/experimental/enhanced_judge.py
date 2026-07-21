@@ -21,8 +21,6 @@ from src.domain.agent_interfaces import IAvaliadorModoB
 from src.infrastructure.dspy_impl import (
     MetricsGeneratorSignature,
     SwapSynthesisSignature,
-    _parse_manteve_regras,
-    _parse_defeitos,
 )
 from src.signatures import AvaliacaoModoB, SCORE_WEIGHTS
 

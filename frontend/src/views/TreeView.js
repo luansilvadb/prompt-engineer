@@ -109,6 +109,10 @@ export class TreeView {
         this.vm.addEventListener('nodeAdded', (e) => {
             const { node, nodeCount } = e.detail;
             el.mctsNodeCount.textContent = nodeCount;
+            if (el.mctsDagHits) {
+                const dagHits = Object.values(this.vm.mctsNodes).filter(n => n.visits > 1 && n.parent_id).length;
+                el.mctsDagHits.textContent = dagHits;
+            }
             this.addNodeDOM(node);
         });
 
@@ -121,6 +125,7 @@ export class TreeView {
         this.vm.addEventListener('treeCleared', () => {
             el.treeCanvas.innerHTML = '';
             el.mctsNodeCount.textContent = '0';
+            if (el.mctsDagHits) el.mctsDagHits.textContent = '0';
             el.mctsBestScore.textContent = '0.0%';
             this.nodeElements.clear();
             this.recenterTree();

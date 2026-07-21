@@ -1,41 +1,41 @@
 {
-  "judge_label": "atual",
-  "spearman_composite": 0.8535714285714285,
-  "offset_scale": -3.0622222222222217,
+  "judge_label": "candidato",
+  "spearman_composite": 0.8464285714285714,
+  "offset_scale": -4.845714285714287,
   "mae_per_dimension": [
     {
       "dimension": "nota_clareza",
-      "mae": 7.888888888888889
+      "mae": 10.0
     },
     {
       "dimension": "nota_formatacao",
-      "mae": 15.0
+      "mae": 14.466666666666667
     },
     {
       "dimension": "nota_robustez",
-      "mae": 14.333333333333334
+      "mae": 13.733333333333333
     },
     {
       "dimension": "nota_densidade_informacional",
-      "mae": 11.977777777777778
+      "mae": 10.666666666666666
     },
     {
       "dimension": "nota_acionabilidade",
-      "mae": 12.733333333333334
+      "mae": 14.666666666666666
     },
     {
       "dimension": "nota_anti_fragilidade",
-      "mae": 14.222222222222223
+      "mae": 15.0
     }
   ],
   "critical_rules_concordance": 1.0,
   "critical_rules_violated": false,
   "missed_violations": 0,
   "false_rejections": 0,
-  "mean_variance": 0.5432375906258556,
+  "mean_variance": 0.0,
   "repetitions": 3,
   "low_confidence": false,
-  "style_gap": 0.47714285714285704,
+  "style_gap": 0.4188571428571427,
   "style_drift_signal": false,
   "category_accuracy": {
     "estilo": 1.0,
@@ -50,7 +50,7 @@
     {
       "probe_id": "SD-1",
       "expected_composite": 0.9185714285714287,
-      "predicted_composite": 0.9399999999999998,
+      "predicted_composite": 0.9602857142857142,
       "variance": 0.0,
       "expected_critical": true,
       "observed_critical_all_correct": true,
@@ -60,7 +60,7 @@
     {
       "probe_id": "SD-2",
       "expected_composite": 0.5442857142857143,
-      "predicted_composite": 0.33428571428571424,
+      "predicted_composite": 0.3428571428571429,
       "variance": 0.0,
       "expected_critical": false,
       "observed_critical_all_correct": true,
@@ -70,7 +70,7 @@
     {
       "probe_id": "SD-3",
       "expected_composite": 0.4642857142857143,
-      "predicted_composite": 0.4628571428571428,
+      "predicted_composite": 0.5414285714285715,
       "variance": 0.0,
       "expected_critical": true,
       "observed_critical_all_correct": true,
@@ -80,7 +80,7 @@
     {
       "probe_id": "NAT-1",
       "expected_composite": 0.8385714285714284,
-      "predicted_composite": 0.8357142857142856,
+      "predicted_composite": 0.9057142857142857,
       "variance": 0.0,
       "expected_critical": true,
       "observed_critical_all_correct": true,
@@ -90,7 +90,7 @@
     {
       "probe_id": "CON-1",
       "expected_composite": 0.8634285714285715,
-      "predicted_composite": 0.9742857142857143,
+      "predicted_composite": 0.9385714285714285,
       "variance": 0.0,
       "expected_critical": true,
       "observed_critical_all_correct": true,
@@ -100,7 +100,7 @@
     {
       "probe_id": "MAN-1",
       "expected_composite": 0.8371428571428572,
-      "predicted_composite": 0.9057142857142857,
+      "predicted_composite": 0.8742857142857142,
       "variance": 0.0,
       "expected_critical": true,
       "observed_critical_all_correct": true,
@@ -110,7 +110,7 @@
     {
       "probe_id": "NEG-1",
       "expected_composite": 0.864,
-      "predicted_composite": 0.9271428571428572,
+      "predicted_composite": 0.8817142857142857,
       "variance": 0.0,
       "expected_critical": true,
       "observed_critical_all_correct": true,
@@ -120,7 +120,7 @@
     {
       "probe_id": "NEIGHBOR-1",
       "expected_composite": 0.6042857142857143,
-      "predicted_composite": 0.5914285714285714,
+      "predicted_composite": 0.5328571428571429,
       "variance": 0.0,
       "expected_critical": false,
       "observed_critical_all_correct": true,
@@ -130,8 +130,8 @@
     {
       "probe_id": "NEIGHBOR-2",
       "expected_composite": 0.5408571428571428,
-      "predicted_composite": 0.6433333333333334,
-      "variance": 1.9529615861342764,
+      "predicted_composite": 0.4485714285714285,
+      "variance": 0.0,
       "expected_critical": false,
       "observed_critical_all_correct": true,
       "missed_violations": 0,
@@ -140,7 +140,7 @@
     {
       "probe_id": "GPTOUT-1",
       "expected_composite": 0.5128571428571429,
-      "predicted_composite": 0.2414285714285714,
+      "predicted_composite": 0.2557142857142857,
       "variance": 0.0,
       "expected_critical": false,
       "observed_critical_all_correct": true,
@@ -150,8 +150,8 @@
     {
       "probe_id": "GPTOUT-2",
       "expected_composite": 0.4914285714285714,
-      "predicted_composite": 0.3761904761904762,
-      "variance": 5.38748023761179,
+      "predicted_composite": 0.40857142857142853,
+      "variance": 0.0,
       "expected_critical": false,
       "observed_critical_all_correct": true,
       "missed_violations": 0,
@@ -160,7 +160,7 @@
     {
       "probe_id": "NAT-2",
       "expected_composite": 0.2857142857142857,
-      "predicted_composite": 0.19999999999999998,
+      "predicted_composite": 0.19714285714285712,
       "variance": 0.0,
       "expected_critical": false,
       "observed_critical_all_correct": true,
@@ -170,8 +170,8 @@
     {
       "probe_id": "CON-2",
       "expected_composite": 0.40514285714285714,
-      "predicted_composite": 0.39142857142857146,
-      "variance": 0.8081220356417679,
+      "predicted_composite": 0.3628571428571429,
+      "variance": 0.0,
       "expected_critical": false,
       "observed_critical_all_correct": true,
       "missed_violations": 0,
@@ -180,7 +180,7 @@
     {
       "probe_id": "MAN-2",
       "expected_composite": 0.29571428571428576,
-      "predicted_composite": 0.22285714285714286,
+      "predicted_composite": 0.18571428571428572,
       "variance": 0.0,
       "expected_critical": false,
       "observed_critical_all_correct": true,
@@ -190,7 +190,7 @@
     {
       "probe_id": "NEG-2",
       "expected_composite": 0.4539999999999999,
-      "predicted_composite": 0.41428571428571426,
+      "predicted_composite": 0.35714285714285715,
       "variance": 0.0,
       "expected_critical": false,
       "observed_critical_all_correct": true,
@@ -198,6 +198,6 @@
       "false_rejections": 0
     }
   ],
-  "measured_at": 1784517378.8397963,
-  "judge_config_hash": "zero"
+  "measured_at": 1784662967.1523807,
+  "judge_config_hash": "8fa1dd93781c2f6f825bd6a90c99cf22de97294ea50f04b7651a0e8b27707cfb"
 }

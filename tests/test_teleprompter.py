@@ -2,7 +2,6 @@
 
 import pytest
 from unittest.mock import MagicMock, patch
-from pathlib import Path
 
 from src.teleprompter import (
     _build_trainset,

@@ -91,7 +91,6 @@ class Avaliacao:
     feedback_detalhado: str
 
     def __post_init__(self):
-        import re
         notas = [
             'nota_clareza', 'nota_formatacao', 'nota_robustez',
             'nota_densidade_informacional', 'nota_acionabilidade',
@@ -99,10 +98,6 @@ class Avaliacao:
         ]
         for attr in notas:
             v = getattr(self, attr)
-            if isinstance(v, str):
-                match = re.search(r'\d+(?:\.\d+)?', v)
-                if match:
-                    v = match.group(0)
             try:
                 v_float = float(v)
             except (ValueError, TypeError):

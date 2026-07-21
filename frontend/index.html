@@ -81,6 +81,15 @@
                                     title="Mostrar chave de API"><i class="fa-regular fa-eye"></i></button>
                             </div>
                         </div>
+                        <div class="form-group">
+                            <label for="dspy-optimizer">Otimizador DSPy de Compilação <small>(DSPy 3.x)</small></label>
+                            <select id="dspy-optimizer" class="select-input">
+                                <option value="bootstrap" selected>BootstrapFewShot (Rápido & Estável)</option>
+                                <option value="mipro">MIPROv2 (Busca Bayesiana Instrução+Demos)</option>
+                                <option value="gepa">GEPA (Evolutivo por Reflexão - SOTA)</option>
+                                <option value="bootstrap_rs">Bootstrap + Random Search</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 
@@ -127,6 +136,7 @@
                         <h2><i class="fa-solid fa-network-wired"></i> Árvore MCTS (Seleção UCT & Reflexões)</h2>
                         <div class="mcts-stats">
                             <span>Nós: <strong id="mcts-node-count">0</strong></span>
+                            <span>DAG Hits: <strong id="mcts-dag-hits">0</strong></span>
                             <span>Melhor Nota: <strong id="mcts-best-score">0.0%</strong></span>
                         </div>
                     </div>

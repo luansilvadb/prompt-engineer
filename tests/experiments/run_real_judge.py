@@ -21,7 +21,7 @@ from pathlib import Path
 # Adiciona o diretorio raiz ao path para imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from src.signatures import funcao_de_recompensa, AvaliacaoModoB
+from src.signatures import funcao_de_recompensa
 from src.infrastructure.container import Container
 
 # ── Mesma skill fixa usada nos experimentos mock (test_variance.py) ──────────
@@ -57,10 +57,10 @@ def run_experiment_b_real(n: int = 20) -> dict:
     raw_scores = []
     errors = []
 
-    print(f"\n=== Experiment B: Judge Noise (REAL LLM) ===")
+    print("\n=== Experiment B: Judge Noise (REAL LLM) ===")
     print(f"  N={n}")
     print(f"  Skill: {FIXED_SKILL_FOR_JUDGE[:80]}...")
-    print(f"  Running...")
+    print("  Running...")
 
     for i in range(n):
         try:
@@ -139,10 +139,10 @@ def run_experiment_b_real(n: int = 20) -> dict:
     }
 
     # ── Output ──────────────────────────────────────────────────────────
-    print(f"\n  Results:")
+    print("\n  Results:")
     print(f"    mean={mean:.3f}, stdev={stdev:.3f}, median={median:.3f}")
     print(f"    min={min_val:.3f}, max={max_val:.3f}")
-    print(f"  Histogram:")
+    print("  Histogram:")
     max_bar = max(bins) if bins else 1
     for i in range(bin_count):
         lo = min_val + i * bin_width

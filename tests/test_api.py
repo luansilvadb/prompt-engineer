@@ -64,3 +64,12 @@ def test_start_optimization(mock_execute):
         assert "job_id" in data
         assert mock_save.called
         assert mock_execute.called
+
+def test_get_drift_status():
+    response = client.get("/api/drift-status")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert "golden_count" in data
+    assert "is_golden_empty" in data
+

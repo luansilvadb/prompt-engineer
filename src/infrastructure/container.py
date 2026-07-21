@@ -37,8 +37,8 @@ class JobStore(IJobStore):
         return store_module.delete_job(job_id)
 
 class AvaliadorCompiler(IAvaliadorCompiler):
-    def compilar_avaliador(self, lm=None, min_reward=0.8) -> str:
-        return compilar_avaliador(lm, min_reward)
+    def compilar_avaliador(self, lm=None, min_reward=0.8, optimizer_type="bootstrap") -> str:
+        return compilar_avaliador(lm, min_reward, optimizer_type)
 
 class Container:
     def __init__(self) -> None:

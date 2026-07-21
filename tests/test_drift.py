@@ -466,53 +466,6 @@ def test_runner_run_modo_b_all_fail_raises():
             runner.run_modo_b(_make_probe(), repetitions=2)
 
 
-# ---------------------------------------------------------------------------
-# Testes de regressao para _parse_manteve_regras — Item 2 (hard-gate SD-2)
-# ---------------------------------------------------------------------------
-
-from src.infrastructure.dspy_impl import _parse_manteve_regras
-
-
-@pytest.mark.parametrize("input_val,expected", [
-    # True cases
-    ("True", True),
-    ("true", True),
-    ("TRUE", True),
-    ("True.", True),
-    ("true, com ressalvas", True),
-    ("sim", True),
-    ("Sim", True),
-    ("SIM", True),
-    ("yes", True),
-    ("Yes", True),
-    ("YES", True),
-    ("1", True),
-    # False cases
-    ("False", False),
-    ("false", False),
-    ("FALSE", False),
-    ("false, a lei foi removida", False),
-    ("não", False),
-    ("nao", False),
-    ("no", False),
-    ("0", False),
-    # Edge cases
-    ("", False),
-    (None, False),
-    ("maybe", False),
-    ("parcialmente", False),
-    ("   true   ", True),
-    ("   false   ", False),
-    # Case: "0" should NOT match (it's not in true_markers)
-    ("0", False),
-    # Case: "True-ish" text
-    ("not true", False),  # 'not true' starts with 'no' → false_markers catches it
-    ("untrue", False),    # 'untrue' doesn't start with false_markers, but doesn't contain true_markers
-])
-def test_parse_manteve_regras_edge_cases(input_val, expected):
-    """Item 2: _parse_manteve_regras deve lidar com todos os edge cases corretamente."""
-    assert _parse_manteve_regras(input_val) == expected
-
 
 def test_missed_violation_sd2_scenario():
     """

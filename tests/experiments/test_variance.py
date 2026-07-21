@@ -13,9 +13,6 @@ import json
 from unittest.mock import MagicMock
 
 from src.domain.config import MCTSConfig
-from src.mutation_strategies.bandit import MutationBandit
-from src.mutation_strategies.registry import StrategyRegistry
-from src.experience_store import ExperienceStore
 from src.domain.mcts import MCTSNode
 from tests.conftest import DeterministicJudge
 
@@ -156,7 +153,7 @@ def test_experiment_a_end_to_end_variance(mock_optimizer_factory,
           f"min-max=[{min(rewards):.3f}, {max(rewards):.3f}]")
     print(f"  best_score:  mean={statistics.mean(scores):.3f}, "
           f"stdev={statistics.stdev(scores):.3f}")
-    print(f"  first_3_strategies por run:")
+    print("  first_3_strategies por run:")
     for r in results:
         print(f"    run {r['run']}: {r['first_3_strategies']}")
 
@@ -276,7 +273,7 @@ def test_experiment_c_bandit_variance(mock_optimizer_factory):
           f"min-max=[{min(rewards):.3f}, {max(rewards):.3f}]")
     print(f"  best_score:  mean={statistics.mean(scores):.3f}, "
           f"stdev={statistics.stdev(scores):.3f}")
-    print(f"  first_3_strategies por run:")
+    print("  first_3_strategies por run:")
     for r in results:
         print(f"    run {r['run']}: {r['first_3_strategies']}")
 

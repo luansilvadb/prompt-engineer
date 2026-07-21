@@ -53,7 +53,6 @@ def _measure_all_probes(runner, golden, repetitions: int) -> list:
     # próprio runner clonado com dspy.Predict independente.
     max_workers = min(len(golden.probes), 4)
     lock = threading.Lock()
-    probe_index: dict[str, int] = {probe.id: idx for idx, probe in enumerate(golden.probes)}
     results: list = [None] * len(golden.probes)
     errors: list = []
 

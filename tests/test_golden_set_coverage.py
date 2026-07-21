@@ -1,7 +1,6 @@
 """Teste de cobertura do golden set — Fase 5 (LLMBar)."""
 import pytest
 from src.drift.golden import GoldenSet
-from src.drift.models import GoldenProbe
 
 
 REQUIRED_CATEGORIES = ['estilo', 'natural', 'constraint', 'manual', 'negation']

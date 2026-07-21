@@ -29,9 +29,17 @@ class MCTSConfig:
     density_threshold: float
     density_structured_bonus: float
     reward_floor: float
+    mcts_early_termination_threshold: float = 0.95
+    rave_k: float = 10.0
+    virtual_loss_weight: float = 1.0
+    num_threads: int = 4
     root_median_samples: int = 1
+    selection_policy: str = "puct"
+    c_bias: float = 0.5
 
     def __post_init__(self) -> None:
+        if self.selection_policy not in ("puct", "ucb1_tuned", "ucb1"):
+            raise ValueError(f"selection_policy deve ser um de ('puct', 'ucb1_tuned', 'ucb1'), recebeu '{self.selection_policy}'")
         if not (0.0 < self.gamma <= 1.0):
             raise ValueError("gamma must be in (0.0, 1.0]")
         if self.c_param <= 0.0:
@@ -96,7 +104,13 @@ def load_mcts_config() -> MCTSConfig:
         density_threshold=float(os.environ.get("MCTS_DENSITY_THRESHOLD", "1.0")),
         density_structured_bonus=float(os.environ.get("MCTS_DENSITY_STRUCTURED_BONUS", "0.2")),
         reward_floor=float(os.environ.get("MCTS_REWARD_FLOOR", "0.30")),
+        mcts_early_termination_threshold=float(os.environ.get("MCTS_EARLY_TERMINATION_THRESHOLD", "0.95")),
+        rave_k=float(os.environ.get("MCTS_RAVE_K", "10.0")),
+        virtual_loss_weight=float(os.environ.get("MCTS_VIRTUAL_LOSS_WEIGHT", "1.0")),
+        num_threads=int(os.environ.get("MCTS_NUM_THREADS", "4")),
         root_median_samples=int(os.environ.get("MCTS_ROOT_MEDIAN_SAMPLES", "1")),
+        selection_policy=os.environ.get("MCTS_SELECTION_POLICY", "puct"),
+        c_bias=float(os.environ.get("MCTS_C_BIAS", "0.5")),
     )
 
 

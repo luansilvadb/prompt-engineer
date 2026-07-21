@@ -43,5 +43,5 @@ class IExperienceStore(Protocol):
 
 
 class IAvaliadorCompiler(Protocol):
-    def compilar_avaliador(self, lm: Any = None, min_reward: float = 0.8) -> str:
+    def compilar_avaliador(self, lm: Any = None, min_reward: float = 0.8, optimizer_type: str = "bootstrap") -> str:
         ...

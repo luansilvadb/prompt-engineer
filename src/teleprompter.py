@@ -38,13 +38,87 @@ def _build_trainset(store: ExperienceStore, min_reward: float) -> list:
         trainset.append(exemplo)
     return trainset
 
-def _run_teleprompt(trainset: list, candidate_path: Path):
-    def trivial_metric(example, pred, trace=None):
+def _run_teleprompt(trainset: list, candidate_path: Path, optimizer_type: str = "bootstrap"):
+    def quality_metric(example, pred, trace=None):
+        if not pred:
+            return False
+        # Suporta tanto objetos quanto dicionários (flexibilidade DSPy 3.x)
+        manteve = getattr(pred, 'manteve_regras_criticas', None)
+        if manteve is None and isinstance(pred, dict):
+            manteve = pred.get('manteve_regras_criticas', False)
+        if isinstance(manteve, str):
+            manteve = manteve.lower() in ('true', '1', 'sim')
+        if not manteve:
+            return False
+
+        # Penalizar candidatos com defeitos críticos estruturais ou contradições
+        defeitos = getattr(pred, 'defeitos_encontrados', None)
+        if defeitos is None and isinstance(pred, dict):
+            defeitos = pred.get('defeitos_encontrados', [])
+        if defeitos and len(defeitos) > 3:
+            return False
+
+        feedback = getattr(pred, 'feedback_detalhado', '')
+        if not feedback and isinstance(pred, dict):
+            feedback = pred.get('feedback_detalhado', '')
+        if not feedback or len(str(feedback).strip()) < 5:
+            return False
+
+        nota = getattr(pred, 'nota_qualidade', None)
+        if nota is None and isinstance(pred, dict):
+            nota = pred.get('nota_qualidade', None)
+        if nota is not None:
+            try:
+                val = float(nota)
+                if val < 0.0:
+                    return False
+            except (ValueError, TypeError):
+                pass
+
         return True
 
-    print("Iniciando compilação (Teleprompting) via BootstrapFewShot...")
-    teleprompter = BootstrapFewShot(metric=trivial_metric, max_bootstrapped_demos=3, max_labeled_demos=0)
     avaliador_module = dspy.Predict(AvaliadorModoBSignature)
+
+    if optimizer_type and optimizer_type.lower() == "gepa":
+        try:
+            from dspy.teleprompt import GEPA
+            print("Iniciando compilação (Teleprompting) via GEPA...")
+            teleprompter = GEPA(metric=quality_metric, auto="light")
+            compilado = teleprompter.compile(avaliador_module, trainset=trainset)
+            compilado.save(str(candidate_path))
+            return
+        except Exception as e:
+            print(f"[!] Fallback para BootstrapFewShot devido a erro ou indisponibilidade em GEPA: {e}")
+
+    if optimizer_type and optimizer_type.lower() in ("mipro", "miprov2"):
+        try:
+            from dspy.teleprompt import MIPROv2
+            print("Iniciando compilação (Teleprompting) via MIPROv2...")
+            teleprompter = MIPROv2(metric=quality_metric, auto="light")
+            compilado = teleprompter.compile(avaliador_module, trainset=trainset)
+            compilado.save(str(candidate_path))
+            return
+        except Exception as e:
+            print(f"[!] Fallback para BootstrapFewShot devido a erro ou indisponibilidade em MIPROv2: {e}")
+
+    if optimizer_type and optimizer_type.lower() in ("bootstrap_rs", "bootstrapfewshotwithrandomsearch", "random_search"):
+        try:
+            from dspy.teleprompt import BootstrapFewShotWithRandomSearch
+            print("Iniciando compilação (Teleprompting) via BootstrapFewShotWithRandomSearch...")
+            teleprompter = BootstrapFewShotWithRandomSearch(
+                metric=quality_metric,
+                max_bootstrapped_demos=3,
+                max_labeled_demos=0,
+                num_candidate_sets=4,
+            )
+            compilado = teleprompter.compile(avaliador_module, trainset=trainset)
+            compilado.save(str(candidate_path))
+            return
+        except Exception as e:
+            print(f"[!] Fallback para BootstrapFewShot devido a erro ou indisponibilidade em BootstrapFewShotWithRandomSearch: {e}")
+
+    print("Iniciando compilação (Teleprompting) via BootstrapFewShot...")
+    teleprompter = BootstrapFewShot(metric=quality_metric, max_bootstrapped_demos=3, max_labeled_demos=0)
     compilado = teleprompter.compile(avaliador_module, trainset=trainset)
     compilado.save(str(candidate_path))
 
@@ -148,9 +222,9 @@ def _evaluate_drift_gate(candidate_path: Path, out_path: Path, output_dir: Path)
         print(f"[!] Erro de medição de drift ({e.message}). Fail-closed: candidato descartado.")
         return "measurement_error"
 
-def compilar_avaliador(lm=None, min_reward: float = 0.8) -> str:
+def compilar_avaliador(lm=None, min_reward: float = 0.8, optimizer_type: str = "bootstrap") -> str:
     """
-    Recompila o juiz via BootstrapFewShot e valida o candidato contra o golden
+    Recompila o juiz via BootstrapFewShot ou MIPROv2 e valida o candidato contra o golden
     set antes de persistir (A1 — grounding da recompensa).
 
     Retorna um status (não mais bool). O save é sob prova (vetor, não otimizador).
@@ -176,7 +250,7 @@ def compilar_avaliador(lm=None, min_reward: float = 0.8) -> str:
         out_path = output_dir / 'avaliador_modo_b_otimizado.json'
         candidate_path = output_dir / 'avaliador_modo_b_otimizado.candidate.json'
 
-        _run_teleprompt(trainset, candidate_path)
+        _run_teleprompt(trainset, candidate_path, optimizer_type=optimizer_type)
 
         return _evaluate_drift_gate(candidate_path, out_path, output_dir)
 

@@ -81,13 +81,13 @@ class AvaliadorDeSkillSignature(dspy.Signature):
     skill_otimizada: str = dspy.InputField()
     regras_adicionais: str = dspy.InputField(desc="Diretrizes, restrições ou métricas extras especificadas pelo usuário que devem ser estritamente seguidas.")
 
-    manteve_regras_criticas: str = dspy.OutputField(desc="True se nenhuma regra comportamental vital (inclusive as regras adicionais) foi omitida. False caso contrário.")
-    nota_clareza: str = dspy.OutputField(desc="Nota de 0 a 100 avaliando se a instrução é clara e direta.")
-    nota_formatacao: str = dspy.OutputField(desc="Nota de 0 a 100 avaliando o uso de markdown, listas e negritos.")
-    nota_robustez: str = dspy.OutputField(desc="Nota de 0 a 100 avaliando a imunidade a 'lost in the middle' e ambiguidades.")
-    nota_densidade_informacional: str = dspy.OutputField(desc="Nota de 0 a 100 avaliando a razão sinal/ruído — penaliza verbosidade vazia e repetição sem valor.")
-    nota_acionabilidade: str = dspy.OutputField(desc="Nota de 0 a 100 avaliando se as instruções são claras o suficiente para um agente de IA executar sem ambiguidade.")
-    nota_anti_fragilidade: str = dspy.OutputField(desc="Nota de 0 a 100 avaliando se a skill resiste a edge cases, inputs adversariais e contextos ambíguos.")
+    manteve_regras_criticas: bool = dspy.OutputField(desc="True se nenhuma regra comportamental vital (inclusive as regras adicionais) foi omitida. False caso contrário.")
+    nota_clareza: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando se a instrução é clara e direta.")
+    nota_formatacao: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando o uso de markdown, listas e negritos.")
+    nota_robustez: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando a imunidade a 'lost in the middle' e ambiguidades.")
+    nota_densidade_informacional: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando a razão sinal/ruído — penaliza verbosidade vazia e repetição sem valor.")
+    nota_acionabilidade: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando se as instruções são claras o suficiente para um agente de IA executar sem ambiguidade.")
+    nota_anti_fragilidade: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando se a skill resiste a edge cases, inputs adversariais e contextos ambíguos.")
     feedback_detalhado: str = dspy.OutputField(desc="Explicação detalhada dos pontos fortes e fracos, justificando as notas.")
 
 class AvaliadorModoBSignature(dspy.Signature):
@@ -115,14 +115,14 @@ class AvaliadorModoBSignature(dspy.Signature):
     skill_otimizada: str = dspy.InputField()
     regras_adicionais: str = dspy.InputField(desc="Diretrizes, restrições ou métricas extras especificadas pelo usuário que devem ser estritamente seguidas.")
 
-    manteve_regras_criticas: str = dspy.OutputField(desc="True se nenhuma regra comportamental vital (inclusive as regras adicionais) foi omitida. False caso contrário.")
-    defeitos_encontrados: str = dspy.OutputField(desc="Lista de violações, paradoxos e ambiguidades detectadas. Enumere cada defeito encontrado (use nova linha para cada).")
-    nota_clareza: str = dspy.OutputField(desc="Nota de 0 a 100 avaliando se a instrução é clara e direta.")
-    nota_formatacao: str = dspy.OutputField(desc="Nota de 0 a 100 avaliando o uso de markdown, listas e negritos.")
-    nota_robustez: str = dspy.OutputField(desc="Nota de 0 a 100 avaliando a imunidade a 'lost in the middle' e ambiguidades.")
-    nota_densidade_informacional: str = dspy.OutputField(desc="Nota de 0 a 100 avaliando a razão sinal/ruído — penaliza verbosidade vazia e repetição sem valor.")
-    nota_acionabilidade: str = dspy.OutputField(desc="Nota de 0 a 100 avaliando se as instruções são claras o suficiente para um agente de IA executar sem ambiguidade.")
-    nota_anti_fragilidade: str = dspy.OutputField(desc="Nota de 0 a 100 avaliando se a skill resiste a edge cases, inputs adversariais e contextos ambíguos.")
+    manteve_regras_criticas: bool = dspy.OutputField(desc="True se nenhuma regra comportamental vital (inclusive as regras adicionais) foi omitida. False caso contrário.")
+    defeitos_encontrados: list[str] = dspy.OutputField(desc="Lista de violações, paradoxos e ambiguidades detectadas.")
+    nota_clareza: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando se a instrução é clara e direta.")
+    nota_formatacao: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando o uso de markdown, listas e negritos.")
+    nota_robustez: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando a imunidade a 'lost in the middle' e ambiguidades.")
+    nota_densidade_informacional: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando a razão sinal/ruído — penaliza verbosidade vazia e repetição sem valor.")
+    nota_acionabilidade: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando se as instruções são claras o suficiente para um agente de IA executar sem ambiguidade.")
+    nota_anti_fragilidade: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando se a skill resiste a edge cases, inputs adversariais e contextos ambíguos.")
     feedback_detalhado: str = dspy.OutputField(desc="Explicação detalhada dos pontos fortes e fracos, justificando as notas.")
 
 
@@ -130,7 +130,7 @@ class AvaliadorModoBSignature(dspy.Signature):
 
 class DSPyStrategyDiscoverer(IStrategyDiscoverer):
     def __init__(self):
-        self._predictor = dspy.Predict(StrategyDiscovererSignature)
+        self._predictor = dspy.ChainOfThought(StrategyDiscovererSignature)
 
     def __call__(self, skill_atual: str, feedbacks_recentes: str, estrategias_conhecidas: str) -> DiscoveredStrategy:
         res = self._predictor(
@@ -146,14 +146,32 @@ class DSPyStrategyDiscoverer(IStrategyDiscoverer):
 class DSPySelfReflectiveAgent(ISelfReflectiveAgent):
     def __init__(self):
         self._predictor = dspy.ChainOfThought(SelfReflectiveAgentSignature)
+        self._fast_predictor = dspy.Predict(SelfReflectiveAgentSignature)
 
     def __call__(self, instrucao_anterior: str, nota_anterior: str, feedback_juiz: str, estrategia_mutacao: str) -> SelfReflectiveOutput:
-        res = self._predictor(
-            instrucao_anterior=instrucao_anterior,
-            nota_anterior=nota_anterior,
-            feedback_juiz=feedback_juiz,
-            estrategia_mutacao=estrategia_mutacao
-        )
+        # Uso avançado de módulos: selecionar arquitetura baseada na heurística
+        if "direto" in estrategia_mutacao.lower() or "simples" in estrategia_mutacao.lower():
+            predictor = self._fast_predictor
+        else:
+            predictor = self._predictor
+
+        max_retries = 2
+        res = None
+        current_strategy = estrategia_mutacao
+        for attempt in range(max_retries):
+            res = predictor(
+                instrucao_anterior=instrucao_anterior,
+                nota_anterior=nota_anterior,
+                feedback_juiz=feedback_juiz,
+                estrategia_mutacao=current_strategy
+            )
+            
+            if res.nova_instrucao and res.nova_instrucao.strip() and res.nova_instrucao.strip() != instrucao_anterior.strip():
+                break
+                
+            # Internal Refine: hint aggressively if LLM generated identical output
+            current_strategy += "\n[CRÍTICO] A ÚLTIMA RESPOSTA GERADA FOI IDÊNTICA À ORIGINAL. ISSO É INACEITÁVEL. VOCÊ DEVE REESCREVER O TEXTO APLICANDO A MUTAÇÃO!"
+
         return SelfReflectiveOutput(
             critica=res.critica,
             nova_instrucao=res.nova_instrucao
@@ -162,83 +180,42 @@ class DSPySelfReflectiveAgent(ISelfReflectiveAgent):
 class DSPyMutadorCognitivoAgent(IMutadorCognitivoAgent):
     def __init__(self):
         self._predictor = dspy.ChainOfThought(MutadorCognitivoAgentSignature)
+        self._predict_predictor = dspy.Predict(MutadorCognitivoAgentSignature)
 
     def __call__(self, instrucao_anterior: str, nota_anterior: str, feedback_juiz: str, estrategia_mutacao: str) -> MutadorCognitivoAgentOutput:
-        res = self._predictor(
-            instrucao_anterior=instrucao_anterior,
-            nota_anterior=nota_anterior,
-            feedback_juiz=feedback_juiz,
-            estrategia_mutacao=estrategia_mutacao
-        )
+        # Se a estratégia já exige raciocínio explícito estruturado, 
+        # ChainOfThought pode causar redundância dupla. Podemos usar Predict em heurísticas lógicas.
+        if "premissas" in estrategia_mutacao.lower() or "dedução" in estrategia_mutacao.lower():
+            predictor = self._predict_predictor
+        else:
+            predictor = self._predictor
+
+        max_retries = 2
+        res = None
+        current_strategy = estrategia_mutacao
+        for attempt in range(max_retries):
+            res = predictor(
+                instrucao_anterior=instrucao_anterior,
+                nota_anterior=nota_anterior,
+                feedback_juiz=feedback_juiz,
+                estrategia_mutacao=current_strategy
+            )
+            
+            if res.nova_instrucao and res.nova_instrucao.strip() and res.nova_instrucao.strip() != instrucao_anterior.strip():
+                break
+                
+            current_strategy += "\n[CRÍTICO] A ÚLTIMA RESPOSTA GERADA FOI IDÊNTICA À ORIGINAL. ISSO É INACEITÁVEL. VOCÊ DEVE REESCREVER O TEXTO APLICANDO A MUTAÇÃO!"
+
         return MutadorCognitivoAgentOutput(
             critica=res.critica,
             raciocinio_estruturado=res.raciocinio_estruturado,
             nova_instrucao=res.nova_instrucao
         )
 
-def _parse_manteve_regras(manteve_str: str) -> bool:
-    """Parse do campo manteve_regras_criticas do juiz.
-
-    Estrategia defensiva: so retorna True se a string contiver marcadores
-    explicitos de afirmacao. Qualquer outra resposta (False, vazia, None,
-    texto ambíguo) e tratada como False.
-
-    Edge cases cobertos:
-    - "True", "true", "TRUE" → True
-    - "true, com ressalvas" → True
-    - "False", "false", "FALSE" → False
-    - "false, a lei foi removida" → False
-    - "" (vazio) → False
-    - None → False
-    - "1" → True
-    - "0" → False
-    - "sim", "Sim", "SIM" → True
-    - "não", "nao", "no" → False
-    - "yes", "Yes", "YES" → True
-    """
-    if manteve_str is None:
-        return False
-    manteve_str = str(manteve_str).strip().lower()
-    if not manteve_str:
-        return False
-
-    if manteve_str == '1':
-        return True
-    if manteve_str == '0':
-        return False
-
-    # Marcadores de início direto (se começar dizendo 'false', é False)
-    if manteve_str.startswith('false') or manteve_str.startswith('falso') or manteve_str.startswith('not') or manteve_str.startswith('un'):
-        return False
-    
-    if manteve_str.startswith('true') or manteve_str.startswith('verdadeiro') or manteve_str.startswith('sim') or manteve_str.startswith('yes'):
-        return True
-
-    # Usar regex para buscar palavras completas (evita que '1' na frase 'Fase 1' valide como True)
-    import re
-    matches = re.findall(r'\b(false|falso|não|nao|not|no|true|verdadeiro|sim|yes)\b', manteve_str)
-    
-    if not matches:
-        return False
-        
-    first_marker = matches[0]
-    if first_marker in ['false', 'falso', 'não', 'nao', 'not', 'no']:
-        return False
-        
-    return True
-
-
-def _parse_defeitos(defeitos_raw) -> list[str]:
-    if isinstance(defeitos_raw, str):
-        return [d.strip("- *").strip() for d in defeitos_raw.split('\\n') if d.strip("- *").strip()]
-    if isinstance(defeitos_raw, list):
-        return [str(d) for d in defeitos_raw]
-    return []
-
 
 class DSPyAvaliadorModoB(IAvaliadorModoB):
     def __init__(self, predictor=None):
-        self._predictor = predictor or dspy.Predict(AvaliadorModoBSignature)
+        self._predictor = predictor or dspy.ChainOfThought(AvaliadorModoBSignature)
 
     def __call__(self, skill_original: str, skill_otimizada: str, regras_adicionais: str) -> AvaliacaoModoB:
         if not regras_adicionais:
@@ -250,23 +227,21 @@ class DSPyAvaliadorModoB(IAvaliadorModoB):
             regras_adicionais=regras_adicionais
         )
 
-        defeitos_list = _parse_defeitos(getattr(res, 'defeitos_encontrados', ''))
-
         return AvaliacaoModoB(
-            manteve_regras_criticas=_parse_manteve_regras(res.manteve_regras_criticas),
-            defeitos_encontrados=defeitos_list,
-            nota_clareza=res.nota_clareza,
-            nota_formatacao=res.nota_formatacao,
-            nota_robustez=res.nota_robustez,
-            nota_densidade_informacional=res.nota_densidade_informacional,
-            nota_acionabilidade=res.nota_acionabilidade,
-            nota_anti_fragilidade=res.nota_anti_fragilidade,
+            manteve_regras_criticas=bool(res.manteve_regras_criticas),
+            defeitos_encontrados=list(getattr(res, 'defeitos_encontrados', [])),
+            nota_clareza=float(res.nota_clareza),
+            nota_formatacao=float(res.nota_formatacao),
+            nota_robustez=float(res.nota_robustez),
+            nota_densidade_informacional=float(res.nota_densidade_informacional),
+            nota_acionabilidade=float(res.nota_acionabilidade),
+            nota_anti_fragilidade=float(res.nota_anti_fragilidade),
             feedback_detalhado=res.feedback_detalhado
         )
 
 # Global instances for teleprompter and backward-compatibility with services that just load
-avaliador_module = dspy.Predict(AvaliadorDeSkillSignature)
-avaliador_modo_b_module = dspy.Predict(AvaliadorModoBSignature)
+avaliador_module = dspy.ChainOfThought(AvaliadorDeSkillSignature)
+avaliador_modo_b_module = dspy.ChainOfThought(AvaliadorModoBSignature)
 
 def load_avaliador():
     model_path_a = Path('src/outputs/models/avaliador_modo_a_otimizado.json')
@@ -298,13 +273,13 @@ def _invoke_judge_with(module, exemplo, predicao) -> Avaliacao:
     )
 
     return Avaliacao(
-        manteve_regras_criticas=_parse_manteve_regras(res.manteve_regras_criticas),
-        nota_clareza=res.nota_clareza,
-        nota_formatacao=res.nota_formatacao,
-        nota_robustez=res.nota_robustez,
-        nota_densidade_informacional=res.nota_densidade_informacional,
-        nota_acionabilidade=res.nota_acionabilidade,
-        nota_anti_fragilidade=res.nota_anti_fragilidade,
+        manteve_regras_criticas=bool(res.manteve_regras_criticas),
+        nota_clareza=float(res.nota_clareza),
+        nota_formatacao=float(res.nota_formatacao),
+        nota_robustez=float(res.nota_robustez),
+        nota_densidade_informacional=float(res.nota_densidade_informacional),
+        nota_acionabilidade=float(res.nota_acionabilidade),
+        nota_anti_fragilidade=float(res.nota_anti_fragilidade),
         feedback_detalhado=res.feedback_detalhado
     )
 
@@ -319,16 +294,14 @@ def _invoke_judge_modo_b_with(module, exemplo, predicao) -> AvaliacaoModoB:
         regras_adicionais=regras
     )
 
-    defeitos_list = _parse_defeitos(getattr(res, 'defeitos_encontrados', ''))
-
     return AvaliacaoModoB(
-        manteve_regras_criticas=_parse_manteve_regras(res.manteve_regras_criticas),
-        defeitos_encontrados=defeitos_list,
-        nota_clareza=res.nota_clareza,
-        nota_formatacao=res.nota_formatacao,
-        nota_robustez=res.nota_robustez,
-        nota_densidade_informacional=res.nota_densidade_informacional,
-        nota_acionabilidade=res.nota_acionabilidade,
-        nota_anti_fragilidade=res.nota_anti_fragilidade,
+        manteve_regras_criticas=bool(res.manteve_regras_criticas),
+        defeitos_encontrados=list(getattr(res, 'defeitos_encontrados', [])),
+        nota_clareza=float(res.nota_clareza),
+        nota_formatacao=float(res.nota_formatacao),
+        nota_robustez=float(res.nota_robustez),
+        nota_densidade_informacional=float(res.nota_densidade_informacional),
+        nota_acionabilidade=float(res.nota_acionabilidade),
+        nota_anti_fragilidade=float(res.nota_anti_fragilidade),
         feedback_detalhado=res.feedback_detalhado
     )

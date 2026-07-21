@@ -27,6 +27,8 @@ def main():
     check_parser = subparsers.add_parser("check", help="Audita e otimiza uma skill")
     check_parser.add_argument("skill_path", type=str, help="Caminho para o arquivo da skill (.md)")
     
+    compile_parser = subparsers.add_parser("compile", help="Compila os agentes usando DSPy Optimizers com memórias passadas")
+    
     args = parser.parse_args()
     
     if args.command == "check":
@@ -87,6 +89,10 @@ def main():
         except Exception as e:
             print(f"\n[!] Erro fatal durante a execução: {e}", file=sys.stderr)
             sys.exit(1)
+            
+    elif args.command == "compile":
+        from scripts.compile_dspy import compile_agents
+        compile_agents()
 
 if __name__ == "__main__":
     main()

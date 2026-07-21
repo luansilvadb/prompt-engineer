@@ -60,3 +60,21 @@ def test_mcts_node_best_child_ucb_visited():
     # child1 has higher Q/N (0.8 vs 0.6), same visits, so child1 should have higher UCB
     best = parent.best_child_ucb(c_param=1.41)
     assert best == child1
+
+def test_mcts_node_best_child_puct_progressive_bias():
+    parent = MCTSNode(instruction="Parent")
+    child1 = MCTSNode(instruction="Child 1", parent=parent, prior=0.9, mutation_strategy="strat_a")
+    child2 = MCTSNode(instruction="Child 2", parent=parent, prior=0.1, mutation_strategy="strat_b")
+    parent.children = [child1, child2]
+
+    parent.visits = 5
+    child1.visits = 1
+    child1.q_value = 0.5
+
+    child2.visits = 1
+    child2.q_value = 0.5
+
+    # Com Q-values e visitas idênticos, o prior maior (0.9 vs 0.1) e o Progressive Bias elevam a pontuação do child1
+    best = parent.best_child_puct(c_param=1.0, c_bias=0.5)
+    assert best == child1
+

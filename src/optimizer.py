@@ -15,6 +15,8 @@ Evolução do core inspirada nos princípios de David Silver (AlphaGo/AlphaZero)
 import re
 import time
 import uuid
+import threading
+import concurrent.futures
 from typing import Tuple
 
 from src.domain.agent_interfaces import (
@@ -26,7 +28,7 @@ from src.domain.agent_interfaces import (
 from src.domain.config import MCTSConfig
 from src.domain.events import IJobEventEmitter, NodeEventPayload
 from src.domain.store_interfaces import IExperienceStore
-from src.domain.mcts import MCTSNode
+from src.domain.mcts import MCTSNode, TranspositionTable
 from src.domain.bandit_interfaces import IMutationBandit, IStrategyRegistry
 from src.signatures import calcular_delta_reward, MutadorCognitivoOutput, _validate_raciocinio, funcao_de_recompensa
 from src.experience_store import Experience, hash_instruction
@@ -34,7 +36,7 @@ from src.value_estimator import ValueEstimator
 from src.mutation_strategies.api import get_strategy_description
 from src.semantic_evaluator import calculate_semantic_penalty
 from src.heuristic_evaluator import evaluate_heuristics
-from src.density_evaluator import calculate_density_multiplier
+from src.density_evaluator import calculate_density_multiplier, compute_lexical_density
 
 
 class Optimizer:
@@ -73,6 +75,10 @@ class Optimizer:
         self._expand_count: int = 0
         self._llm_call_count: int = 0    # contador de chamadas LLM da iteração atual
         self._total_llm_calls: int = 0   # acumulado cumulativo da sessão inteira (BUG-2 fix)
+        self.best_reward_so_far: float = 0.0  # Rastreamento para poda relativa MCTS
+        self._simulation_cache: dict[str, Tuple[float, str]] = {}  # MCTS Expert: cache de simulação deduplicada
+        self.transposition_table = TranspositionTable()  # MCTS Expert: Tabela de Transposição para fusão de nós DAG
+        self.lock = threading.Lock()
 
         strategy_stats = self.experience_store.get_strategy_stats()
         if strategy_stats:
@@ -96,37 +102,90 @@ class Optimizer:
 
     def _count_llm_call(self, n: int = 1) -> None:
         """Registra chamadas LLM para metricas de custo."""
-        self._llm_call_count += n
-        self._total_llm_calls += n  # BUG-2 fix: acumulador cumulativo nunca é zerado
+        with self.lock:
+            self._llm_call_count += n
+            self._total_llm_calls += n  # BUG-2 fix: acumulador cumulativo nunca é zerado
 
     def _emit_cost_event(self, iteration: int) -> None:
         """Emite evento de custo apos cada iteracao MCTS."""
         from src.domain.events import CostEventPayload
-        estimated_tokens = self._llm_call_count * 2000  # estimativa conservadora
+        with self.lock:
+            calls = self._llm_call_count
+            self._llm_call_count = 0  # reset apenas o contador da iteração atual
+        estimated_tokens = calls * 2000  # estimativa conservadora
         self._emitter.emit_cost(CostEventPayload(
             iteration=iteration + 1,
-            llm_calls=self._llm_call_count,
+            llm_calls=calls,
             estimated_tokens=estimated_tokens,
             job_id=self.job_id,
         ))
-        self._llm_call_count = 0  # reset apenas o contador da iteração atual
 
     def selection(self, node: MCTSNode) -> MCTSNode:
-        """Seleção UCB com progressive widening."""
+        """Seleção MCTS com política configurável (PUCT, UCB1-Tuned ou UCB1) e progressive widening."""
         cfg = self.config
         while node.children and len(node.children) >= node.max_children_allowed(cfg.progressive_c, cfg.progressive_alpha):
             if self._emitter.is_cancelled():
                 return node
-            best = node.best_child_ucb(cfg.c_param)
+            
+            # Recupera as estatísticas globais das estratégias (RAVE/AMAF)
+            bandit_stats = {
+                k: v.mean_delta for k, v in self.mutation_bandit.get_stats().items()
+            }
+            
+            policy = getattr(cfg, "selection_policy", "puct")
+            if policy == "ucb1_tuned":
+                best = node.best_child_ucb_tuned(
+                    cfg.c_param,
+                    bandit_stats=bandit_stats,
+                    rave_k=cfg.rave_k,
+                    virtual_loss_weight=cfg.virtual_loss_weight,
+                )
+            elif policy == "ucb1":
+                best = node.best_child_ucb(cfg.c_param)
+            else:
+                # Padrão PUCT (AlphaZero-style com RAVE e Progressive Bias)
+                best = node.best_child_puct(
+                    cfg.c_param, 
+                    bandit_stats=bandit_stats, 
+                    rave_k=cfg.rave_k,
+                    virtual_loss_weight=cfg.virtual_loss_weight,
+                    c_bias=getattr(cfg, "c_bias", 0.5),
+                )
+
             if best is None:
                 return node
             node = best
+            node.add_virtual_loss()
         return node
 
     def simulation(self, instruction: str) -> Tuple[float, str]:
         if self._emitter.is_cancelled():
             return 0.0, 'Cancelado pelo usuário.'
         try:
+            # 1. Early Cut-Off Heurístico (MCTS Expert / Heavy Playout Shortcut)
+            if not instruction or len(instruction.strip()) < 20:
+                self._emitter.emit_log("    [Early Cut-Off Heurístico] Instrução curta ou vazia (< 20 chars). Abortando avaliação LLM.")
+                return 0.05, "Early Cut-Off Heurístico: instrução demasiado curta ou corrompida."
+
+            density_mult = calculate_density_multiplier(instruction, self.skill_original)
+            if density_mult < 0.20:
+                self._emitter.emit_log(f"    [Early Cut-Off Heurístico] Densidade informacional muito baixa ({density_mult:.2f}). Abortando avaliação LLM.")
+                return 0.10, "Early Cut-Off Heurístico: baixa densidade informacional."
+
+            # 2. Tabela de Transposição & Simulation Cache Hit
+            hash_key = hash_instruction(instruction)
+            trans_node = self.transposition_table.get(hash_key)
+            if trans_node is not None and trans_node.visits > 0:
+                reward = trans_node.q_value / trans_node.visits
+                self._emitter.emit_log(f"    [Transposition Table Hit] Nó reaproveitado via DAG. Recompensa: {reward:.2f}")
+                return reward, trans_node.feedback
+
+            with self.lock:
+                if hash_key in self._simulation_cache:
+                    cached_reward, cached_feedback = self._simulation_cache[hash_key]
+                    self._emitter.emit_log(f"    [Simulação Cache Hit] Instrução deduplicada. Recompensa: {cached_reward:.2f}")
+                    return cached_reward, cached_feedback
+
             self._count_llm_call()  # 1 chamada LLM (avaliador_modo_b)
             reward, feedback = funcao_de_recompensa(
                 avaliador_modo_b=self.avaliador_modo_b,
@@ -141,19 +200,47 @@ class Optimizer:
 
             self.value_estimator.update(instruction, reward)
 
-            return float(reward), feedback
+            res_reward = float(reward)
+            with self.lock:
+                self._simulation_cache[hash_key] = (res_reward, feedback)
+
+            return res_reward, feedback
         except Exception as e:
             self._emitter.emit_error(f"[!] Erro na simulação: {e}")
             return 0.0, f"Erro na simulação: {str(e)}"
 
-    def _should_prune(self, instruction: str) -> bool:
+    def _should_prune(self, instruction: str, parent_instruction: str = "", mutation_strategy: str = "") -> bool:
+        # Dynamic Action Reduction (MCTS Expert - Swiechowski et al. Sec 3.2)
+        lexical_density = compute_lexical_density(instruction)
+        if 0 < lexical_density < 0.15:
+            self._emitter.emit_log(f"    [Poda Dinâmica de Ações] Densidade lexical crítica ({lexical_density:.2f}). Podando antes de simular.")
+            return True
+
+        ref_instruction = parent_instruction if parent_instruction else self.skill_original
+        if len(ref_instruction) >= 50:
+            density_mult = calculate_density_multiplier(instruction, ref_instruction, mutation_strategy=mutation_strategy)
+            if density_mult < 0.20:
+                self._emitter.emit_log(f"    [Poda Dinâmica de Ações] Densidade informacional crítica ({density_mult:.2f}). Podando antes de simular.")
+                return True
+
+        if parent_instruction:
+            sem_penalty = calculate_semantic_penalty(instruction, parent_instruction)
+            if sem_penalty < 0.4:
+                self._emitter.emit_log(f"    [Poda Dinâmica de Ações] Penalidade semântica excessiva (fator {sem_penalty:.2f}). Podando antes de simular.")
+                return True
+
         if self.value_estimator.confidence < 0.3:
             return False
 
         estimated = self.value_estimator.estimate(instruction)
         if estimated < self.config.value_threshold:
-            self._emitter.emit_log(f"    [Poda] Value estimator: {estimated:.2f} < threshold {self.config.value_threshold}. Podando.")
+            self._emitter.emit_log(f"    [Poda Absoluta] Value estimator: {estimated:.2f} < threshold {self.config.value_threshold}. Podando.")
             return True
+
+        if self.best_reward_so_far > 0.6 and (estimated + 0.15) < self.best_reward_so_far:
+            self._emitter.emit_log(f"    [Poda Relativa] Estimado ({estimated:.2f} + 0.15) < melhor recompensa ({self.best_reward_so_far:.2f}). Podando.")
+            return True
+
         return False
 
     def notify_node(self, node: MCTSNode):
@@ -177,22 +264,39 @@ class Optimizer:
 
     def backpropagation(self, node: MCTSNode, reward: float):
         """
-        Backpropagation com γ discount.
+        Backpropagation com γ discount para MCTS em Grafo Orientado Acíclico (DAG).
 
-        Silver: temporal-difference — nós mais próximos da folha
-        recebem mais crédito que nós distantes.
+        Swiechowski et al. Sec 3.4 / Silver: temporal-difference.
+        Propaga o crédito descontado para o nó folha e todos os seus ancestrais no DAG.
         """
-        current = node
-        depth_from_leaf = 0
-        while current is not None:
+        visited = set()
+        queue = [(node, 0)]  # (nó, profundidade_relativa)
+
+        while queue:
             if self._emitter.is_cancelled():
                 break
-            discounted_reward = reward * (self.config.gamma ** depth_from_leaf)
-            current.q_value += discounted_reward
-            current.visits += 1
+            current, depth_from_leaf = queue.pop(0)
+
+            if current.node_id in visited:
+                continue
+            visited.add(current.node_id)
+
+            with current.lock:
+                discounted_reward = reward * (self.config.gamma ** depth_from_leaf)
+                current.q_value += discounted_reward
+                current.sq_q_value += discounted_reward ** 2
+                current.visits += 1
+
+            current.remove_virtual_loss()
             self.notify_node(current)
-            current = current.parent
-            depth_from_leaf += 1
+
+            parents = getattr(current, 'parents', [])
+            if not parents and current.parent:
+                parents = [current.parent]
+
+            for p in parents:
+                if p and p.node_id not in visited:
+                    queue.append((p, depth_from_leaf + 1))
 
     def _discover_strategy(self, leaf: MCTSNode) -> str:
         self._emitter.emit_log('[*] Bandit escolheu __DISCOVER__. Inventando nova heurística de mutação...')
@@ -219,8 +323,14 @@ class Optimizer:
             self._emitter.emit_log(f'[+] Nova estratégia descoberta! {nova_estrat.nome_estrategia}')
             return key
         except Exception as e:
-            self._emitter.emit_error(f'[!] Falha ao inventar estratégia: {e}. Usando fallback.')
-            return '__DISCOVER__'
+            if "RateLimit" in str(e) or "429" in str(e):
+                self._emitter.emit_error('[!] Rate limit atingido na descoberta. Pausando 15s...')
+                time.sleep(15)
+            else:
+                self._emitter.emit_error(f'[!] Falha ao inventar estratégia: {e}. Usando fallback.')
+            # Retorna uma estratégia segura real (fallback) para evitar quebrar o loop
+            fallback_keys = [k for k in self._strategy_registry.get_all_keys() if k != '__DISCOVER__']
+            return fallback_keys[0] if fallback_keys else 'mutador_cognitivo'
 
     def _get_lessons_context(self, feedback: str) -> str:
         similar_experiences = self.experience_store.query_similar(feedback, top_k=3)
@@ -257,38 +367,46 @@ class Optimizer:
         nota: str,
         critica: str
     ) -> Tuple[str, str, bool]:
-        try:
-            self._count_llm_call()  # 1 chamada LLM (agent ou agent_cognitivo)
-            if strategy == 'mutador_cognitivo':
-                predicao = self.agent_cognitivo(
-                    instrucao_anterior=leaf.instruction,
-                    nota_anterior=nota,
-                    feedback_juiz=feedback_completo,
-                    estrategia_mutacao=strategy_prompt,
-                )
-                self._validate_cognitive_output(predicao)
-            else:
-                predicao = self.agent(
-                    instrucao_anterior=leaf.instruction,
-                    nota_anterior=nota,
-                    feedback_juiz=feedback_completo,
-                    estrategia_mutacao=strategy_prompt,
-                )
-            candidata = predicao.nova_instrucao
-            if candidata and candidata.strip() and candidata.strip() != leaf.instruction.strip():
-                if self._should_prune(candidata):
-                    self._emitter.emit_log('    [!] Candidata podada pelo value estimator. Tentando novamente...')
-                    nova_critica = f'{critica}\nA última tentativa gerou uma skill de baixa qualidade estimada. Mude radicalmente a abordagem.'
-                    return '', nova_critica, False
+        for local_attempt in range(3):
+            try:
+                self._count_llm_call()  # 1 chamada LLM (agent ou agent_cognitivo)
+                if strategy == 'mutador_cognitivo':
+                    predicao = self.agent_cognitivo(
+                        instrucao_anterior=leaf.instruction,
+                        nota_anterior=nota,
+                        feedback_juiz=feedback_completo,
+                        estrategia_mutacao=strategy_prompt,
+                    )
+                    self._validate_cognitive_output(predicao)
+                else:
+                    predicao = self.agent(
+                        instrucao_anterior=leaf.instruction,
+                        nota_anterior=nota,
+                        feedback_juiz=feedback_completo,
+                        estrategia_mutacao=strategy_prompt,
+                    )
+                candidata = predicao.nova_instrucao
+                if candidata and candidata.strip() and candidata.strip() != leaf.instruction.strip():
+                    if self._should_prune(candidata, leaf.instruction, strategy):
+                        self._emitter.emit_log('    [!] Candidata podada pelo value estimator / poda dinâmica. Tentando novamente...')
+                        nova_critica = f'{critica}\nA última tentativa gerou uma skill de baixa qualidade estimada. Mude radicalmente a abordagem.'
+                        return '', nova_critica, False
 
-                self._emitter.emit_log(f'    [Crítica]: {predicao.critica}')
-                return candidata, predicao.critica, True
-            else:
-                return self._handle_empty_candidate(critica)
-        except Exception as e:
-            self._emitter.emit_error(f'    [!] Erro técnico na geração: {str(e)}')
-            nova_critica = f'{critica}\nErro técnico ({e}). Tente uma reescrita mais simples.'
-            return '', nova_critica, False
+                    self._emitter.emit_log(f'    [Crítica]: {predicao.critica}')
+                    return candidata, predicao.critica, True
+                else:
+                    return self._handle_empty_candidate(critica)
+            except Exception as e:
+                if "RateLimit" in str(e) or "429" in str(e):
+                    self._emitter.emit_error(f'    [!] Rate Limit atingido. Pausando 15s antes de retentar... ({local_attempt + 1}/3)')
+                    time.sleep(15)
+                    continue
+                self._emitter.emit_error(f'    [!] Erro técnico na geração: {str(e)}')
+                nova_critica = f'{critica}\nErro técnico ({e}). Tente uma reescrita mais simples.'
+                return '', nova_critica, False
+
+        self._emitter.emit_error('    [!] Falha persistente por Rate Limit ou indisponibilidade da API.')
+        return '', f'{critica}\nErro técnico persistente da API.', False
 
     def _expand_node(self, leaf: MCTSNode) -> MCTSNode:
         strategy = self.mutation_bandit.select()
@@ -323,8 +441,15 @@ class Optimizer:
             )
             critica = nova_critica
             if sucesso:
-                nova_instrucao = candidata
-                break
+                if candidata.strip() == leaf.instruction.strip():
+                    self._emitter.emit_log(f'    [Action Reduction] Candidato gerado pela estratégia {strategy_desc} é idêntico ao instrução original. Descartando.')
+                    sucesso = False
+                elif len(candidata.strip()) < 10:
+                    self._emitter.emit_log(f'    [Action Reduction] Candidato gerado pela estratégia {strategy_desc} é muito curto (<10 caracteres). Descartando.')
+                    sucesso = False
+                else:
+                    nova_instrucao = candidata
+                    break
 
             # Trocar de estratégia entre tentativas — a atual falhou
             failed_strategies.add(strategy)
@@ -357,17 +482,26 @@ class Optimizer:
             critica=critica,
             mutation_strategy=strategy,
             depth=leaf.depth + 1,
+            prior=self.value_estimator.estimate(nova_instrucao),
         )
-        leaf.children.append(child)
+        hash_key = hash_instruction(nova_instrucao)
+        canonical_node = self.transposition_table.put(hash_key, child)
+        if canonical_node != child:
+            self._emitter.emit_log("    [Transposition Merge] Nó de instrução alinhado com nó existente em DAG.")
+            child = canonical_node
+        with leaf.lock:
+            if child not in leaf.children:
+                leaf.children.append(child)
 
-        self._expand_count += 1
-        self._expansion_order.append({
-            'expand_num': self._expand_count,
-            'strategy_key': strategy,
-            'strategy_desc': strategy_desc,
-            'depth': child.depth,
-            'parent_score': leaf.q_value / max(1, leaf.visits) if leaf != child else 0.0,
-        })
+        with self.lock:
+            self._expand_count += 1
+            self._expansion_order.append({
+                'expand_num': self._expand_count,
+                'strategy_key': strategy,
+                'strategy_desc': strategy_desc,
+                'depth': child.depth,
+                'parent_score': leaf.q_value / max(1, leaf.visits) if leaf != child else 0.0,
+            })
 
         self.notify_node(child)
         return child
@@ -434,23 +568,31 @@ class Optimizer:
     def _run_mcts_iteration(self, root: MCTSNode) -> Tuple[bool, float]:
         """RN-06: Verifica cancelamento em 3 checkpoints obrigatórios."""
         cfg = self.config
-        if self._emitter.is_cancelled():
+        if self._emitter.is_cancelled() or getattr(self, '_abort_flag', False):
             return True, 0.0
 
         leaf = self.selection(root)
-        if len(leaf.children) >= leaf.max_children_allowed(cfg.progressive_c, cfg.progressive_alpha):
-            child = leaf
-        else:
-            child = self._expand_node(leaf)
+        
+        try:
+            if len(leaf.children) >= leaf.max_children_allowed(cfg.progressive_c, cfg.progressive_alpha):
+                child = leaf
+            else:
+                child = self._expand_node(leaf)
+                child.add_virtual_loss() # Child will be simulated, so we add a virtual loss here
+        finally:
+            if leaf != child:
+                leaf.remove_virtual_loss() # We only needed it for expansion phase on leaf
 
-        if self._emitter.is_cancelled():
+        if self._emitter.is_cancelled() or getattr(self, '_abort_flag', False):
+            if child != leaf:
+                child.remove_virtual_loss()
             return True, 0.0
 
         is_pruned, heuristic_result = self._evaluate_and_prune(child)
         if is_pruned:
             return False, 0.0
 
-        if self._emitter.is_cancelled():
+        if self._emitter.is_cancelled() or getattr(self, '_abort_flag', False):
             return True, 0.0
 
         reward, feedback = self.simulation(child.instruction)
@@ -469,24 +611,30 @@ class Optimizer:
         child.feedback = feedback
         child.last_reward = reward
 
+        with self.lock:
+            if reward > self.best_reward_so_far:
+                self.best_reward_so_far = reward
+
         parent_reward = child.parent.last_reward if child.parent else 0.0
         shaped_reward = calcular_delta_reward(reward, parent_reward)
 
+
         self.backpropagation(child, shaped_reward)
 
-        if child.mutation_strategy:
-            self.mutation_bandit.update(child.mutation_strategy, shaped_reward)
+        with self.lock:
+            if child.mutation_strategy:
+                self.mutation_bandit.update(child.mutation_strategy, shaped_reward)
 
-        self.experience_store.add(Experience(
-            skill_hash=hash_instruction(self.skill_original),
-            mutation_strategy=child.mutation_strategy,
-            delta_reward=reward - parent_reward,
-            absolute_reward=reward,
-            feedback=feedback[:500],
-            parent_instruction_hash=hash_instruction(child.parent.instruction) if child.parent else '',
-            instruction=child.instruction,
-            parent_instruction=child.parent.instruction if child.parent else self.skill_original
-        ))
+            self.experience_store.add(Experience(
+                skill_hash=hash_instruction(self.skill_original),
+                mutation_strategy=child.mutation_strategy,
+                delta_reward=reward - parent_reward,
+                absolute_reward=reward,
+                feedback=feedback[:500],
+                parent_instruction_hash=hash_instruction(child.parent.instruction) if child.parent else '',
+                instruction=child.instruction,
+                parent_instruction=child.parent.instruction if child.parent else self.skill_original
+            ))
 
         return False, reward
 
@@ -511,6 +659,18 @@ class Optimizer:
             self._emit_cost_event(i)  # emite metricas de custo apos a iteracao
             if should_break:
                 return True, consecutive_zeros, consecutive_api_errors
+
+            if iter_reward >= self.config.mcts_early_termination_threshold:
+                self._emitter.emit_log(f'\n[!] EARLY TERMINATION: Recompensa {iter_reward:.3f} >= {self.config.mcts_early_termination_threshold:.3f}. Abortando busca.')
+                return True, consecutive_zeros, consecutive_api_errors
+
+            with self.lock:
+                if self.best_reward_so_far >= self.config.mcts_early_termination_threshold:
+                    self._emitter.emit_log(
+                        f'\n[!] EARLY TERMINATION: Melhor recompensa acumulada ({self.best_reward_so_far:.3f}) '
+                        f'alcançou o limiar ({self.config.mcts_early_termination_threshold:.3f}). Abortando busca.'
+                    )
+                    return True, consecutive_zeros, consecutive_api_errors
 
             if iter_reward == 0.0:
                 consecutive_zeros += 1
@@ -651,20 +811,48 @@ class Optimizer:
 
         consecutive_zeros = 0
         consecutive_api_errors = 0
-
-        for i in range(cfg.max_iterations):
-            if self._emitter.is_cancelled():
-                self._emitter.emit_log('\n[!] OTIMIZAÇÃO INTERROMPIDA PELO USUÁRIO.')
-                break
-
-            should_break, consecutive_zeros, consecutive_api_errors = self._run_single_iteration(
+        self._abort_flag = False
+        
+        def run_task(i):
+            nonlocal consecutive_zeros, consecutive_api_errors
+            if self._emitter.is_cancelled() or self._abort_flag:
+                return True
+            
+            should_break, z, e = self._run_single_iteration(
                 root, i, consecutive_zeros, consecutive_api_errors
             )
+            with self.lock:
+                consecutive_zeros = z
+                consecutive_api_errors = e
+            
             if should_break:
-                break
+                self._abort_flag = True
+            return should_break
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=cfg.num_threads) as executor:
+            futures = [executor.submit(run_task, i) for i in range(cfg.max_iterations)]
+            for future in concurrent.futures.as_completed(futures):
+                if self._emitter.is_cancelled():
+                    self._emitter.emit_log('\n[!] OTIMIZAÇÃO INTERROMPIDA PELO USUÁRIO.')
+                    executor.shutdown(wait=False, cancel_futures=True)
+                    break
+                try:
+                    should_break = future.result()
+                    if should_break:
+                        executor.shutdown(wait=False, cancel_futures=True)
+                        break
+                except Exception as ex:
+                    self._emitter.emit_error(f'[!] Erro fatal em thread: {ex}')
 
         self.experience_store.save()
         self._emitter.emit_log(f'[*] {len(self.experience_store.experiences)} experiências salvas na memória de longo prazo.')
+
+        if hasattr(self, 'transposition_table') and self.transposition_table:
+            tt = self.transposition_table
+            self._emitter.emit_log(
+                f'[*] Tabela de Transposição: {tt.size} nós únicos, '
+                f'{tt.hits} hits de {tt.lookups} buscas ({tt.hit_rate:.1%} taxa de reaproveitamento).'
+            )
 
         self._log_bandit_stats()
 

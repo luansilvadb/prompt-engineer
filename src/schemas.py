@@ -20,3 +20,7 @@ class ConfigResponseDTO(BaseModel):
     modelPrefix: str
     apiBase: str
     hasApiKey: bool
+
+class CompileRequestDTO(BaseModel):
+    optimizerType: Optional[str] = "bootstrap"
+    minReward: Optional[float] = 0.8

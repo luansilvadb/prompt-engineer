@@ -11,7 +11,6 @@ from src.signatures import (
     calcular_delta_reward,
     funcao_de_recompensa,
 )
-from src.infrastructure.dspy_impl import DSPyMutadorCognitivoAgent as MutadorCognitivoAgent
 
 
 def test_raciocinio_cognitivo_happy_path():
@@ -308,21 +307,6 @@ def test_avaliacao_coerces_integer_note_to_float():
     assert av.nota_clareza == 80.0
     assert isinstance(av.nota_clareza, float)
 
-
-def test_avaliacao_parses_embedded_number_from_string():
-    # Juiz pode devolver "85/100" ou "nota: 92" — regex extrai o número.
-    av = Avaliacao(**_av_kwargs(nota_clareza="nota: 85/100"))
-    assert av.nota_clareza == 85.0
-
-
-def test_avaliacao_parses_plain_numeric_string():
-    av = Avaliacao(**_av_kwargs(nota_robustez="92"))
-    assert av.nota_robustez == 92.0
-
-
-def test_avaliacao_rejects_non_numeric_string():
-    with pytest.raises(ValueError, match="numérico"):
-        Avaliacao(**_av_kwargs(nota_clareza="abc"))
 
 
 def test_avaliacao_rejects_note_above_hundred():

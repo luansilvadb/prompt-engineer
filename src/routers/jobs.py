@@ -10,6 +10,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from loguru import logger
 
+from dotenv import load_dotenv as _reload_dotenv
 from src.schemas import OtimizacaoRequestDTO, ConfigRequestDTO, ConfigResponseDTO
 from src.state import JobState, jobs
 import src.store as job_store
@@ -298,8 +299,6 @@ async def stream_progress(job_id: str):
 
 # ── Config (Desktop .env persistence) ────────────────────────────────────────
 
-from dotenv import load_dotenv as _reload_dotenv
-
 _ENV_PATH = _get_env_path()
 
 def _read_dotenv() -> dict[str, str]:
@@ -358,3 +357,26 @@ async def save_config(body: ConfigRequestDTO):
     _write_dotenv(updates)
 
     return {"status": "ok", "message": "Configurações salvas no .env"}
+
+
+@router.get("/drift-status")
+async def get_drift_status():
+    """Retorna o relatório do Drift Gate e o número de elementos do Golden Set."""
+    from src.drift.golden import GoldenSet
+    from src.drift.cache import load_drift_cache
+
+    golden = GoldenSet()
+    report = load_drift_cache()
+
+    return {
+        "status": "ok",
+        "golden_count": len(golden.probes),
+        "is_golden_empty": golden.is_empty(),
+        "cached_report": {
+            "spearman_composite": report.spearman_composite if report else None,
+            "offset_scale": report.offset_scale if report else None,
+            "mean_variance": report.mean_variance if report else None,
+            "critical_rules_violated": report.critical_rules_violated if report else None,
+        } if report else None,
+    }
+
