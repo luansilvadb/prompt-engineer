@@ -249,19 +249,9 @@ class DSPyAvaliadorModoB(IAvaliadorModoB):
             feedback_detalhado=res.feedback_detalhado
         )
 
-# Global instances for teleprompter and backward-compatibility with services that just load
-avaliador_module = dspy.ChainOfThought(AvaliadorDeSkillSignature)
 avaliador_modo_b_module = dspy.ChainOfThought(AvaliadorModoBSignature)
 
 def load_avaliador():
-    model_path_a = Path('src/outputs/models/avaliador_modo_a_otimizado.json')
-    if model_path_a.exists():
-        try:
-            avaliador_module.load(str(model_path_a))
-            print(f"[*] Avaliador otimizado Modo A carregado de {model_path_a}.")
-        except Exception as e:
-            print(f"[!] Erro ao carregar avaliador Modo A: {e}")
-
     model_path_b = Path('src/outputs/models/avaliador_modo_b_otimizado.json')
     if model_path_b.exists():
         try:

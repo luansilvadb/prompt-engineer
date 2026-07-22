@@ -20,7 +20,6 @@ from src.domain.agent_interfaces import (
     IStrategyDiscoverer,
 )
 from src.domain.config import MCTSConfig, load_mcts_config
-from src.domain.scoring_pipeline import IScoringPipeline
 from src.domain.store_interfaces import IAvaliadorCompiler, IExperienceStore, IJobStore
 from src.experience_store_sqlite import create_experience_store
 from src.infrastructure.dspy_impl import (
@@ -30,7 +29,6 @@ from src.infrastructure.dspy_impl import (
     DSPyStrategyDiscoverer,
     load_avaliador,
 )
-from src.infrastructure.scoring_pipeline import ScoringPipeline
 from src.mutation_strategies.bandit import MutationBandit
 from src.domain.bandit_interfaces import IMutationBandit, IStrategyRegistry
 from src.mutation_strategies.registry import StrategyRegistry
@@ -85,14 +83,6 @@ class Container:
     def __init__(self) -> None:
         load_avaliador()
         self._config = load_mcts_config()
-        self._scoring_pipeline = ScoringPipeline(
-            semantic_sim_threshold=self._config.semantic_sim_threshold,
-            density_threshold=self._config.density_threshold,
-            density_multiplier_min=self._config.density_multiplier_min,
-            density_multiplier_max=self._config.density_multiplier_max,
-            density_structured_bonus=self._config.density_structured_bonus,
-            lexical_density_min=self._config.lexical_density_min,
-        )
 
         # ── Registro de dependências ──────────────────────────────────────
         self._registry: dict[str, tuple[Lifecycle, Any | None]] = {
@@ -158,9 +148,6 @@ class Container:
     def get_config(self) -> MCTSConfig:
         return self._config
 
-    def get_scoring_pipeline(self) -> IScoringPipeline:
-        return self._scoring_pipeline
-
     def get_bandit(self) -> IMutationBandit:
         def _factory():
             return MutationBandit(
@@ -209,11 +196,3 @@ class Container:
 
         return True, None
 
-
-# ── Retrocompatibilidade ──────────────────────────────────────────────────────
-
-
-# Mantém create_bandit e create_strategy_registry como aliases depreciados
-# para não quebrar código existente (main.py CLI, tests).
-Container.create_bandit = Container.get_bandit  # type: ignore[attr-defined]
-Container.create_strategy_registry = Container.get_strategy_registry  # type: ignore[attr-defined]

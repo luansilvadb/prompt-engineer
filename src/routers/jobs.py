@@ -60,33 +60,7 @@ async def audit_skill_endpoint(request: Request, body: AuditRequestDTO):
     return report.to_dict()
 
 
-# ── Métricas Simplificadas ────────────────────────────────────────────────────
 
-_request_metrics: list[dict] = []  # Em produção, substituir por Prometheus
-
-
-@router.get("/metrics/summary")
-async def metrics_summary():
-    """Resumo de latência das últimas 100 requests."""
-    if not _request_metrics:
-        return {"status": "ok", "total_requests": 0, "message": "Nenhuma métrica coletada ainda."}
-
-    durations = sorted([m["duration_ms"] for m in _request_metrics])
-    n = len(durations)
-    p50 = durations[int(n * 0.50)] if n > 0 else 0
-    p95 = durations[int(n * 0.95)] if n > 1 else durations[-1]
-    p99 = durations[int(n * 0.99)] if n > 2 else durations[-1]
-
-    return {
-        "status": "ok",
-        "total_requests": n,
-        "avg_ms": round(sum(durations) / n, 2),
-        "p50_ms": p50,
-        "p95_ms": p95,
-        "p99_ms": p99,
-        "max_ms": durations[-1],
-        "min_ms": durations[0],
-    }
 
 
 # ── Optimize ──────────────────────────────────────────────────────────────────
@@ -135,8 +109,8 @@ async def start_optimization(request: Request, body: OtimizacaoRequestDTO, backg
         job_store=container.get_job_store(),
         ai_framework=container.get_ai_framework(),
         config=container.get_config(),
-        bandit=container.create_bandit(),
-        strategy_registry=container.create_strategy_registry(),
+        bandit=container.get_bandit(),
+        strategy_registry=container.get_strategy_registry(),
     )
 
     background_tasks.add_task(service.execute, job_id, loop)

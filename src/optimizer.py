@@ -411,20 +411,60 @@ class Optimizer:
         self._emitter.emit_error('    [!] Falha persistente por Rate Limit ou indisponibilidade da API.')
         return '', f'{critica}\nErro técnico persistente da API.', False
 
-    def _expand_node(self, leaf: MCTSNode) -> MCTSNode:
+    def _pick_strategy(self, leaf: MCTSNode) -> str:
         strategy = self.mutation_bandit.select()
+        return self._discover_strategy(leaf) if strategy == '__DISCOVER__' else strategy
 
-        if strategy == '__DISCOVER__':
-            strategy = self._discover_strategy(leaf)
+    def _try_fallback_strategy(self, leaf: MCTSNode, failed_strategies: set) -> tuple[str, str, str] | None:
+        for _ in range(5):
+            strategy = self._pick_strategy(leaf)
+            if strategy not in failed_strategies:
+                prompt = self._strategy_registry.get_prompt(strategy)
+                desc = self._strategy_registry.get_name(strategy)
+                return strategy, prompt, desc
+        return None
 
+    def _is_candidate_valid(self, candidata: str, leaf: MCTSNode, strategy_desc: str) -> bool:
+        if candidata.strip() == leaf.instruction.strip():
+            self._emitter.emit_log(f'    [Action Reduction] Candidato de {strategy_desc} é idêntico ao original. Descartando.')
+            return False
+        if len(candidata.strip()) < 10:
+            self._emitter.emit_log(f'    [Action Reduction] Candidato de {strategy_desc} muito curto (<10 chars). Descartando.')
+            return False
+        return True
+
+    def _create_child_node(self, leaf: MCTSNode, instruction: str, critica: str, strategy: str, strategy_desc: str) -> MCTSNode:
+        child = MCTSNode(
+            instruction, parent=leaf, feedback='', critica=critica,
+            mutation_strategy=strategy, depth=leaf.depth + 1,
+            prior=self.value_estimator.estimate(instruction),
+        )
+        canonical = self.transposition_table.put(hash_instruction(instruction), child)
+        if canonical != child:
+            self._emitter.emit_log("    [Transposition Merge] Nó alinhado com nó existente em DAG.")
+            child = canonical
+        with leaf.lock:
+            if child not in leaf.children:
+                leaf.children.append(child)
+        with self.lock:
+            self._expand_count += 1
+            self._expansion_order.append({
+                'expand_num': self._expand_count,
+                'strategy_key': strategy,
+                'strategy_desc': strategy_desc,
+                'depth': child.depth,
+                'parent_score': leaf.q_value / max(1, leaf.visits) if leaf != child else 0.0,
+            })
+        self.notify_node(child)
+        return child
+
+    def _expand_node(self, leaf: MCTSNode) -> MCTSNode:
+        strategy = self._pick_strategy(leaf)
         strategy_prompt = self._strategy_registry.get_prompt(strategy)
         strategy_desc = self._strategy_registry.get_name(strategy) or strategy
-
         experience_context = self._get_lessons_context(leaf.feedback)
-
         critica = leaf.feedback
-        nova_instrucao = leaf.instruction
-        failed_strategies = set()
+        failed_strategies: set[str] = set()
 
         for tentativa in range(3):
             if self._emitter.is_cancelled():
@@ -435,79 +475,25 @@ class Optimizer:
             nota = str(leaf.q_value / max(1, leaf.visits))
             self._emitter.emit_log(f'[*] Expandindo nó (Tentativa {tentativa + 1}/3) | Estratégia: {strategy_desc} | Nota: {nota}')
 
-            feedback_completo = critica
-            if experience_context:
-                feedback_completo += experience_context
-
+            feedback_completo = critica + (experience_context if experience_context else '')
             candidata, nova_critica, sucesso = self._try_generate_mutation(
                 leaf, strategy, strategy_prompt, feedback_completo, nota, critica
             )
             critica = nova_critica
-            if sucesso:
-                if candidata.strip() == leaf.instruction.strip():
-                    self._emitter.emit_log(f'    [Action Reduction] Candidato gerado pela estratégia {strategy_desc} é idêntico ao instrução original. Descartando.')
-                    sucesso = False
-                elif len(candidata.strip()) < 10:
-                    self._emitter.emit_log(f'    [Action Reduction] Candidato gerado pela estratégia {strategy_desc} é muito curto (<10 caracteres). Descartando.')
-                    sucesso = False
-                else:
-                    nova_instrucao = candidata
-                    break
 
-            # Trocar de estratégia entre tentativas — a atual falhou
+            if sucesso and self._is_candidate_valid(candidata, leaf, strategy_desc):
+                return self._create_child_node(leaf, candidata, critica, strategy, strategy_desc)
+
             failed_strategies.add(strategy)
             self._emitter.emit_log(f'    [!] Estratégia {strategy_desc} falhou. Selecionando nova estratégia...')
-            fallback_found = False
-            for _ in range(5):
-                strategy = self.mutation_bandit.select()
-                if strategy == '__DISCOVER__':
-                    strategy = self._discover_strategy(leaf)
-                if strategy not in failed_strategies:
-                    strategy_prompt = self._strategy_registry.get_prompt(strategy)
-                    strategy_desc = self._strategy_registry.get_name(strategy)
-                    fallback_found = True
-                    break
-            if not fallback_found:
-                # BUG-1 fix: sem nova estratégia disponível e a atual já falhou.
-                # Retornar leaf evita criar filho idêntico ao pai (instrucao=leaf.instruction).
+            fallback = self._try_fallback_strategy(leaf, failed_strategies)
+            if fallback is None:
                 self._emitter.emit_log('    [!] Todas as estratégias falharam. Retornando nó pai sem expansão.')
                 return leaf
-        else:
-            # BUG-1 fix: todas as 3 tentativas usadas sem sucesso.
-            # Retorna o próprio nó pai sem criar filho inútil.
-            self._emitter.emit_error('[!] Falha em gerar nova instrução após 3 tentativas. Retornando nó pai sem expansão.')
-            return leaf
+            strategy, strategy_prompt, strategy_desc = fallback
 
-        child = MCTSNode(
-            nova_instrucao,
-            parent=leaf,
-            feedback='',
-            critica=critica,
-            mutation_strategy=strategy,
-            depth=leaf.depth + 1,
-            prior=self.value_estimator.estimate(nova_instrucao),
-        )
-        hash_key = hash_instruction(nova_instrucao)
-        canonical_node = self.transposition_table.put(hash_key, child)
-        if canonical_node != child:
-            self._emitter.emit_log("    [Transposition Merge] Nó de instrução alinhado com nó existente em DAG.")
-            child = canonical_node
-        with leaf.lock:
-            if child not in leaf.children:
-                leaf.children.append(child)
-
-        with self.lock:
-            self._expand_count += 1
-            self._expansion_order.append({
-                'expand_num': self._expand_count,
-                'strategy_key': strategy,
-                'strategy_desc': strategy_desc,
-                'depth': child.depth,
-                'parent_score': leaf.q_value / max(1, leaf.visits) if leaf != child else 0.0,
-            })
-
-        self.notify_node(child)
-        return child
+        self._emitter.emit_error('[!] Falha em gerar nova instrução após 3 tentativas. Retornando nó pai sem expansão.')
+        return leaf
 
     def _evaluate_and_prune(self, child: MCTSNode) -> Tuple[bool, dict]:
         """Returns (is_pruned, heuristic_result)"""
@@ -783,57 +769,40 @@ class Optimizer:
 
         return best_node.instruction
 
-    def optimize(self) -> str:
-        cfg = self.config
-        self._emitter.emit_log('\n[+] Inicializando o pipeline MCTS RL customizado com refinamentos...')
-        self._emitter.emit_log(f'    Config: γ={cfg.gamma}, C_ucb={cfg.c_param}, α_pw={cfg.progressive_alpha}, threshold={cfg.value_threshold}')
-
-        root = MCTSNode(self.skill_original, critica='Rascunho Inicial')
-        self.notify_node(root)
-
-        n_samples = self.config.root_median_samples
+    def _evaluate_root(self, root: MCTSNode, n_samples: int) -> None:
         if n_samples == 1:
             self._emitter.emit_log('[*] Avaliando a instrucao original (raiz)...')
             reward, feedback = self.simulation(root.instruction)
         else:
-            self._emitter.emit_log(
-                f'[*] Avaliando a instrucao original (raiz) com mediana de {n_samples}...'
-            )
-            root_rewards = []
-            root_feedbacks = []
-            for sim_i in range(n_samples):
+            self._emitter.emit_log(f'[*] Avaliando a instrucao original (raiz) com mediana de {n_samples}...')
+            rewards, feedbacks = [], []
+            for _ in range(n_samples):
                 if self._emitter.is_cancelled():
                     break
                 r, f = self.simulation(root.instruction)
-                root_rewards.append(r)
-                root_feedbacks.append(f)
-            root_rewards.sort()
-            reward = root_rewards[len(root_rewards) // 2]
-            feedback = root_feedbacks[len(root_feedbacks) // 2]
-            self._emitter.emit_log(
-                f'    [Raiz] {n_samples} avaliacoes: {[f"{v:.3f}" for v in root_rewards]}, '
-                f'mediana={reward:.3f}'
-            )
+                rewards.append(r); feedbacks.append(f)
+            rewards.sort()
+            idx = len(rewards) // 2
+            reward, feedback = rewards[idx], feedbacks[idx]
+            self._emitter.emit_log(f'    [Raiz] {n_samples} avaliacoes: {[f"{v:.3f}" for v in rewards]}, mediana={reward:.3f}')
         root.feedback = feedback
         root.last_reward = reward
         self.backpropagation(root, reward)
 
+    def _run_threaded_search(self, root: MCTSNode) -> None:
+        cfg = self.config
         consecutive_zeros = 0
         consecutive_api_errors = 0
         self._abort_flag = False
-        
+
         def run_task(i):
             nonlocal consecutive_zeros, consecutive_api_errors
             if self._emitter.is_cancelled() or self._abort_flag:
                 return True
-            
-            should_break, z, e = self._run_single_iteration(
-                root, i, consecutive_zeros, consecutive_api_errors
-            )
+            should_break, z, e = self._run_single_iteration(root, i, consecutive_zeros, consecutive_api_errors)
             with self.lock:
                 consecutive_zeros = z
                 consecutive_api_errors = e
-            
             if should_break:
                 self._abort_flag = True
             return should_break
@@ -846,25 +815,33 @@ class Optimizer:
                     executor.shutdown(wait=False, cancel_futures=True)
                     break
                 try:
-                    should_break = future.result()
-                    if should_break:
+                    if future.result():
                         executor.shutdown(wait=False, cancel_futures=True)
                         break
                 except Exception as ex:
                     self._emitter.emit_error(f'[!] Erro fatal em thread: {ex}')
 
+    def _log_final_stats(self) -> None:
         self.experience_store.save()
         self._emitter.emit_log(f'[*] {len(self.experience_store.experiences)} experiências salvas na memória de longo prazo.')
-
-        if hasattr(self, 'transposition_table') and self.transposition_table:
-            tt = self.transposition_table
-            self._emitter.emit_log(
-                f'[*] Tabela de Transposição: {tt.size} nós únicos, '
-                f'{tt.hits} hits de {tt.lookups} buscas ({tt.hit_rate:.1%} taxa de reaproveitamento).'
-            )
-
+        tt = self.transposition_table
+        self._emitter.emit_log(
+            f'[*] Tabela de Transposição: {tt.size} nós únicos, '
+            f'{tt.hits} hits de {tt.lookups} buscas ({tt.hit_rate:.1%} taxa de reaproveitamento).'
+        )
         self._log_bandit_stats()
 
-        self._emitter.emit_log('\n=======================================================\n                OTIMIZAÇÃO CONCLUÍDA                   \n=======================================================\n')
+    def optimize(self) -> str:
+        cfg = self.config
+        self._emitter.emit_log('\n[+] Inicializando o pipeline MCTS RL customizado com refinamentos...')
+        self._emitter.emit_log(f'    Config: γ={cfg.gamma}, C_ucb={cfg.c_param}, α_pw={cfg.progressive_alpha}, threshold={cfg.value_threshold}')
 
+        root = MCTSNode(self.skill_original, critica='Rascunho Inicial')
+        self.notify_node(root)
+        self._evaluate_root(root, cfg.root_median_samples)
+
+        self._run_threaded_search(root)
+        self._log_final_stats()
+
+        self._emitter.emit_log('\n=======================================================\n                OTIMIZAÇÃO CONCLUÍDA                   \n=======================================================\n')
         return self._format_best_node(root)
