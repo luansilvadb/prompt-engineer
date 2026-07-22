@@ -111,9 +111,9 @@ def test_experience_store_lifecycle(tmp_path):
         # Adding exp4 should truncate the oldest one (exp1) because max_experiences=3
         store.add(exp4)
         assert len(store.experiences) == 3
-        # SQLite orders by timestamp ASC for truncation; exp1 was oldest, so exp2 is now first
-        assert store.experiences[0].skill_hash == "h2"
-        assert store.experiences[2].skill_hash == "h4"
+        # SQLite returns newest first (ORDER BY timestamp DESC): [h4, h3, h2]
+        assert store.experiences[0].skill_hash == "h4"
+        assert store.experiences[2].skill_hash == "h2"
 
         # Save to disk
         store.save()
@@ -122,8 +122,8 @@ def test_experience_store_lifecycle(tmp_path):
         # Load from disk in a new store
         store2 = SqliteExperienceStore(gamma=0.9, max_experiences=3)
         assert len(store2.experiences) == 3
-        assert store2.experiences[0].skill_hash == "h2"
-        assert store2.experiences[2].skill_hash == "h4"
+        assert store2.experiences[0].skill_hash == "h4"
+        assert store2.experiences[2].skill_hash == "h2"
         store2.close()
 
 def test_experience_store_query_similar(tmp_path):
