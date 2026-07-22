@@ -143,9 +143,8 @@ class Container:
     def get_experience_store(self) -> IExperienceStore:
         def _factory():
             return create_experience_store(
-                gamma=0.995,  # temporal decay factor (padrão do ExperienceStore)
+                gamma=0.995,  # temporal decay factor
                 max_experiences=500,
-                use_sqlite=True,
             )
 
         return self._resolve("experience_store", _factory)
