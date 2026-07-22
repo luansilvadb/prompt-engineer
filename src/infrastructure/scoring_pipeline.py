@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 from src.domain.scoring_pipeline import CompositeScore, HeuristicResult, IScoringPipeline
-from src.density_evaluator import calculate_density_multiplier
-from src.semantic_evaluator import calculate_semantic_penalty
+from src.evaluators import calculate_density_multiplier, calculate_semantic_penalty
 
 
 class ScoringPipeline(IScoringPipeline):

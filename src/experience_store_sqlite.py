@@ -7,7 +7,7 @@ Substitui o armazenamento JSON Lines + dict em memória por SQLite com:
 - WAL mode para leitura concorrente durante escrita
 - Migração automática do formato antigo JSON Lines
 
-Implementa IExperienceStore (Protocol) — drop-in replacement para ExperienceStore.
+Implementa IExperienceStore (Protocol).
 """
 
 from __future__ import annotations
@@ -247,27 +247,15 @@ class SqliteExperienceStore:
 # ── Fallback Factory ─────────────────────────────────────────────────────────
 
 
-def create_experience_store(gamma: float = 0.995, max_experiences: int = 500, use_sqlite: bool = True):
+def create_experience_store(gamma: float = 0.995, max_experiences: int = 500):
     """
-    Factory que retorna o backend apropriado.
+    Factory que retorna o backend SQLite.
 
     Args:
         gamma: Fator de decaimento temporal
         max_experiences: Número máximo de experiências mantidas
-        use_sqlite: Se True, usa SQLite. Se False, usa JSON Lines original.
 
     Returns:
         Instância compatível com IExperienceStore (Protocol).
     """
-    if use_sqlite:
-        try:
-            return SqliteExperienceStore(gamma=gamma, max_experiences=max_experiences)
-        except Exception:
-            # Fallback para JSON Lines se SQLite falhar
-            from src.experience_store import ExperienceStore
-
-            return ExperienceStore(gamma=gamma, max_experiences=max_experiences)
-    else:
-        from src.experience_store import ExperienceStore
-
-        return ExperienceStore(gamma=gamma, max_experiences=max_experiences)
+    return SqliteExperienceStore(gamma=gamma, max_experiences=max_experiences)

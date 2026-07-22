@@ -1,4 +1,4 @@
-from src.heuristic_evaluator import evaluate_heuristics
+from src.evaluators import evaluate_heuristics
 
 def test_short_text_bypass():
     result = evaluate_heuristics("Curto e direto.")

@@ -34,7 +34,7 @@ Write-Host "[3/4] Executando PyInstaller via SkillOptimizer.spec..." -Foreground
 
 Push-Location $PSScriptRoot
 try {
-    pyinstaller --noconfirm SkillOptimizer.spec
+    pyinstaller --noconfirm scripts/SkillOptimizer.spec
     if ($LASTEXITCODE -ne 0) {
         throw "PyInstaller retornou código de erro $LASTEXITCODE"
     }

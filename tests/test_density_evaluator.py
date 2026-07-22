@@ -1,4 +1,4 @@
-from src.density_evaluator import calculate_density_multiplier, _has_structured_fields
+from src.evaluators.density import calculate_density_multiplier, _has_structured_fields
 
 
 def test_compression_boost():

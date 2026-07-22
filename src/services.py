@@ -9,7 +9,7 @@ from src.domain.config import MCTSConfig, load_mcts_config
 from src.domain.store_interfaces import IJobStore, IAvaliadorCompiler, IExperienceStore
 from src.infrastructure.events import JobEventEmitter
 from src.mutation_strategies.bandit import MutationBandit
-from src.mutation_strategies.bandit_interfaces import IMutationBandit, IStrategyRegistry
+from src.domain.bandit_interfaces import IMutationBandit, IStrategyRegistry
 from src.mutation_strategies.registry import StrategyRegistry
 
 def _create_callbacks(job_id: str, job, loop, store: IJobStore):
