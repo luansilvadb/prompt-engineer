@@ -32,7 +32,7 @@ from src.infrastructure.dspy_impl import (
 )
 from src.infrastructure.scoring_pipeline import ScoringPipeline
 from src.mutation_strategies.bandit import MutationBandit
-from src.mutation_strategies.bandit_interfaces import IMutationBandit, IStrategyRegistry
+from src.domain.bandit_interfaces import IMutationBandit, IStrategyRegistry
 from src.mutation_strategies.registry import StrategyRegistry
 from src.teleprompter import compilar_avaliador
 
@@ -143,9 +143,8 @@ class Container:
     def get_experience_store(self) -> IExperienceStore:
         def _factory():
             return create_experience_store(
-                gamma=0.995,  # temporal decay factor (padrão do ExperienceStore)
+                gamma=0.995,  # temporal decay factor
                 max_experiences=500,
-                use_sqlite=True,
             )
 
         return self._resolve("experience_store", _factory)
@@ -195,7 +194,7 @@ class Container:
 
         # 2. SentenceTransformer (lazy — testa carregamento)
         try:
-            from src.semantic_evaluator import get_embedder
+            from src.evaluators.semantic import get_embedder
 
             get_embedder()
         except Exception as e:

@@ -1,6 +1,6 @@
 import math
 import pytest
-from src.value_estimator import _extract_features, ValueEstimator
+from src.evaluators.value import _extract_features, ValueEstimator
 
 def test_extract_features_empty():
     features = _extract_features("")

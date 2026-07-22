@@ -12,7 +12,7 @@ except ImportError:
 
 @pytest.fixture(autouse=True)
 def clear_semantic_cache():
-    import src.semantic_evaluator as sem
+    import src.evaluators.semantic as sem
     sem._embedder = None
     sem._cached_encode.cache_clear()
     yield
@@ -58,7 +58,7 @@ def mock_heavy_evaluators():
 
     with patch('src.infrastructure.dspy_impl.DSPyAvaliadorModoB', mock_avaliador), \
          patch('sentence_transformers.SentenceTransformer'), \
-         patch('src.semantic_evaluator.SentenceTransformer') as mock_st_module:
+         patch('src.evaluators.semantic.SentenceTransformer') as mock_st_module:
         mock_st_module.return_value = mock_st_instance
         yield {
             'AvaliadorModoB': mock_avaliador,
@@ -83,7 +83,7 @@ def mock_optimizer_factory(mock_heavy_evaluators):
     from src.domain.config import MCTSConfig
     from src.mutation_strategies.bandit import MutationBandit
     from src.mutation_strategies.registry import StrategyRegistry
-    from src.experience_store import ExperienceStore
+    from src.experience_store_sqlite import create_experience_store
     
     def _create_optimizer(skill_original: str = "Test", **overrides):
         mock_emitter = MagicMock()
@@ -96,7 +96,7 @@ def mock_optimizer_factory(mock_heavy_evaluators):
         mock_agent_cognitivo = MagicMock()
         mock_avaliador_modo_b = mock_heavy_evaluators['AvaliadorModoB']
         
-        experience_store = ExperienceStore()
+        experience_store = create_experience_store(db_path=":memory:")
         bandit = MutationBandit()
         strategy_registry = StrategyRegistry()
         

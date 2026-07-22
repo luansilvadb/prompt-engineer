@@ -1,7 +1,7 @@
 from dataclasses import replace
 
 from src.domain.mcts import MCTSNode
-from src.density_evaluator import calculate_density_multiplier
+from src.evaluators import calculate_density_multiplier
 from unittest.mock import MagicMock
 
 

@@ -3,13 +3,14 @@ import time
 from unittest.mock import patch
 from src.experience_store import (
     Experience,
-    ExperienceStore,
     _tokenize,
     _compute_tf,
     _compute_idf,
     _cosine_similarity,
-    hash_instruction
+    hash_instruction,
 )
+from src.experience_store_sqlite import SqliteExperienceStore
+
 
 def test_experience_model():
     exp = Experience(
@@ -48,8 +49,6 @@ def test_experience_model():
 
 def test_tokenize():
     text = "A e o de gato cachorro the and running"
-    # 'A', 'e', 'o', 'de', 'the', 'and' are stop words
-    # 'gato', 'cachorro', 'running' should remain
     tokens = _tokenize(text)
     assert "gato" in tokens
     assert "cachorro" in tokens
@@ -70,9 +69,6 @@ def test_compute_idf():
         ["peixe"]
     ]
     idf = _compute_idf(docs)
-    # n_docs = 3
-    # gato: freq = 2 -> idf = log((1 + 3) / (1 + 2)) + 1 = log(4/3) + 1
-    # peixe: freq = 1 -> idf = log((1 + 3) / (1 + 1)) + 1 = log(2) + 1
     import math
     assert math.isclose(idf["gato"], math.log(4 / 3) + 1)
     assert math.isclose(idf["peixe"], math.log(2) + 1)
@@ -80,18 +76,11 @@ def test_compute_idf():
 def test_cosine_similarity():
     vec_a = {"gato": 1.0, "cachorro": 2.0}
     vec_b = {"gato": 2.0, "peixe": 3.0}
-
-    # common keys: "gato"
-    # dot product = 1.0 * 2.0 = 2.0
-    # mag_a = sqrt(1^2 + 2^2) = sqrt(5)
-    # mag_b = sqrt(2^2 + 3^2) = sqrt(13)
     import math
     expected = 2.0 / (math.sqrt(5) * math.sqrt(13))
     assert math.isclose(_cosine_similarity(vec_a, vec_b), expected)
 
-    # No common keys
     assert _cosine_similarity({"gato": 1.0}, {"peixe": 1.0}) == 0.0
-    # Zero magnitude
     assert _cosine_similarity({"gato": 0.0}, {"peixe": 1.0}) == 0.0
 
 def test_hash_instruction():
@@ -102,9 +91,9 @@ def test_hash_instruction():
     assert len(h1) == 16
 
 def test_experience_store_lifecycle(tmp_path):
-    # Mocking the EXPERIENCES_DIR in experience_store to point to our temp directory
-    with patch("src.experience_store.EXPERIENCES_DIR", tmp_path):
-        store = ExperienceStore(gamma=0.9, max_experiences=3)
+    db_path = tmp_path / "test.db"
+    with patch("src.experience_store_sqlite.DB_PATH", db_path):
+        store = SqliteExperienceStore(gamma=0.9, max_experiences=3)
 
         # Test initial state
         assert len(store.experiences) == 0
@@ -122,40 +111,44 @@ def test_experience_store_lifecycle(tmp_path):
         # Adding exp4 should truncate the oldest one (exp1) because max_experiences=3
         store.add(exp4)
         assert len(store.experiences) == 3
-        assert store.experiences[0].skill_hash == "h2"
-        assert store.experiences[2].skill_hash == "h4"
+        # SQLite returns newest first (ORDER BY timestamp DESC): [h4, h3, h2]
+        assert store.experiences[0].skill_hash == "h4"
+        assert store.experiences[2].skill_hash == "h2"
 
         # Save to disk
         store.save()
+        store.close()
 
         # Load from disk in a new store
-        store2 = ExperienceStore(gamma=0.9, max_experiences=3)
+        store2 = SqliteExperienceStore(gamma=0.9, max_experiences=3)
         assert len(store2.experiences) == 3
-        assert store2.experiences[0].skill_hash == "h2"
-        assert store2.experiences[2].skill_hash == "h4"
+        assert store2.experiences[0].skill_hash == "h4"
+        assert store2.experiences[2].skill_hash == "h2"
+        store2.close()
 
 def test_experience_store_query_similar(tmp_path):
-    with patch("src.experience_store.EXPERIENCES_DIR", tmp_path):
-        store = ExperienceStore(gamma=0.9, max_experiences=10)
+    db_path = tmp_path / "test.db"
+    with patch("src.experience_store_sqlite.DB_PATH", db_path):
+        store = SqliteExperienceStore(gamma=0.9, max_experiences=10)
 
         now = time.time()
-        # Create experiences at different times
         exp_recent = Experience("h1", "s1", 0.5, 1.5, "gato feliz deitado no sol", timestamp=now)
-        exp_old = Experience("h2", "s2", 0.5, 1.5, "gato feliz deitado no sol", timestamp=now - 86400 * 5) # 5 days ago
+        exp_old = Experience("h2", "s2", 0.5, 1.5, "gato feliz deitado no sol", timestamp=now - 86400 * 5)
 
         store.add(exp_old)
         store.add(exp_recent)
 
-        # Querying "gato" should return both, but recent should have higher score (or come first due to decay)
         results = store.query_similar("gato", top_k=2)
         assert len(results) == 2
         # Since text is identical, the decay factor makes recent have higher score
         assert results[0].skill_hash == "h1"
         assert results[1].skill_hash == "h2"
+        store.close()
 
 def test_experience_store_strategy_stats(tmp_path):
-    with patch("src.experience_store.EXPERIENCES_DIR", tmp_path):
-        store = ExperienceStore()
+    db_path = tmp_path / "test.db"
+    with patch("src.experience_store_sqlite.DB_PATH", db_path):
+        store = SqliteExperienceStore()
 
         exp1 = Experience("h1", "strat1", 0.2, 1.0, "f1")
         exp2 = Experience("h2", "strat1", 0.4, 2.0, "f2")
@@ -178,3 +171,4 @@ def test_experience_store_strategy_stats(tmp_path):
         assert pytest.approx(stats["strat2"]["total_delta"]) == 0.3
         assert pytest.approx(stats["strat2"]["mean_delta"]) == 0.3
         assert pytest.approx(stats["strat2"]["total_reward"]) == 1.5
+        store.close()

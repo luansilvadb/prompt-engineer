@@ -1,7 +1,8 @@
 import dspy
 import threading
 from pathlib import Path
-from src.experience_store import ExperienceStore
+from src.domain.store_interfaces import IExperienceStore
+from src.experience_store_sqlite import create_experience_store
 from src.infrastructure.dspy_impl import AvaliadorModoBSignature
 from src.config import get_drift_thresholds
 from dspy.teleprompt import BootstrapFewShot
@@ -23,7 +24,7 @@ _compile_lock = threading.Lock()
 #   "golden_required"    — golden ausente; candidato DESCARTADO (fail-closed). Juiz anterior preservado.
 
 
-def _build_trainset(store: ExperienceStore, min_reward: float) -> list:
+def _build_trainset(store: IExperienceStore, min_reward: float) -> list:
     melhores = [exp for exp in store.experiences if exp.absolute_reward >= min_reward and exp.instruction and exp.parent_instruction]
     if not melhores:
         return []
@@ -237,7 +238,7 @@ def compilar_avaliador(lm=None, min_reward: float = 0.8, optimizer_type: str = "
         # Nota: dspy.configure() já foi chamado pelo setup() na thread do event loop.
         # NÃO chamamos dspy.settings.configure() aqui — seria bloqueado pelo dspy
         # por tentar reconfigurar o singleton a partir de uma thread worker diferente.
-        store = ExperienceStore()
+        store = create_experience_store()
         trainset = _build_trainset(store, min_reward)
         if not trainset:
             print("Nenhuma experiência de alta qualidade (com instrução) encontrada para compilação.")

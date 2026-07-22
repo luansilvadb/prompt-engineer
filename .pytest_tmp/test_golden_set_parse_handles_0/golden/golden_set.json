@@ -1,1 +1,0 @@
-{"version": "1.0.0", "curated_at": "now", "probes": [{"id": "px", "skill_original": "o", "skill_otimizada": "p", "expected": {"manteve_regras_criticas": true, "nota_clareza": 70, "nota_formatacao": 70, "nota_robustez": 70, "nota_densidade_informacional": 70, "nota_acionabilidade": 70, "nota_anti_fragilidade": 70}, "expected_rank_band": "medio"}]}

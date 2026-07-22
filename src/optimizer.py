@@ -32,11 +32,14 @@ from src.domain.mcts import MCTSNode, TranspositionTable
 from src.domain.bandit_interfaces import IMutationBandit, IStrategyRegistry
 from src.signatures import calcular_delta_reward, MutadorCognitivoOutput, _validate_raciocinio, funcao_de_recompensa
 from src.experience_store import Experience, hash_instruction
-from src.value_estimator import ValueEstimator
+from src.evaluators import (
+    ValueEstimator,
+    calculate_density_multiplier,
+    calculate_semantic_penalty,
+    compute_lexical_density,
+    evaluate_heuristics,
+)
 from src.mutation_strategies.api import get_strategy_description
-from src.semantic_evaluator import calculate_semantic_penalty
-from src.heuristic_evaluator import evaluate_heuristics
-from src.density_evaluator import calculate_density_multiplier, compute_lexical_density
 
 
 class Optimizer:
