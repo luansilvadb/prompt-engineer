@@ -9,3 +9,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-refactor-cleanup-densify-2.md`
   summary: `load_drift_history` em history.py ficou totalmente órfã após remoção de `append_drift_report` (seu único chamador)
   evidence: grep em toda a codebase confirma zero referências externas; era transitivamente morta antes mas agora é detectable pelo vulture
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-audit-bugs.md`
+  summary: `_drain_pending_events` materializa fila inteira em lista em vez de fazer yield incremental
+  evidence: Código antigo fazia yield direto no gerador; novo código aloca lista completa antes de iterar, aumentando pico de memória em conexões SSE com filas grandes

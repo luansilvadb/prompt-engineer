@@ -244,19 +244,42 @@ def _check_terminal_events(job) -> list[dict]:
     return events
 
 
+def _drain_pending_events(job):
+    """Drena e formata todos os eventos pendentes na fila do job.
+    Retorna (events_list, first_event_received)."""
+    first_event_received = not job.events_queue.empty()
+    events = []
+    while not job.events_queue.empty():
+        event = job.events_queue.get_nowait()
+        formatted = _format_event(event)
+        if formatted:
+            events.append(formatted)
+    return events, first_event_received
+
+
+async def _try_consume_event(job):
+    """Tenta consumir um evento da fila. Retorna (formatted_event_or_none, should_exit)."""
+    try:
+        event = await asyncio.wait_for(job.events_queue.get(), timeout=0.1)
+        formatted = _format_event(event)
+        job.events_queue.task_done()
+        return formatted, False
+    except TimeoutError:
+        return None, False
+    except asyncio.CancelledError:
+        logger.info("SSE stream do job {} cancelado (CancelledError)", id(job))
+        return {"event": "end", "data": "cancelled"}, True
+
+
 async def _live_event_generator(job):
     """Gera eventos SSE com heartbeat, timeout dinâmico e cleanup de conexões órfãs."""
     start_time = asyncio.get_event_loop().time()
     last_heartbeat = start_time
     HEARTBEAT_INTERVAL = 15.0
 
-    # Drena eventos já enfileirados
-    first_event_received = not job.events_queue.empty()
-    while not job.events_queue.empty():
-        event = job.events_queue.get_nowait()
-        formatted = _format_event(event)
-        if formatted:
-            yield formatted
+    drained, first_event_received = _drain_pending_events(job)
+    for formatted in drained:
+        yield formatted
 
     last_event_time = start_time
 
@@ -276,20 +299,14 @@ async def _live_event_generator(job):
             return
 
         # Consome próximo evento da fila
-        try:
-            event = await asyncio.wait_for(job.events_queue.get(), timeout=0.1)
+        formatted, should_exit = await _try_consume_event(job)
+        if should_exit:
+            yield formatted
+            return
+        if formatted:
             first_event_received = True
             last_event_time = now
-            formatted = _format_event(event)
-            if formatted:
-                yield formatted
-            job.events_queue.task_done()
-        except TimeoutError:
-            pass
-        except asyncio.CancelledError:
-            logger.info("SSE stream do job {} cancelado (CancelledError)", id(job))
-            yield {"event": "end", "data": "cancelled"}
-            return
+            yield formatted
 
         # Verifica estado terminal após processar evento
         terminal_events = _check_terminal_events(job)

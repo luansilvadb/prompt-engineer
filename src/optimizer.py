@@ -42,6 +42,28 @@ from src.evaluators import (
 from src.mutation_strategies.api import get_strategy_description
 
 
+# ── helpers de poda dinâmica (extraídos de _should_prune) ─────────────────────
+
+def _check_lexical_critical(instruction: str) -> bool:
+    """Poda por densidade lexical crítica (< 0.15)."""
+    ld = compute_lexical_density(instruction)
+    return 0 < ld < 0.15
+
+
+def _check_density_critical(instruction: str, ref_instruction: str, mutation_strategy: str = "") -> bool:
+    """Poda por densidade informacional crítica (< 0.20)."""
+    if len(ref_instruction) < 50:
+        return False
+    dm = calculate_density_multiplier(instruction, ref_instruction, mutation_strategy=mutation_strategy)
+    return dm < 0.20
+
+
+def _check_semantic_critical(instruction: str, parent_instruction: str) -> bool:
+    """Poda por penalidade semântica excessiva (< 0.4)."""
+    sp = calculate_semantic_penalty(instruction, parent_instruction)
+    return sp < 0.4
+
+
 class Optimizer:
     def __init__(
         self,
@@ -214,23 +236,18 @@ class Optimizer:
 
     def _should_prune(self, instruction: str, parent_instruction: str = "", mutation_strategy: str = "") -> bool:
         # Dynamic Action Reduction (MCTS Expert - Swiechowski et al. Sec 3.2)
-        lexical_density = compute_lexical_density(instruction)
-        if 0 < lexical_density < 0.15:
-            self._emitter.emit_log(f"    [Poda Dinâmica de Ações] Densidade lexical crítica ({lexical_density:.2f}). Podando antes de simular.")
+        if _check_lexical_critical(instruction):
+            self._emitter.emit_log(f"    [Poda Dinâmica de Ações] Densidade lexical crítica ({compute_lexical_density(instruction):.2f}).")
             return True
-
-        ref_instruction = parent_instruction if parent_instruction else self.skill_original
-        if len(ref_instruction) >= 50:
-            density_mult = calculate_density_multiplier(instruction, ref_instruction, mutation_strategy=mutation_strategy)
-            if density_mult < 0.20:
-                self._emitter.emit_log(f"    [Poda Dinâmica de Ações] Densidade informacional crítica ({density_mult:.2f}). Podando antes de simular.")
-                return True
-
-        if parent_instruction:
-            sem_penalty = calculate_semantic_penalty(instruction, parent_instruction)
-            if sem_penalty < 0.4:
-                self._emitter.emit_log(f"    [Poda Dinâmica de Ações] Penalidade semântica excessiva (fator {sem_penalty:.2f}). Podando antes de simular.")
-                return True
+        ref = parent_instruction or self.skill_original
+        if _check_density_critical(instruction, ref, mutation_strategy):
+            dm = calculate_density_multiplier(instruction, ref, mutation_strategy=mutation_strategy)
+            self._emitter.emit_log(f"    [Poda Dinâmica de Ações] Densidade informacional crítica ({dm:.2f}).")
+            return True
+        if parent_instruction and _check_semantic_critical(instruction, parent_instruction):
+            sp = calculate_semantic_penalty(instruction, parent_instruction)
+            self._emitter.emit_log(f"    [Poda Dinâmica de Ações] Penalidade semântica excessiva ({sp:.2f}).")
+            return True
 
         if self.value_estimator.confidence < 0.3:
             return False
@@ -554,25 +571,64 @@ class Optimizer:
             self._emitter.emit_log(f"    [{direction}] Fator: {density_mult:.2f}")
         return reward * density_mult
 
+    def _is_cancelled(self) -> bool:
+        return self._emitter.is_cancelled() or getattr(self, '_abort_flag', False)
+
+    def _expand_child(self, leaf: MCTSNode) -> MCTSNode:
+        """Expande ou reutiliza leaf; gerencia virtual loss no finally."""
+        cfg = self.config
+        if len(leaf.children) >= leaf.max_children_allowed(cfg.progressive_c, cfg.progressive_alpha):
+            return leaf
+        child = self._expand_node(leaf)
+        child.add_virtual_loss()
+        return child
+
+    def _apply_reward_multipliers(self, reward: float, heuristic_result: dict, child: MCTSNode) -> float:
+        """Aplica multiplicadores de heurística, semântica e densidade + reward floor."""
+        reward_before = reward
+        reward = self._apply_heuristic_multiplier(reward, heuristic_result)
+        reward = self._apply_semantic_penalty(child, reward)
+        reward = self._apply_density_multiplier(child, reward)
+        if reward < self.config.reward_floor and reward_before >= self.config.reward_floor * 2:
+            self._emitter.emit_log(
+                f"    [Reward Floor] reward={reward:.3f} < floor={self.config.reward_floor:.2f}. "
+                f"Restaurando para {self.config.reward_floor:.2f}"
+            )
+            reward = self.config.reward_floor
+        return reward
+
+    def _commit_iteration(self, child: MCTSNode, reward: float, feedback: str):
+        """Persiste resultados da iteração: bandit update e experience store."""
+        parent_reward = child.parent.last_reward if child.parent else 0.0
+        shaped_reward = calcular_delta_reward(reward, parent_reward)
+        self.backpropagation(child, shaped_reward)
+        with self.lock:
+            if child.mutation_strategy:
+                self.mutation_bandit.update(child.mutation_strategy, shaped_reward)
+            self.experience_store.add(Experience(
+                skill_hash=hash_instruction(self.skill_original),
+                mutation_strategy=child.mutation_strategy,
+                delta_reward=reward - parent_reward,
+                absolute_reward=reward,
+                feedback=feedback[:500],
+                parent_instruction_hash=hash_instruction(child.parent.instruction) if child.parent else '',
+                instruction=child.instruction,
+                parent_instruction=child.parent.instruction if child.parent else self.skill_original
+            ))
+
     def _run_mcts_iteration(self, root: MCTSNode) -> Tuple[bool, float]:
         """RN-06: Verifica cancelamento em 3 checkpoints obrigatórios."""
-        cfg = self.config
-        if self._emitter.is_cancelled() or getattr(self, '_abort_flag', False):
+        if self._is_cancelled():
             return True, 0.0
 
         leaf = self.selection(root)
-        
         try:
-            if len(leaf.children) >= leaf.max_children_allowed(cfg.progressive_c, cfg.progressive_alpha):
-                child = leaf
-            else:
-                child = self._expand_node(leaf)
-                child.add_virtual_loss() # Child will be simulated, so we add a virtual loss here
+            child = self._expand_child(leaf)
         finally:
             if leaf != child:
-                leaf.remove_virtual_loss() # We only needed it for expansion phase on leaf
+                leaf.remove_virtual_loss()
 
-        if self._emitter.is_cancelled() or getattr(self, '_abort_flag', False):
+        if self._is_cancelled():
             if child != leaf:
                 child.remove_virtual_loss()
             return True, 0.0
@@ -587,21 +643,11 @@ class Optimizer:
         if is_pruned:
             return False, 0.0
 
-        if self._emitter.is_cancelled() or getattr(self, '_abort_flag', False):
+        if self._is_cancelled():
             return True, 0.0
 
         reward, feedback = self.simulation(child.instruction)
-
-        reward_before_multipliers = reward
-        reward = self._apply_heuristic_multiplier(reward, heuristic_result)
-        reward = self._apply_semantic_penalty(child, reward)
-        reward = self._apply_density_multiplier(child, reward)
-        if reward < self.config.reward_floor and reward_before_multipliers >= self.config.reward_floor * 2:
-            self._emitter.emit_log(
-                f"    [Reward Floor] reward={reward:.3f} < floor={self.config.reward_floor:.2f}. "
-                f"Restaurando para {self.config.reward_floor:.2f}"
-            )
-            reward = self.config.reward_floor
+        reward = self._apply_reward_multipliers(reward, heuristic_result, child)
 
         child.feedback = feedback
         child.last_reward = reward
@@ -610,27 +656,7 @@ class Optimizer:
             if reward > self.best_reward_so_far:
                 self.best_reward_so_far = reward
 
-        parent_reward = child.parent.last_reward if child.parent else 0.0
-        shaped_reward = calcular_delta_reward(reward, parent_reward)
-
-
-        self.backpropagation(child, shaped_reward)
-
-        with self.lock:
-            if child.mutation_strategy:
-                self.mutation_bandit.update(child.mutation_strategy, shaped_reward)
-
-            self.experience_store.add(Experience(
-                skill_hash=hash_instruction(self.skill_original),
-                mutation_strategy=child.mutation_strategy,
-                delta_reward=reward - parent_reward,
-                absolute_reward=reward,
-                feedback=feedback[:500],
-                parent_instruction_hash=hash_instruction(child.parent.instruction) if child.parent else '',
-                instruction=child.instruction,
-                parent_instruction=child.parent.instruction if child.parent else self.skill_original
-            ))
-
+        self._commit_iteration(child, reward, feedback)
         return False, reward
 
     def _get_all_nodes(self, node: MCTSNode) -> list[MCTSNode]:
@@ -799,7 +825,10 @@ class Optimizer:
             nonlocal consecutive_zeros, consecutive_api_errors
             if self._emitter.is_cancelled() or self._abort_flag:
                 return True
-            should_break, z, e = self._run_single_iteration(root, i, consecutive_zeros, consecutive_api_errors)
+            with self.lock:
+                local_zeros = consecutive_zeros
+                local_errors = consecutive_api_errors
+            should_break, z, e = self._run_single_iteration(root, i, local_zeros, local_errors)
             with self.lock:
                 consecutive_zeros = z
                 consecutive_api_errors = e

@@ -1,5 +1,6 @@
 import threading
 import math
+import re
 import uuid
 from typing import Optional, List, Dict
 
@@ -206,22 +207,10 @@ class TranspositionTable:
         if not key:
             return ""
         normalized = key.replace("\r\n", "\n").strip()
-        # Remove cercas markdown (ex: ```markdown ... ``` ou ``` ... ```)
         lines = [line.rstrip() for line in normalized.splitlines()]
-        while lines and not lines[0].strip():
-            lines.pop(0)
-        while lines and not lines[-1].strip():
-            lines.pop()
-        
-        if lines and lines[0].startswith("```"):
-            lines.pop(0)
-        if lines and lines and lines[-1].strip() == "```":
-            lines.pop()
-
-        # Normalizar múltiplos espaços/linhas em branco consecutivos
+        lines = _strip_markdown_fences(lines)
         clean_text = "\n".join(lines).strip()
-        import re
-        clean_text = re.sub(r'\n{3,}', '\n\n', clean_text)
+        clean_text = _collapse_blank_lines(clean_text)
         return clean_text
 
     @property
@@ -280,6 +269,24 @@ class TranspositionTable:
             self._table.clear()
             self._transposition_hits = 0
             self._lookups = 0
+
+
+def _strip_markdown_fences(lines: list[str]) -> list[str]:
+    """Remove linhas em branco das bordas e cercas markdown (ex: ``` ... ```)."""
+    while lines and not lines[0].strip():
+        lines.pop(0)
+    while lines and not lines[-1].strip():
+        lines.pop()
+    if lines and lines[0].startswith("```"):
+        lines.pop(0)
+    if lines and lines and lines[-1].strip() == "```":
+        lines.pop()
+    return lines
+
+
+def _collapse_blank_lines(text: str) -> str:
+    """Normaliza múltiplas linhas em branco consecutivas em no máximo duas."""
+    return re.sub(r'\n{3,}', '\n\n', text)
 
 
 

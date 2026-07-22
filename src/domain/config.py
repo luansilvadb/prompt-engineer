@@ -38,28 +38,48 @@ class MCTSConfig:
     c_bias: float = 0.5
 
     def __post_init__(self) -> None:
-        if self.selection_policy not in ("puct", "ucb1_tuned", "ucb1"):
-            raise ValueError(f"selection_policy deve ser um de ('puct', 'ucb1_tuned', 'ucb1'), recebeu '{self.selection_policy}'")
-        if not (0.0 < self.gamma <= 1.0):
-            raise ValueError("gamma must be in (0.0, 1.0]")
-        if self.c_param <= 0.0:
-            raise ValueError("c_param must be positive")
-        if not (0.0 < self.progressive_alpha <= 1.0):
-            raise ValueError("progressive_alpha must be in (0.0, 1.0]")
-        if self.progressive_c <= 0.0:
-            raise ValueError("progressive_c must be positive")
-        if not (0.0 <= self.value_threshold <= 1.0):
-            raise ValueError("value_threshold must be in [0.0, 1.0]")
-        if self.max_iterations < 1:
-            raise ValueError("max_iterations must be at least 1")
-        if self.density_multiplier_min <= 0.0:
-            raise ValueError("density_multiplier_min must be positive")
-        if self.density_multiplier_max < self.density_multiplier_min:
-            raise ValueError("density_multiplier_max must be >= density_multiplier_min")
-        if self.root_median_samples < 1 or self.root_median_samples % 2 != 1:
-            raise ValueError(
-                f"root_median_samples must be an odd integer >= 1, got {self.root_median_samples}"
-            )
+        _validate_selection_policy(self.selection_policy)
+        _validate_bounds(self.gamma, self.c_param, self.progressive_c)
+        _validate_thresholds(self.progressive_alpha, self.value_threshold, self.max_iterations)
+        _validate_density(self.density_multiplier_min, self.density_multiplier_max)
+        _validate_root_samples(self.root_median_samples)
+
+
+def _validate_selection_policy(policy: str) -> None:
+    if policy not in ("puct", "ucb1_tuned", "ucb1"):
+        raise ValueError(f"selection_policy deve ser um de ('puct', 'ucb1_tuned', 'ucb1'), recebeu '{policy}'")
+
+
+def _validate_bounds(gamma: float, c_param: float, progressive_c: float) -> None:
+    if not (0.0 < gamma <= 1.0):
+        raise ValueError("gamma must be in (0.0, 1.0]")
+    if c_param <= 0.0:
+        raise ValueError("c_param must be positive")
+    if progressive_c <= 0.0:
+        raise ValueError("progressive_c must be positive")
+
+
+def _validate_thresholds(progressive_alpha: float, value_threshold: float, max_iterations: int) -> None:
+    if not (0.0 < progressive_alpha <= 1.0):
+        raise ValueError("progressive_alpha must be in (0.0, 1.0]")
+    if not (0.0 <= value_threshold <= 1.0):
+        raise ValueError("value_threshold must be in [0.0, 1.0]")
+    if max_iterations < 1:
+        raise ValueError("max_iterations must be at least 1")
+
+
+def _validate_density(density_multiplier_min: float, density_multiplier_max: float) -> None:
+    if density_multiplier_min <= 0.0:
+        raise ValueError("density_multiplier_min must be positive")
+    if density_multiplier_max < density_multiplier_min:
+        raise ValueError("density_multiplier_max must be >= density_multiplier_min")
+
+
+def _validate_root_samples(root_median_samples: int) -> None:
+    if root_median_samples < 1 or root_median_samples % 2 != 1:
+        raise ValueError(
+            f"root_median_samples must be an odd integer >= 1, got {root_median_samples}"
+        )
 
 
 def load_mcts_config() -> MCTSConfig:
