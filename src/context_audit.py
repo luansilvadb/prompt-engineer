@@ -7,7 +7,7 @@ Baseado nos 7 critérios empíricos do artigo:
 
 import re
 from dataclasses import dataclass
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Callable
 import textstat
 
 textstat.set_lang('pt')
@@ -59,6 +59,158 @@ _VAGUE_BUZZWORDS = [
 _BUZZWORD_RE = re.compile("|".join(_VAGUE_BUZZWORDS), re.IGNORECASE)
 
 
+# ── critério #1: Role Clarity ───────────────────────────────────────────────
+
+def _eval_role_clarity(text: str, text_lower: str) -> CriterionScore:
+    score = 5.0
+    finding = "Definição de papel genérica ou implícita."
+    if re.search(r"(?i)#+\s*(papel|função|identity|identidade|você é|role|persona)", text):
+        score += 3.0
+        finding = "Seção de identidade/papel explicitamente declarada."
+    if "você é" in text_lower or "you are" in text_lower or "atuando como" in text_lower or "act as" in text_lower:
+        score = min(10.0, score + 2.0)
+        if score < 10.0:
+            finding += " (Declaração de persona identificada)."
+    return CriterionScore("role_clarity", "Clareza de Papel", min(10.0, score), finding)
+
+
+# ── critério #2: Guardrail Coverage ──────────────────────────────────────────
+
+_GUARD_KEYWORDS = [
+    "não", "nunca", "proibido", "apenas se", "restrição", "limite",
+    "never", "do not", "refuse", "guardrail", "atenção", "importante",
+    "warning", "caution", "regras",
+]
+
+def _eval_guardrail_coverage(text_lower: str) -> CriterionScore:
+    score = 2.0
+    finding = "Sem regras de recusa ou limitações claras de segurança."
+    hits = sum(1 for kw in _GUARD_KEYWORDS if kw in text_lower)
+    if hits > 0:
+        score = min(10.0, 2.0 + hits * 1.25)
+        finding = f"Presentes {hits} marcadores de guardrail e restrições comportamentais."
+    return CriterionScore("guardrail_coverage", "Cobertura de Guardrails", score, finding)
+
+
+# ── critério #3: Instruction Consistency ─────────────────────────────────────
+
+def _eval_instruction_consistency(text: str, text_lower: str, total_len: int) -> CriterionScore:
+    score = 7.0
+    finding = "Fluxo de instruções estruturado sem contradições óbvias."
+    if re.search(r"(?i)(prioridade|ordem de precedência|em caso de conflito|prevalece|hierarquia)", text):
+        score = min(10.0, score + 3.0)
+        finding = "Possui regras explícitas de hierarquia e resolução de conflito."
+    elif total_len < 100:
+        score = 4.0
+        finding = "Instruções excessivamente breves podem gerar ambiguidade."
+    return CriterionScore("instruction_consistency", "Consistência de Instruções", min(10.0, score), finding)
+
+
+# ── critério #4: Tool Schema Quality ─────────────────────────────────────────
+
+def _eval_tool_schema(text: str, text_lower: str) -> CriterionScore:
+    score = 5.0
+    finding = "Não cita ferramentas específicas ou possui especificações genéricas."
+    if re.search(r"(?i)(ferramenta|tool|mcp|api|função|parâmetros|schema|json|payload|args|arguments|parameters)", text):
+        score = 7.5
+        finding = "Declaração de ferramentas/parâmetros presentes."
+        if re.search(r"(?i)(string|int|float|boolean|array|object|required|type|esquema)", text):
+            score = 9.5
+            finding = "Contrato de ferramentas fortemente tipado e parametrizado."
+    return CriterionScore("tool_schema_quality", "Contrato de Ferramentas", score, finding)
+
+
+# ── critério #5: Grounding Sufficiency ───────────────────────────────────────
+
+def _eval_grounding(text: str, text_lower: str) -> CriterionScore:
+    score = 3.0
+    finding = "Poucos ou nenhuns exemplos/casos de uso fornecidos no contexto."
+    if re.search(r"(?i)(exemplo|exem:|[eE]xample|caso de uso|few-shot|demonstração|referência|exemplo de uso|exemplo visual)", text):
+        score = 8.5
+        finding = "Contém exemplos práticos ou referências diretas de fundamentação."
+    return CriterionScore("grounding_sufficiency", "Fundamentação (Exemplos/RAG)", score, finding)
+
+
+# ── critério #6: Injection Hardening ─────────────────────────────────────────
+
+_INJECTION_RE = re.compile(
+    r"(?i)(delimitad|untrusted|<user_input>|<context>|<data>|<input>|"
+    r"tags xml|sanitiz|aspas|backticks|separe|trust boundar)"
+)
+
+def _eval_injection_hardening(text_lower: str) -> CriterionScore:
+    score = 3.0
+    finding = "Entradas de usuário não isoladas das instruções do sistema."
+    if _INJECTION_RE.search(text_lower):
+        score = 9.0
+        finding = "Isolamento explícito de inputs não confiáveis e contorno de injeções (tags XML/delimitadores)."
+    return CriterionScore("injection_hardening", "Proteção contra Injeção", score, finding)
+
+
+# ── critério #7: Token Efficiency ────────────────────────────────────────────
+
+def _eval_token_efficiency(text: str, text_lower: str, word_count: int) -> CriterionScore:
+    score = 8.0
+    finding = "Boa densidade semântica e pouca verbosidade oca."
+    buzzwords_found = len(_BUZZWORD_RE.findall(text))
+    if buzzwords_found > 2:
+        score = max(2.0, 8.0 - buzzwords_found * 1.5)
+        finding = f"Presença de {buzzwords_found} clichês/buzzwords de escrita oca de IA."
+    elif word_count > 1000:
+        score = 6.0
+        finding = "Texto muito longo; considere modularizar em sub-skills."
+    return CriterionScore("token_efficiency", "Eficiência de Tokens", score, finding)
+
+
+# ── risk & fix mappers ───────────────────────────────────────────────────────
+
+_RISK_MAP = {
+    "role_clarity": "Risco de desvio de escopo (Instruction Drift) e incerteza operacional.",
+    "guardrail_coverage": "Risco de respostas inadequadas, quebra de limites e alucinações de segurança.",
+    "instruction_consistency": "Risco de comportamentos contraditórios sob cenários de contorno.",
+    "tool_schema_quality": "Risco de chamadas incorretas ou malformadas de ferramentas (Tool Misuse).",
+    "grounding_sufficiency": "Risco elevado de alucinação factual por falta de referências concretas.",
+    "injection_hardening": "Vulnerabilidade a injeções de prompt e manipulação por inputs do usuário.",
+    "token_efficiency": "Desperdício de orçamento de tokens e diluição de atenção em modelos de contexto longo.",
+}
+
+_FIX_MAP = {
+    "guardrail_coverage": "Adicione seções explícitas de restrições ('O que NÃO fazer') e regras de recusa.",
+    "injection_hardening": "Delimite inputs do usuário utilizando tags XML ou marcadores estritos de contorno.",
+    "grounding_sufficiency": "Inclua exemplos de poucos disparos (few-shot) ou esquema explícito de dados.",
+    "role_clarity": "Defina claramente o papel do agente, objetivo central e limites de atuação.",
+    "instruction_consistency": "Especifique regras explícitas de precedência em caso de ambiguidades ou conflitos.",
+    "token_efficiency": "Remova clichês de IA e frases de preenchimento para aumentar a densidade de informação.",
+    "tool_schema_quality": "Documente os parâmetros esperados e os retornos das ferramentas de forma tipada.",
+}
+
+
+def _compute_risks(criteria: List[CriterionScore]) -> List[str]:
+    """Extrai riscos previstos dos 2 critérios com menor nota."""
+    lowest_2 = sorted(criteria, key=lambda c: c.score)[:2]
+    risks = [_RISK_MAP[c.name] for c in lowest_2 if c.score < 7.0 and c.name in _RISK_MAP]
+    return risks or ["Nenhum risco crítico imediato detectado no contexto fornecido."]
+
+
+def _compute_fixes(criteria: List[CriterionScore]) -> List[str]:
+    """Gera top-3 correções a partir dos critérios de menor nota."""
+    fixes = []
+    for c in sorted(criteria, key=lambda c: c.score)[:3]:
+        if c.name in _FIX_MAP:
+            fixes.append(_FIX_MAP[c.name])
+    return fixes[:3]
+
+
+def _compute_grade(overall: float) -> str:
+    if overall >= 8.0:
+        return "Strong"
+    if overall >= 5.0:
+        return "Adequate"
+    return "Weak"
+
+
+# ── entry point ──────────────────────────────────────────────────────────────
+
 def audit_context_heuristics(skill_text: str) -> ContextAuditReport:
     """
     Realiza a auditoria pré-flight do contexto/skill através dos 7 critérios.
@@ -69,139 +221,38 @@ def audit_context_heuristics(skill_text: str) -> ContextAuditReport:
     total_len = len(text)
     word_count = textstat.lexicon_count(text)
 
-    # 1. Role Clarity (Clareza de Papel)
-    role_score = 5.0
-    role_finding = "Definição de papel genérica ou implícita."
-    if re.search(r"(?i)#+\s*(papel|função|identity|identidade|você é|role|persona)", text):
-        role_score += 3.0
-        role_finding = "Seção de identidade/papel explicitamente declarada."
-    if "você é" in text_lower or "you are" in text_lower or "atuando como" in text_lower or "act as" in text_lower:
-        role_score += 2.0
-        if role_score < 10.0:
-            role_finding += " (Declaração de persona identificada)."
-    role_score = min(10.0, role_score)
-
-    # 2. Guardrail Coverage (Cobertura de Guardrails)
-    guard_score = 2.0
-    guard_finding = "Sem regras de recusa ou limitações claras de segurança."
-    guard_keywords = [
-        "não", "nunca", "proibido", "apenas se", "restrição", "limite",
-        "never", "do not", "refuse", "guardrail", "atenção", "importante", "warning", "caution", "regras"
+    evaluators: List[Callable] = [
+        _eval_role_clarity,
+        _eval_guardrail_coverage,
+        _eval_instruction_consistency,
+        _eval_tool_schema,
+        _eval_grounding,
+        _eval_injection_hardening,
+        _eval_token_efficiency,
     ]
-    hits = sum(1 for kw in guard_keywords if kw in text_lower)
-    if hits > 0:
-        guard_score = min(10.0, 2.0 + hits * 1.25)
-        guard_finding = f"Presentes {hits} marcadores de guardrail e restrições comportamentais."
 
-    # 3. Instruction Consistency (Consistência das Instruções)
-    cons_score = 7.0
-    cons_finding = "Fluxo de instruções estruturado sem contradições óbvias."
-    if re.search(r"(?i)(prioridade|ordem de precedência|em caso de conflito|prevalece|hierarquia)", text):
-        cons_score += 3.0
-        cons_finding = "Possui regras explícitas de hierarquia e resolução de conflito."
-    elif total_len < 100:
-        cons_score = 4.0
-        cons_finding = "Instruções excessivamente breves podem gerar ambiguidade."
-    cons_score = min(10.0, cons_score)
-
-    # 4. Tool Schema Quality (Qualidade de Esquema das Ferramentas)
-    tool_score = 5.0
-    tool_finding = "Não cita ferramentas específicas ou possui especificações genéricas."
-    if re.search(r"(?i)(ferramenta|tool|mcp|api|função|parâmetros|schema|json|payload|args|arguments|parameters)", text):
-        tool_score = 7.5
-        tool_finding = "Declaração de ferramentas/parâmetros presentes."
-        if re.search(r"(?i)(string|int|float|boolean|array|object|required|type|esquema)", text):
-            tool_score = 9.5
-            tool_finding = "Contrato de ferramentas fortemente tipado e parametrizado."
-
-    # 5. Grounding Sufficiency (Suficiência de Fundamentação / RAG / Exemplos)
-    ground_score = 3.0
-    ground_finding = "Poucos ou nenhuns exemplos/casos de uso fornecidos no contexto."
-    if re.search(r"(?i)(exemplo|exem:|[eE]xample|caso de uso|few-shot|demonstração|referência|exemplo de uso|exemplo visual)", text):
-        ground_score = 8.5
-        ground_finding = "Contém exemplos práticos ou referências diretas de fundamentação."
-
-    # 6. Injection Hardening (Proteção contra Injeção de Prompt / Untrusted Input)
-    inj_score = 3.0
-    inj_finding = "Entradas de usuário não isoladas das instruções do sistema."
-    if re.search(r"(?i)(delimitad|untrusted|<user_input>|<context>|<data>|<input>|tags xml|sanitiz|aspas|backticks|separe|trust boundar)", text_lower):
-        inj_score = 9.0
-        inj_finding = "Isolamento explícito de inputs não confiáveis e contorno de injeções (tags XML/delimitadores)."
-
-    # 7. Token Efficiency (Eficiência de Tokens e Sinal-Ruído)
-    tok_score = 8.0
-    tok_finding = "Boa densidade semântica e pouca verbosidade oca."
-    buzzwords_found = len(_BUZZWORD_RE.findall(text))
-    if buzzwords_found > 2:
-        tok_score = max(2.0, 8.0 - buzzwords_found * 1.5)
-        tok_finding = f"Presença de {buzzwords_found} clichês/buzzwords de escrita oca de IA."
-    elif word_count > 1000:
-        tok_score = 6.0
-        tok_finding = "Texto muito longo; considere modularizar em sub-skills."
-
-    criteria = [
-        CriterionScore("role_clarity", "Clareza de Papel", role_score, role_finding),
-        CriterionScore("guardrail_coverage", "Cobertura de Guardrails", guard_score, guard_finding),
-        CriterionScore("instruction_consistency", "Consistência de Instruções", cons_score, cons_finding),
-        CriterionScore("tool_schema_quality", "Contrato de Ferramentas", tool_score, tool_finding),
-        CriterionScore("grounding_sufficiency", "Fundamentação (Exemplos/RAG)", ground_score, ground_finding),
-        CriterionScore("injection_hardening", "Proteção contra Injeção", inj_score, inj_finding),
-        CriterionScore("token_efficiency", "Eficiência de Tokens", tok_score, tok_finding),
-    ]
+    criteria: List[CriterionScore] = []
+    for ev in evaluators:
+        # Pass only the arguments each evaluator actually needs (by name)
+        sig = ev.__code__.co_varnames[:ev.__code__.co_argcount]
+        kwargs = {}
+        for param in sig:
+            if param == 'text':
+                kwargs[param] = text
+            elif param == 'text_lower':
+                kwargs[param] = text_lower
+            elif param == 'total_len':
+                kwargs[param] = total_len
+            elif param == 'word_count':
+                kwargs[param] = word_count
+        criteria.append(ev(**kwargs))
 
     overall = sum(c.score for c in criteria) / len(criteria)
 
-    if overall >= 8.0:
-        grade = "Strong"
-    elif overall >= 5.0:
-        grade = "Adequate"
-    else:
-        grade = "Weak"
-
-    # Mapeamento dos riscos previstos (com base nos critérios de menor nota)
-    risks = []
-    sorted_criteria = sorted(criteria, key=lambda c: c.score)
-    lowest_2 = sorted_criteria[:2]
-
-    risk_map = {
-        "role_clarity": "Risco de desvio de escopo (Instruction Drift) e incerteza operacional.",
-        "guardrail_coverage": "Risco de respostas inadequadas, quebra de limites e alucinações de segurança.",
-        "instruction_consistency": "Risco de comportamentos contraditórios sob cenários de contorno.",
-        "tool_schema_quality": "Risco de chamadas incorretas ou malformadas de ferramentas (Tool Misuse).",
-        "grounding_sufficiency": "Risco elevado de alucinação factual por falta de referências concretas.",
-        "injection_hardening": "Vulnerabilidade a injeções de prompt e manipulação por inputs do usuário.",
-        "token_efficiency": "Desperdício de orçamento de tokens e diluição de atenção em modelos de contexto longo.",
-    }
-
-    for c in lowest_2:
-        if c.score < 7.0 and c.name in risk_map:
-            risks.append(risk_map[c.name])
-
-    if not risks:
-        risks.append("Nenhum risco crítico imediato detectado no contexto fornecido.")
-
-    # Top 3 correções de maior alavancagem
-    top_fixes = []
-    for c in sorted_criteria[:3]:
-        if c.name == "guardrail_coverage":
-            top_fixes.append("Adicione seções explícitas de restrições ('O que NÃO fazer') e regras de recusa.")
-        elif c.name == "injection_hardening":
-            top_fixes.append("Delimite inputs do usuário utilizando tags XML ou marcadores estritos de contorno.")
-        elif c.name == "grounding_sufficiency":
-            top_fixes.append("Inclua exemplos de poucos disparos (few-shot) ou esquema explícito de dados.")
-        elif c.name == "role_clarity":
-            top_fixes.append("Defina claramente o papel do agente, objetivo central e limites de atuação.")
-        elif c.name == "instruction_consistency":
-            top_fixes.append("Especifique regras explícitas de precedência em caso de ambiguidades ou conflitos.")
-        elif c.name == "token_efficiency":
-            top_fixes.append("Remova clichês de IA e frases de preenchimento para aumentar a densidade de informação.")
-        elif c.name == "tool_schema_quality":
-            top_fixes.append("Documente os parâmetros esperados e os retornos das ferramentas de forma tipada.")
-
     return ContextAuditReport(
         overall_score=overall,
-        grade=grade,
+        grade=_compute_grade(overall),
         criteria=criteria,
-        predicted_risks=risks,
-        top_fixes=top_fixes[:3],
+        predicted_risks=_compute_risks(criteria),
+        top_fixes=_compute_fixes(criteria),
     )
