@@ -209,13 +209,46 @@ def _format_result_event(job) -> dict:
     }
 
 
+def _should_terminate_sse(job, elapsed: float, now: float, last_event_time: float,
+                          first_event_received: bool) -> dict | None:
+    """Verifica condições de término do SSE. Retorna evento 'end' ou None para continuar."""
+    ORPHAN_TIMEOUT = 120.0
+    ORPHAN_GRACE_PERIOD = 120.0
+
+    if elapsed > MAX_JOB_DURATION_SECONDS:
+        logger.warning("Job {} excedeu timeout máximo de {}s — encerrando SSE", job, MAX_JOB_DURATION_SECONDS)
+        return {"event": "end", "data": "timeout"}
+
+    if (job.status == "running" and first_event_received
+            and elapsed > ORPHAN_GRACE_PERIOD
+            and (now - last_event_time) > ORPHAN_TIMEOUT):
+        logger.warning(
+            "Job {} parece órfão: status=running mas {}s sem eventos — encerrando SSE",
+            id(job), int(now - last_event_time),
+        )
+        job.status = "error"
+        return {"event": "end", "data": "error"}
+
+    return None
+
+
+def _check_terminal_events(job) -> list[dict]:
+    """Retorna lista de eventos finais se o job atingiu estado terminal."""
+    if not job.events_queue.empty():
+        return []
+    events = []
+    if job.status == "completed":
+        events.append(_format_result_event(job))
+    if job.status in ("completed", "error", "cancelled"):
+        events.append({"event": "end", "data": job.status})
+    return events
+
+
 async def _live_event_generator(job):
     """Gera eventos SSE com heartbeat, timeout dinâmico e cleanup de conexões órfãs."""
     start_time = asyncio.get_event_loop().time()
     last_heartbeat = start_time
-    HEARTBEAT_INTERVAL = 15.0  # envia keepalive a cada 15s para evitar timeout de proxy/load balancer
-    ORPHAN_TIMEOUT = 120.0  # considera job órfão se status='running' mas sem eventos por 120s
-    ORPHAN_GRACE_PERIOD = 120.0  # só ativa detecção de órfão após 120s (startup do job é lento)
+    HEARTBEAT_INTERVAL = 15.0
 
     # Drena eventos já enfileirados
     first_event_received = not job.events_queue.empty()
@@ -231,32 +264,18 @@ async def _live_event_generator(job):
         now = asyncio.get_event_loop().time()
         elapsed = now - start_time
 
-        # Heartbeat: mantém conexão viva mesmo sem eventos de negócio
+        # Heartbeat
         if now - last_heartbeat >= HEARTBEAT_INTERVAL:
             last_heartbeat = now
             yield {"comment": "heartbeat"}
 
-        # Timeout máximo do job
-        if elapsed > MAX_JOB_DURATION_SECONDS:
-            logger.warning("Job {} excedeu timeout máximo de {}s — encerrando SSE", job, MAX_JOB_DURATION_SECONDS)
-            yield {"event": "end", "data": "timeout"}
+        # Verifica condições de término
+        end_event = _should_terminate_sse(job, elapsed, now, last_event_time, first_event_received)
+        if end_event:
+            yield end_event
             return
 
-        # Cleanup de jobs órfãos: só ativa após grace period e primeiro evento
-        if (
-            job.status == "running"
-            and first_event_received
-            and elapsed > ORPHAN_GRACE_PERIOD
-            and (now - last_event_time) > ORPHAN_TIMEOUT
-        ):
-            logger.warning(
-                "Job {} parece órfão: status=running mas {}s sem eventos — encerrando SSE",
-                id(job), int(now - last_event_time),
-            )
-            job.status = "error"
-            yield {"event": "end", "data": "error"}
-            return
-
+        # Consome próximo evento da fila
         try:
             event = await asyncio.wait_for(job.events_queue.get(), timeout=0.1)
             first_event_received = True
@@ -272,12 +291,11 @@ async def _live_event_generator(job):
             yield {"event": "end", "data": "cancelled"}
             return
 
-        queue_empty = job.events_queue.empty()
-        if job.status == "completed" and queue_empty:
-            yield _format_result_event(job)
-
-        if job.status in ("completed", "error", "cancelled") and queue_empty:
-            yield {"event": "end", "data": job.status}
+        # Verifica estado terminal após processar evento
+        terminal_events = _check_terminal_events(job)
+        for evt in terminal_events:
+            yield evt
+        if terminal_events and terminal_events[-1].get("event") == "end":
             await asyncio.sleep(0.5)
             return
 

@@ -62,24 +62,6 @@ class MCTSConfig:
             )
 
 
-@dataclass(frozen=True)
-class DriftConfig:
-    spearman_floor: float
-    spearman_regression_margin: float
-    offset_alarm: float
-    offset_regression_margin: float
-    variance_low_confidence: float
-    repetitions: int
-
-    def __post_init__(self) -> None:
-        if not (0.0 <= self.spearman_floor <= 1.0):
-            raise ValueError("spearman_floor must be in [0.0, 1.0]")
-        if self.repetitions < 1:
-            raise ValueError("repetitions must be at least 1")
-        if self.offset_alarm <= 0.0:
-            raise ValueError("offset_alarm must be positive")
-
-
 def load_mcts_config() -> MCTSConfig:
     load_dotenv()
     return MCTSConfig(
@@ -111,16 +93,4 @@ def load_mcts_config() -> MCTSConfig:
         root_median_samples=int(os.environ.get("MCTS_ROOT_MEDIAN_SAMPLES", "1")),
         selection_policy=os.environ.get("MCTS_SELECTION_POLICY", "puct"),
         c_bias=float(os.environ.get("MCTS_C_BIAS", "0.5")),
-    )
-
-
-def load_drift_config() -> DriftConfig:
-    load_dotenv()
-    return DriftConfig(
-        spearman_floor=float(os.environ.get("DRIFT_SPEARMAN_FLOOR", "0.8")),
-        spearman_regression_margin=float(os.environ.get("DRIFT_SPEARMAN_REGRESSION_MARGIN", "0.05")),
-        offset_alarm=float(os.environ.get("DRIFT_OFFSET_ALARM", "10.0")),
-        offset_regression_margin=float(os.environ.get("DRIFT_OFFSET_REGRESSION_MARGIN", "3.0")),
-        variance_low_confidence=float(os.environ.get("DRIFT_VARIANCE_LOW_CONFIDENCE", "8.0")),
-        repetitions=int(os.environ.get("DRIFT_REPETITIONS", "3")),
     )

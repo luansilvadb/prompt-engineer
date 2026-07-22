@@ -167,9 +167,6 @@ class AvaliacaoModoB(Avaliacao):
     defeitos_encontrados: list[str]
 
 
-def _check_critical_rules(resultado: Avaliacao) -> bool:
-    return resultado.manteve_regras_criticas
-
 # Tabela única de pesos das 6 dimensões (DRY — única fonte de verdade).
 # Robustez e acionabilidade valem mais (são os mais críticos para que a
 # skill funcione num agente real). drift_monitor importa esta constante.
@@ -245,7 +242,7 @@ def funcao_de_recompensa(avaliador_modo_b, skill_original: str, skill_otimizada:
             regras_adicionais=regras_adicionais
         )
 
-        if not _check_critical_rules(resultado):
+        if not resultado.manteve_regras_criticas:
             return 0.0, resultado.feedback_detalhado
 
         score = _calculate_score(resultado)
