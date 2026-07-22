@@ -31,7 +31,18 @@ class SelfReflectiveAgentSignature(dspy.Signature):
 class MutadorCognitivoAgentSignature(dspy.Signature):
     """Analisa a instrução com derivação lógica estruturada obrigatória. OBRIGATÓRIO: preencha
     raciocinio_estruturado com premissas, deduções e conclusão explícitas antes de reescrever.
-    A nova instrução DEVE incluir as seções ## Raciocínio, ## Regras, ## Conclusão derivadas do raciocínio."""
+    A nova instrução DEVE incluir EXATAMENTE as três seções no seguinte formato:
+
+    ## Raciocinio
+    [explicação da derivação lógica]
+
+    ## Regras
+    [regras extraídas]
+
+    ## Conclusao
+    [conclusão final]
+
+    NOTA: Use 'Raciocinio', 'Regras', 'Conclusao' (sem acentos) nos headings."""
     instrucao_anterior: str = dspy.InputField()
     nota_anterior: str = dspy.InputField()
     feedback_juiz: str = dspy.InputField(desc="Feedback detalhado do avaliador explicando os motivos da nota.")
@@ -41,7 +52,7 @@ class MutadorCognitivoAgentSignature(dspy.Signature):
         desc="Derivação lógica obrigatória com campos: premissas | deducoes | conclusao. Não pode ser genérico."
     )
     nova_instrucao: str = dspy.OutputField(
-        desc="A nova skill reescrita em Markdown. DEVE conter ## Raciocínio, ## Regras, ## Conclusão derivados do raciocinio_estruturado."
+        desc="A nova skill reescrita em Markdown. DEVE conter EXATAMENTE as seções: ## Raciocinio, ## Regras, ## Conclusao (use sem acento nos headings)."
     )
 
 class AvaliadorDeSkillSignature(dspy.Signature):
@@ -173,6 +184,14 @@ class DSPyMutadorCognitivoAgent(IMutadorCognitivoAgent):
         else:
             predictor = self._predictor
 
+        _FORMAT_TEMPLATE = (
+            "\n\n[FORMATO OBRIGATÓRIO DA RESPOSTA]\n"
+            "O campo nova_instrucao DEVE seguir este template exato:\n"
+            "## Raciocinio\n[analise logica]\n\n"
+            "## Regras\n[regras derivadas]\n\n"
+            "## Conclusao\n[conclusao final]\n"
+        )
+
         max_retries = 2
         res = None
         current_strategy = estrategia_mutacao
@@ -183,11 +202,15 @@ class DSPyMutadorCognitivoAgent(IMutadorCognitivoAgent):
                 feedback_juiz=feedback_juiz,
                 estrategia_mutacao=current_strategy
             )
-            
+
             if res.nova_instrucao and res.nova_instrucao.strip() and res.nova_instrucao.strip() != instrucao_anterior.strip():
                 break
-                
-            current_strategy += "\n[CRÍTICO] A ÚLTIMA RESPOSTA GERADA FOI IDÊNTICA À ORIGINAL. ISSO É INACEITÁVEL. VOCÊ DEVE REESCREVER O TEXTO APLICANDO A MUTAÇÃO!"
+
+            # Reforça o formato obrigatório no retry
+            current_strategy = estrategia_mutacao + _FORMAT_TEMPLATE + (
+                "\n[CRÍTICO] A ÚLTIMA RESPOSTA GERADA FOI IDÊNTICA À ORIGINAL. "
+                "ISSO É INACEITÁVEL. VOCÊ DEVE REESCREVER O TEXTO APLICANDO A MUTAÇÃO!"
+            )
 
         return MutadorCognitivoAgentOutput(
             critica=res.critica,

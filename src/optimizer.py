@@ -362,13 +362,21 @@ class Optimizer:
         return ''
 
     def _validate_cognitive_output(self, predicao) -> None:
-        """Valida as seções obrigatórias da saída do agente cognitivo."""
+        """Valida as seções obrigatórias da saída do agente cognitivo.
+
+        Se a validação falhar por seções ausentes, tenta auto-reparo injetando
+        as seções faltantes. Só emite erro se o reparo também falhar.
+        """
         try:
             _validate_raciocinio(predicao.raciocinio_estruturado)
         except Exception as e:
             self._emitter.emit_error(f'[!] raciocinio_estruturado invalido: {e}')
         try:
-            MutadorCognitivoOutput(nova_instrucao=predicao.nova_instrucao)
+            output = MutadorCognitivoOutput(nova_instrucao=predicao.nova_instrucao)
+            if output.auto_fix:
+                self._emitter.emit_log('    [Auto-Reparo] Seções cognitivas ausentes foram injetadas automaticamente.')
+                # Atualiza a predicação com a versão reparada
+                object.__setattr__(predicao, 'nova_instrucao', output.nova_instrucao)
         except Exception as e:
             self._emitter.emit_error(f'[!] nova_instrucao secoes cognitivas invalidas: {e}')
 

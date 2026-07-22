@@ -101,3 +101,6 @@ nul
 =======
 >>>>>>> 0b18914 (chore: remove .pytest_tmp from tracking, add to .gitignore)
 .pytest_tmp/
+
+# Stakpak session files
+.stakpak/session*

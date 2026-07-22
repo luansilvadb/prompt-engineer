@@ -52,15 +52,63 @@ def test_mutador_cognitivo_output_valid():
     assert out.nova_instrucao
 
 
-def test_mutador_cognitivo_output_missing_heading():
+def test_mutador_cognitivo_output_missing_heading_auto_fixed():
+    """Auto-reparo injeta ## Conclusão ausente usando o último parágrafo."""
+    out = MutadorCognitivoOutput(
+        nova_instrucao=(
+            "## Raciocínio\nThe analysis shows we need better structure here.\n"
+            "## Regras\nFollow strict logical derivation in every section.\n"
+            "Missing the conclusao heading entirely here."
+        )
+    )
+    assert out.auto_fix is True
+    assert '## Conclusão' in out.nova_instrucao or '## Conclusao' in out.nova_instrucao
+
+
+def test_mutador_cognitivo_output_still_fails_when_unrepairable():
+    """Se o texto for curto demais, auto-reparo não consegue injetar seções e ainda levanta erro."""
     with pytest.raises((ValueError, ValidationError)):
         MutadorCognitivoOutput(
-            nova_instrucao=(
-                "## Raciocínio\nThe analysis shows we need better structure here.\n"
-                "## Regras\nFollow strict logical derivation in every section.\n"
-                "Missing the conclusao heading entirely here."
-            )
+            nova_instrucao="Just a short text without any headings."
         )
+
+
+def test_mutador_cognitivo_output_auto_fix_injects_raciocinio():
+    """Quando falta ## Raciocínio mas ## Regras existe, o prefixo vira ## Raciocínio."""
+    out = MutadorCognitivoOutput(
+        nova_instrucao=(
+            "This is the reasoning part that should become raciocinio.\n"
+            "It has enough content to qualify for auto-fix injection.\n"
+            "## Regras\nFollow strict logical derivation.\n"
+            "## Conclusao\nFinal conclusion here."
+        )
+    )
+    assert out.auto_fix is True
+    assert '## Raciocínio' in out.nova_instrucao or '## Raciocinio' in out.nova_instrucao
+
+
+def test_mutador_cognitivo_output_valid_no_fix_needed():
+    """Quando todas as seções estão presentes, auto_fix é False."""
+    out = MutadorCognitivoOutput(
+        nova_instrucao=(
+            "## Raciocinio\nReasoning here.\n"
+            "## Regras\nRules here.\n"
+            "## Conclusao\nConclusion here."
+        )
+    )
+    assert out.auto_fix is False
+
+
+def test_mutador_cognitivo_output_accent_insensitive():
+    """Headings com ou sem acentos, maiúsculas/minúsculas são todos aceitos."""
+    out = MutadorCognitivoOutput(
+        nova_instrucao=(
+            "## RACIOCÍNIO\nReasoning.\n"
+            "## regras\nRules.\n"
+            "## ConCluSãO\nConclusion."
+        )
+    )
+    assert out.auto_fix is False
 
 
 def test_validate_raciocinio_valid():

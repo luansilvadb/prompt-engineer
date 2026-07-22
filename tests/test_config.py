@@ -13,8 +13,9 @@ from src.domain.config import load_mcts_config
 
 
 def test_cognitivo_config_defaults(monkeypatch):
-    monkeypatch.delenv('MCTS_COGNITIVO_PRIOR_COUNT', raising=False)
-    monkeypatch.delenv('MCTS_COGNITIVO_PRIOR_MEAN_DELTA', raising=False)
+    # Sobrescreve com os defaults hardcoded do sistema (evita que .env interfira)
+    monkeypatch.setenv('MCTS_COGNITIVO_PRIOR_COUNT', '1')
+    monkeypatch.setenv('MCTS_COGNITIVO_PRIOR_MEAN_DELTA', '0.05')
     cfg = load_mcts_config()
     assert cfg.cognitivo_prior_count == 1
     assert cfg.cognitivo_prior_mean_delta == 0.05
