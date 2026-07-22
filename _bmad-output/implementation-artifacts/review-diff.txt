@@ -1,371 +1,145 @@
-warning: in the working copy of 'src/context_audit.py', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'src/domain/agent_interfaces.py', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'src/routers/jobs.py', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'src/teleprompter.py', LF will be replaced by CRLF the next time Git touches it
-diff --git a/src/context_audit.py b/src/context_audit.py
-index 54b8090..aa49a6b 100644
---- a/src/context_audit.py
-+++ b/src/context_audit.py
-@@ -7,7 +7,7 @@ Baseado nos 7 critérios empíricos do artigo:
+warning: in the working copy of 'src/domain/mcts.py', LF will be replaced by CRLF the next time Git touches it
+diff --git a/src/domain/config.py b/src/domain/config.py
+index db6bcd7..93a93ec 100644
+--- a/src/domain/config.py
++++ b/src/domain/config.py
+@@ -38,28 +38,48 @@ class MCTSConfig:
+     c_bias: float = 0.5
  
- import re
- from dataclasses import dataclass
--from typing import Dict, Any, List
-+from typing import Dict, Any, List, Callable
- import textstat
+     def __post_init__(self) -> None:
+-        if self.selection_policy not in ("puct", "ucb1_tuned", "ucb1"):
+-            raise ValueError(f"selection_policy deve ser um de ('puct', 'ucb1_tuned', 'ucb1'), recebeu '{self.selection_policy}'")
+-        if not (0.0 < self.gamma <= 1.0):
+-            raise ValueError("gamma must be in (0.0, 1.0]")
+-        if self.c_param <= 0.0:
+-            raise ValueError("c_param must be positive")
+-        if not (0.0 < self.progressive_alpha <= 1.0):
+-            raise ValueError("progressive_alpha must be in (0.0, 1.0]")
+-        if self.progressive_c <= 0.0:
+-            raise ValueError("progressive_c must be positive")
+-        if not (0.0 <= self.value_threshold <= 1.0):
+-            raise ValueError("value_threshold must be in [0.0, 1.0]")
+-        if self.max_iterations < 1:
+-            raise ValueError("max_iterations must be at least 1")
+-        if self.density_multiplier_min <= 0.0:
+-            raise ValueError("density_multiplier_min must be positive")
+-        if self.density_multiplier_max < self.density_multiplier_min:
+-            raise ValueError("density_multiplier_max must be >= density_multiplier_min")
+-        if self.root_median_samples < 1 or self.root_median_samples % 2 != 1:
+-            raise ValueError(
+-                f"root_median_samples must be an odd integer >= 1, got {self.root_median_samples}"
+-            )
++        _validate_selection_policy(self.selection_policy)
++        _validate_bounds(self.gamma, self.c_param, self.progressive_c)
++        _validate_thresholds(self.progressive_alpha, self.value_threshold, self.max_iterations)
++        _validate_density(self.density_multiplier_min, self.density_multiplier_max)
++        _validate_root_samples(self.root_median_samples)
++
++
++def _validate_selection_policy(policy: str) -> None:
++    if policy not in ("puct", "ucb1_tuned", "ucb1"):
++        raise ValueError(f"selection_policy deve ser um de ('puct', 'ucb1_tuned', 'ucb1'), recebeu '{policy}'")
++
++
++def _validate_bounds(gamma: float, c_param: float, progressive_c: float) -> None:
++    if not (0.0 < gamma <= 1.0):
++        raise ValueError("gamma must be in (0.0, 1.0]")
++    if c_param <= 0.0:
++        raise ValueError("c_param must be positive")
++    if progressive_c <= 0.0:
++        raise ValueError("progressive_c must be positive")
++
++
++def _validate_thresholds(progressive_alpha: float, value_threshold: float, max_iterations: int) -> None:
++    if not (0.0 < progressive_alpha <= 1.0):
++        raise ValueError("progressive_alpha must be in (0.0, 1.0]")
++    if not (0.0 <= value_threshold <= 1.0):
++        raise ValueError("value_threshold must be in [0.0, 1.0]")
++    if max_iterations < 1:
++        raise ValueError("max_iterations must be at least 1")
++
++
++def _validate_density(density_multiplier_min: float, density_multiplier_max: float) -> None:
++    if density_multiplier_min <= 0.0:
++        raise ValueError("density_multiplier_min must be positive")
++    if density_multiplier_max < density_multiplier_min:
++        raise ValueError("density_multiplier_max must be >= density_multiplier_min")
++
++
++def _validate_root_samples(root_median_samples: int) -> None:
++    if root_median_samples < 1 or root_median_samples % 2 != 1:
++        raise ValueError(
++            f"root_median_samples must be an odd integer >= 1, got {root_median_samples}"
++        )
  
- textstat.set_lang('pt')
-@@ -59,149 +59,200 @@ _VAGUE_BUZZWORDS = [
- _BUZZWORD_RE = re.compile("|".join(_VAGUE_BUZZWORDS), re.IGNORECASE)
  
+ def load_mcts_config() -> MCTSConfig:
+diff --git a/src/domain/mcts.py b/src/domain/mcts.py
+index 87c4dd1..23fc7de 100644
+--- a/src/domain/mcts.py
++++ b/src/domain/mcts.py
+@@ -1,5 +1,6 @@
+ import threading
+ import math
++import re
+ import uuid
+ from typing import Optional, List, Dict
  
--def audit_context_heuristics(skill_text: str) -> ContextAuditReport:
--    """
--    Realiza a auditoria pré-flight do contexto/skill através dos 7 critérios.
--    Funciona via análise estática heurística e estrutural imediata.
--    """
--    text = skill_text.strip()
--    text_lower = text.lower()
--    total_len = len(text)
--    word_count = textstat.lexicon_count(text)
-+# ── critério #1: Role Clarity ───────────────────────────────────────────────
- 
--    # 1. Role Clarity (Clareza de Papel)
--    role_score = 5.0
--    role_finding = "Definição de papel genérica ou implícita."
-+def _eval_role_clarity(text: str, text_lower: str) -> CriterionScore:
-+    score = 5.0
-+    finding = "Definição de papel genérica ou implícita."
-     if re.search(r"(?i)#+\s*(papel|função|identity|identidade|você é|role|persona)", text):
--        role_score += 3.0
--        role_finding = "Seção de identidade/papel explicitamente declarada."
-+        score += 3.0
-+        finding = "Seção de identidade/papel explicitamente declarada."
-     if "você é" in text_lower or "you are" in text_lower or "atuando como" in text_lower or "act as" in text_lower:
--        role_score += 2.0
--        if role_score < 10.0:
--            role_finding += " (Declaração de persona identificada)."
--    role_score = min(10.0, role_score)
+@@ -206,22 +207,10 @@ class TranspositionTable:
+         if not key:
+             return ""
+         normalized = key.replace("\r\n", "\n").strip()
+-        # Remove cercas markdown (ex: ```markdown ... ``` ou ``` ... ```)
+         lines = [line.rstrip() for line in normalized.splitlines()]
+-        while lines and not lines[0].strip():
+-            lines.pop(0)
+-        while lines and not lines[-1].strip():
+-            lines.pop()
+-        
+-        if lines and lines[0].startswith("```"):
+-            lines.pop(0)
+-        if lines and lines and lines[-1].strip() == "```":
+-            lines.pop()
 -
--    # 2. Guardrail Coverage (Cobertura de Guardrails)
--    guard_score = 2.0
--    guard_finding = "Sem regras de recusa ou limitações claras de segurança."
--    guard_keywords = [
--        "não", "nunca", "proibido", "apenas se", "restrição", "limite",
--        "never", "do not", "refuse", "guardrail", "atenção", "importante", "warning", "caution", "regras"
--    ]
--    hits = sum(1 for kw in guard_keywords if kw in text_lower)
-+        score = min(10.0, score + 2.0)
-+        if score < 10.0:
-+            finding += " (Declaração de persona identificada)."
-+    return CriterionScore("role_clarity", "Clareza de Papel", min(10.0, score), finding)
-+
-+
-+# ── critério #2: Guardrail Coverage ──────────────────────────────────────────
-+
-+_GUARD_KEYWORDS = [
-+    "não", "nunca", "proibido", "apenas se", "restrição", "limite",
-+    "never", "do not", "refuse", "guardrail", "atenção", "importante",
-+    "warning", "caution", "regras",
-+]
-+
-+def _eval_guardrail_coverage(text_lower: str) -> CriterionScore:
-+    score = 2.0
-+    finding = "Sem regras de recusa ou limitações claras de segurança."
-+    hits = sum(1 for kw in _GUARD_KEYWORDS if kw in text_lower)
-     if hits > 0:
--        guard_score = min(10.0, 2.0 + hits * 1.25)
--        guard_finding = f"Presentes {hits} marcadores de guardrail e restrições comportamentais."
-+        score = min(10.0, 2.0 + hits * 1.25)
-+        finding = f"Presentes {hits} marcadores de guardrail e restrições comportamentais."
-+    return CriterionScore("guardrail_coverage", "Cobertura de Guardrails", score, finding)
-+
+-        # Normalizar múltiplos espaços/linhas em branco consecutivos
++        lines = _strip_markdown_fences(lines)
+         clean_text = "\n".join(lines).strip()
+-        import re
+-        clean_text = re.sub(r'\n{3,}', '\n\n', clean_text)
++        clean_text = _collapse_blank_lines(clean_text)
+         return clean_text
  
--    # 3. Instruction Consistency (Consistência das Instruções)
--    cons_score = 7.0
--    cons_finding = "Fluxo de instruções estruturado sem contradições óbvias."
-+# ── critério #3: Instruction Consistency ─────────────────────────────────────
-+
-+def _eval_instruction_consistency(text: str, text_lower: str, total_len: int) -> CriterionScore:
-+    score = 7.0
-+    finding = "Fluxo de instruções estruturado sem contradições óbvias."
-     if re.search(r"(?i)(prioridade|ordem de precedência|em caso de conflito|prevalece|hierarquia)", text):
--        cons_score += 3.0
--        cons_finding = "Possui regras explícitas de hierarquia e resolução de conflito."
-+        score = min(10.0, score + 3.0)
-+        finding = "Possui regras explícitas de hierarquia e resolução de conflito."
-     elif total_len < 100:
--        cons_score = 4.0
--        cons_finding = "Instruções excessivamente breves podem gerar ambiguidade."
--    cons_score = min(10.0, cons_score)
-+        score = 4.0
-+        finding = "Instruções excessivamente breves podem gerar ambiguidade."
-+    return CriterionScore("instruction_consistency", "Consistência de Instruções", min(10.0, score), finding)
-+
- 
--    # 4. Tool Schema Quality (Qualidade de Esquema das Ferramentas)
--    tool_score = 5.0
--    tool_finding = "Não cita ferramentas específicas ou possui especificações genéricas."
-+# ── critério #4: Tool Schema Quality ─────────────────────────────────────────
-+
-+def _eval_tool_schema(text: str, text_lower: str) -> CriterionScore:
-+    score = 5.0
-+    finding = "Não cita ferramentas específicas ou possui especificações genéricas."
-     if re.search(r"(?i)(ferramenta|tool|mcp|api|função|parâmetros|schema|json|payload|args|arguments|parameters)", text):
--        tool_score = 7.5
--        tool_finding = "Declaração de ferramentas/parâmetros presentes."
-+        score = 7.5
-+        finding = "Declaração de ferramentas/parâmetros presentes."
-         if re.search(r"(?i)(string|int|float|boolean|array|object|required|type|esquema)", text):
--            tool_score = 9.5
--            tool_finding = "Contrato de ferramentas fortemente tipado e parametrizado."
-+            score = 9.5
-+            finding = "Contrato de ferramentas fortemente tipado e parametrizado."
-+    return CriterionScore("tool_schema_quality", "Contrato de Ferramentas", score, finding)
-+
-+
-+# ── critério #5: Grounding Sufficiency ───────────────────────────────────────
- 
--    # 5. Grounding Sufficiency (Suficiência de Fundamentação / RAG / Exemplos)
--    ground_score = 3.0
--    ground_finding = "Poucos ou nenhuns exemplos/casos de uso fornecidos no contexto."
-+def _eval_grounding(text: str, text_lower: str) -> CriterionScore:
-+    score = 3.0
-+    finding = "Poucos ou nenhuns exemplos/casos de uso fornecidos no contexto."
-     if re.search(r"(?i)(exemplo|exem:|[eE]xample|caso de uso|few-shot|demonstração|referência|exemplo de uso|exemplo visual)", text):
--        ground_score = 8.5
--        ground_finding = "Contém exemplos práticos ou referências diretas de fundamentação."
--
--    # 6. Injection Hardening (Proteção contra Injeção de Prompt / Untrusted Input)
--    inj_score = 3.0
--    inj_finding = "Entradas de usuário não isoladas das instruções do sistema."
--    if re.search(r"(?i)(delimitad|untrusted|<user_input>|<context>|<data>|<input>|tags xml|sanitiz|aspas|backticks|separe|trust boundar)", text_lower):
--        inj_score = 9.0
--        inj_finding = "Isolamento explícito de inputs não confiáveis e contorno de injeções (tags XML/delimitadores)."
--
--    # 7. Token Efficiency (Eficiência de Tokens e Sinal-Ruído)
--    tok_score = 8.0
--    tok_finding = "Boa densidade semântica e pouca verbosidade oca."
-+        score = 8.5
-+        finding = "Contém exemplos práticos ou referências diretas de fundamentação."
-+    return CriterionScore("grounding_sufficiency", "Fundamentação (Exemplos/RAG)", score, finding)
-+
-+
-+# ── critério #6: Injection Hardening ─────────────────────────────────────────
-+
-+_INJECTION_RE = re.compile(
-+    r"(?i)(delimitad|untrusted|<user_input>|<context>|<data>|<input>|"
-+    r"tags xml|sanitiz|aspas|backticks|separe|trust boundar)"
-+)
-+
-+def _eval_injection_hardening(text_lower: str) -> CriterionScore:
-+    score = 3.0
-+    finding = "Entradas de usuário não isoladas das instruções do sistema."
-+    if _INJECTION_RE.search(text_lower):
-+        score = 9.0
-+        finding = "Isolamento explícito de inputs não confiáveis e contorno de injeções (tags XML/delimitadores)."
-+    return CriterionScore("injection_hardening", "Proteção contra Injeção", score, finding)
-+
-+
-+# ── critério #7: Token Efficiency ────────────────────────────────────────────
-+
-+def _eval_token_efficiency(text: str, text_lower: str, word_count: int) -> CriterionScore:
-+    score = 8.0
-+    finding = "Boa densidade semântica e pouca verbosidade oca."
-     buzzwords_found = len(_BUZZWORD_RE.findall(text))
-     if buzzwords_found > 2:
--        tok_score = max(2.0, 8.0 - buzzwords_found * 1.5)
--        tok_finding = f"Presença de {buzzwords_found} clichês/buzzwords de escrita oca de IA."
-+        score = max(2.0, 8.0 - buzzwords_found * 1.5)
-+        finding = f"Presença de {buzzwords_found} clichês/buzzwords de escrita oca de IA."
-     elif word_count > 1000:
--        tok_score = 6.0
--        tok_finding = "Texto muito longo; considere modularizar em sub-skills."
--
--    criteria = [
--        CriterionScore("role_clarity", "Clareza de Papel", role_score, role_finding),
--        CriterionScore("guardrail_coverage", "Cobertura de Guardrails", guard_score, guard_finding),
--        CriterionScore("instruction_consistency", "Consistência de Instruções", cons_score, cons_finding),
--        CriterionScore("tool_schema_quality", "Contrato de Ferramentas", tool_score, tool_finding),
--        CriterionScore("grounding_sufficiency", "Fundamentação (Exemplos/RAG)", ground_score, ground_finding),
--        CriterionScore("injection_hardening", "Proteção contra Injeção", inj_score, inj_finding),
--        CriterionScore("token_efficiency", "Eficiência de Tokens", tok_score, tok_finding),
--    ]
-+        score = 6.0
-+        finding = "Texto muito longo; considere modularizar em sub-skills."
-+    return CriterionScore("token_efficiency", "Eficiência de Tokens", score, finding)
- 
--    overall = sum(c.score for c in criteria) / len(criteria)
- 
-+# ── risk & fix mappers ───────────────────────────────────────────────────────
-+
-+_RISK_MAP = {
-+    "role_clarity": "Risco de desvio de escopo (Instruction Drift) e incerteza operacional.",
-+    "guardrail_coverage": "Risco de respostas inadequadas, quebra de limites e alucinações de segurança.",
-+    "instruction_consistency": "Risco de comportamentos contraditórios sob cenários de contorno.",
-+    "tool_schema_quality": "Risco de chamadas incorretas ou malformadas de ferramentas (Tool Misuse).",
-+    "grounding_sufficiency": "Risco elevado de alucinação factual por falta de referências concretas.",
-+    "injection_hardening": "Vulnerabilidade a injeções de prompt e manipulação por inputs do usuário.",
-+    "token_efficiency": "Desperdício de orçamento de tokens e diluição de atenção em modelos de contexto longo.",
-+}
-+
-+_FIX_MAP = {
-+    "guardrail_coverage": "Adicione seções explícitas de restrições ('O que NÃO fazer') e regras de recusa.",
-+    "injection_hardening": "Delimite inputs do usuário utilizando tags XML ou marcadores estritos de contorno.",
-+    "grounding_sufficiency": "Inclua exemplos de poucos disparos (few-shot) ou esquema explícito de dados.",
-+    "role_clarity": "Defina claramente o papel do agente, objetivo central e limites de atuação.",
-+    "instruction_consistency": "Especifique regras explícitas de precedência em caso de ambiguidades ou conflitos.",
-+    "token_efficiency": "Remova clichês de IA e frases de preenchimento para aumentar a densidade de informação.",
-+    "tool_schema_quality": "Documente os parâmetros esperados e os retornos das ferramentas de forma tipada.",
-+}
-+
-+
-+def _compute_risks(criteria: List[CriterionScore]) -> List[str]:
-+    """Extrai riscos previstos dos 2 critérios com menor nota."""
-+    lowest_2 = sorted(criteria, key=lambda c: c.score)[:2]
-+    risks = [_RISK_MAP[c.name] for c in lowest_2 if c.score < 7.0 and c.name in _RISK_MAP]
-+    return risks or ["Nenhum risco crítico imediato detectado no contexto fornecido."]
-+
-+
-+def _compute_fixes(criteria: List[CriterionScore]) -> List[str]:
-+    """Gera top-3 correções a partir dos critérios de menor nota."""
-+    fixes = []
-+    for c in sorted(criteria, key=lambda c: c.score)[:3]:
-+        if c.name in _FIX_MAP:
-+            fixes.append(_FIX_MAP[c.name])
-+    return fixes[:3]
-+
-+
-+def _compute_grade(overall: float) -> str:
-     if overall >= 8.0:
--        grade = "Strong"
--    elif overall >= 5.0:
--        grade = "Adequate"
--    else:
--        grade = "Weak"
--
--    # Mapeamento dos riscos previstos (com base nos critérios de menor nota)
--    risks = []
--    sorted_criteria = sorted(criteria, key=lambda c: c.score)
--    lowest_2 = sorted_criteria[:2]
--
--    risk_map = {
--        "role_clarity": "Risco de desvio de escopo (Instruction Drift) e incerteza operacional.",
--        "guardrail_coverage": "Risco de respostas inadequadas, quebra de limites e alucinações de segurança.",
--        "instruction_consistency": "Risco de comportamentos contraditórios sob cenários de contorno.",
--        "tool_schema_quality": "Risco de chamadas incorretas ou malformadas de ferramentas (Tool Misuse).",
--        "grounding_sufficiency": "Risco elevado de alucinação factual por falta de referências concretas.",
--        "injection_hardening": "Vulnerabilidade a injeções de prompt e manipulação por inputs do usuário.",
--        "token_efficiency": "Desperdício de orçamento de tokens e diluição de atenção em modelos de contexto longo.",
--    }
--
--    for c in lowest_2:
--        if c.score < 7.0 and c.name in risk_map:
--            risks.append(risk_map[c.name])
--
--    if not risks:
--        risks.append("Nenhum risco crítico imediato detectado no contexto fornecido.")
--
--    # Top 3 correções de maior alavancagem
--    top_fixes = []
--    for c in sorted_criteria[:3]:
--        if c.name == "guardrail_coverage":
--            top_fixes.append("Adicione seções explícitas de restrições ('O que NÃO fazer') e regras de recusa.")
--        elif c.name == "injection_hardening":
--            top_fixes.append("Delimite inputs do usuário utilizando tags XML ou marcadores estritos de contorno.")
--        elif c.name == "grounding_sufficiency":
--            top_fixes.append("Inclua exemplos de poucos disparos (few-shot) ou esquema explícito de dados.")
--        elif c.name == "role_clarity":
--            top_fixes.append("Defina claramente o papel do agente, objetivo central e limites de atuação.")
--        elif c.name == "instruction_consistency":
--            top_fixes.append("Especifique regras explícitas de precedência em caso de ambiguidades ou conflitos.")
--        elif c.name == "token_efficiency":
--            top_fixes.append("Remova clichês de IA e frases de preenchimento para aumentar a densidade de informação.")
--        elif c.name == "tool_schema_quality":
--            top_fixes.append("Documente os parâmetros esperados e os retornos das ferramentas de forma tipada.")
-+        return "Strong"
-+    if overall >= 5.0:
-+        return "Adequate"
-+    return "Weak"
-+
-+
-+# ── entry point ──────────────────────────────────────────────────────────────
-+
-+def audit_context_heuristics(skill_text: str) -> ContextAuditReport:
-+    """
-+    Realiza a auditoria pré-flight do contexto/skill através dos 7 critérios.
-+    Funciona via análise estática heurística e estrutural imediata.
-+    """
-+    text = skill_text.strip()
-+    text_lower = text.lower()
-+    total_len = len(text)
-+    word_count = textstat.lexicon_count(text)
-+
-+    evaluators: List[Callable] = [
-+        _eval_role_clarity,
-+        _eval_guardrail_coverage,
-+        _eval_instruction_consistency,
-+        _eval_tool_schema,
-+        _eval_grounding,
-+        _eval_injection_hardening,
-+        _eval_token_efficiency,
-+    ]
-+
-+    criteria: List[CriterionScore] = []
-+    for ev in evaluators:
-+        # Pass only the arguments each evaluator actually needs (by name)
-+        sig = ev.__code__.co_varnames[:ev.__code__.co_argcount]
-+        kwargs = {}
-+        for param in sig:
-+            if param == 'text':
-+                kwargs[param] = text
-+            elif param == 'text_lower':
-+                kwargs[param] = text_lower
-+            elif param == 'total_len':
-+                kwargs[param] = total_len
-+            elif param == 'word_count':
-+                kwargs[param] = word_count
-+        criteria.append(ev(**kwargs))
-+
-+    overall = sum(c.score for c in criteria) / len(criteria)
- 
-     return ContextAuditReport(
-         overall_score=overall,
--        grade=grade,
-+        grade=_compute_grade(overall),
-         criteria=criteria,
--        predicted_risks=risks,
--        top_fixes=top_fixes[:3],
-+        predicted_risks=_compute_risks(criteria),
-+        top_fixes=_compute_fixes(criteria),
-     )
-diff --git a/src/domain/agent_interfaces.py b/src/domain/agent_interfaces.py
-index 1b4a188..b4375d5 100644
---- a/src/domain/agent_interfaces.py
-+++ b/src/domain/agent_interfaces.py
-@@ -62,16 +62,6 @@ class IMutadorCognitivoAgent(Protocol):
-         ...
+     @property
+@@ -282,5 +271,23 @@ class TranspositionTable:
+             self._lookups = 0
  
  
--class IAvaliadorDeSkill(Protocol):
--    def __call__(
--        self,
--        skill_original: str,
--        skill_otimizada: str,
--        regras_adicionais: str,
--    ) -> Avaliacao:
--        ...
--
--
- class IAvaliadorModoB(Protocol):
-     def __call__(
-         self,
++def _strip_markdown_fences(lines: list[str]) -> list[str]:
++    """Remove linhas em branco das bordas e cercas markdown (ex: ``` ... ```)."""
++    while lines and not lines[0].strip():
++        lines.pop(0)
++    while lines and not lines[-1].strip():
++        lines.pop()
++    if lines and lines[0].startswith("```"):
++        lines.pop(0)
++    if lines and lines and lines[-1].strip() == "```":
++        lines.pop()
++    return lines
++
++
++def _collapse_blank_lines(text: str) -> str:
++    """Normaliza múltiplas linhas em branco consecutivas em no máximo duas."""
++    return re.sub(r'\n{3,}', '\n\n', text)
++
++
+ 
+ 
 diff --git a/src/optimizer.py b/src/optimizer.py
-index 3cc72df..9f59138 100644
+index 3360f03..164ed65 100644
 --- a/src/optimizer.py
 +++ b/src/optimizer.py
-@@ -39,6 +39,28 @@ from src.heuristic_evaluator import evaluate_heuristics
- from src.density_evaluator import calculate_density_multiplier, compute_lexical_density
+@@ -42,6 +42,28 @@ from src.evaluators import (
+ from src.mutation_strategies.api import get_strategy_description
  
  
 +# ── helpers de poda dinâmica (extraídos de _should_prune) ─────────────────────
@@ -393,7 +167,7 @@ index 3cc72df..9f59138 100644
  class Optimizer:
      def __init__(
          self,
-@@ -211,36 +233,21 @@ class Optimizer:
+@@ -214,23 +236,18 @@ class Optimizer:
  
      def _should_prune(self, instruction: str, parent_instruction: str = "", mutation_strategy: str = "") -> bool:
          # Dynamic Action Reduction (MCTS Expert - Swiechowski et al. Sec 3.2)
@@ -401,10 +175,16 @@ index 3cc72df..9f59138 100644
 -        if 0 < lexical_density < 0.15:
 -            self._emitter.emit_log(f"    [Poda Dinâmica de Ações] Densidade lexical crítica ({lexical_density:.2f}). Podando antes de simular.")
 +        if _check_lexical_critical(instruction):
++            self._emitter.emit_log(f"    [Poda Dinâmica] Densidade lexical crítica ({compute_lexical_density(instruction):.2f}).")
 +            return True
-+        if _check_density_critical(instruction, parent_instruction or self.skill_original, mutation_strategy):
++        ref = parent_instruction or self.skill_original
++        if _check_density_critical(instruction, ref, mutation_strategy):
++            dm = calculate_density_multiplier(instruction, ref, mutation_strategy=mutation_strategy)
++            self._emitter.emit_log(f"    [Poda Dinâmica] Densidade informacional crítica ({dm:.2f}).")
 +            return True
 +        if parent_instruction and _check_semantic_critical(instruction, parent_instruction):
++            sp = calculate_semantic_penalty(instruction, parent_instruction)
++            self._emitter.emit_log(f"    [Poda Dinâmica] Penalidade semântica excessiva ({sp:.2f}).")
              return True
 -
 -        ref_instruction = parent_instruction if parent_instruction else self.skill_original
@@ -419,177 +199,10 @@ index 3cc72df..9f59138 100644
 -            if sem_penalty < 0.4:
 -                self._emitter.emit_log(f"    [Poda Dinâmica de Ações] Penalidade semântica excessiva (fator {sem_penalty:.2f}). Podando antes de simular.")
 -                return True
--
+ 
          if self.value_estimator.confidence < 0.3:
              return False
--
-         estimated = self.value_estimator.estimate(instruction)
-         if estimated < self.config.value_threshold:
-             self._emitter.emit_log(f"    [Poda Absoluta] Value estimator: {estimated:.2f} < threshold {self.config.value_threshold}. Podando.")
-             return True
--
-         if self.best_reward_so_far > 0.6 and (estimated + 0.15) < self.best_reward_so_far:
-             self._emitter.emit_log(f"    [Poda Relativa] Estimado ({estimated:.2f} + 0.15) < melhor recompensa ({self.best_reward_so_far:.2f}). Podando.")
-             return True
--
-         return False
- 
-     def notify_node(self, node: MCTSNode):
-@@ -408,20 +415,60 @@ class Optimizer:
-         self._emitter.emit_error('    [!] Falha persistente por Rate Limit ou indisponibilidade da API.')
-         return '', f'{critica}\nErro técnico persistente da API.', False
- 
-+    def _select_fallback_strategy(self, leaf: MCTSNode, failed: set) -> Tuple[str | None, str, str]:
-+        """Tenta selecionar uma estratégia ainda não falha. Retorna (strategy, prompt, desc) ou (None, '', '')."""
-+        for _ in range(5):
-+            strategy = self.mutation_bandit.select()
-+            if strategy == '__DISCOVER__':
-+                strategy = self._discover_strategy(leaf)
-+            if strategy not in failed:
-+                return strategy, self._strategy_registry.get_prompt(strategy), self._strategy_registry.get_name(strategy)
-+        return None, '', ''
-+
-+    def _is_candidate_valid(self, candidata: str, original: str, strategy_desc: str) -> bool:
-+        """Valida se a candidata gerada é usável."""
-+        if candidata.strip() == original.strip():
-+            self._emitter.emit_log(f'    [Action Reduction] Candidato idêntico ao original ({strategy_desc}).')
-+            return False
-+        if len(candidata.strip()) < 10:
-+            self._emitter.emit_log(f'    [Action Reduction] Candidato muito curto ({strategy_desc}).')
-+            return False
-+        return True
-+
-+    def _register_child_node(self, leaf: MCTSNode, instruction: str, critica: str, strategy: str, strategy_desc: str) -> MCTSNode:
-+        """Cria, registra via transposition table e notifica o nó filho."""
-+        child = MCTSNode(
-+            instruction, parent=leaf, feedback='', critica=critica,
-+            mutation_strategy=strategy, depth=leaf.depth + 1,
-+            prior=self.value_estimator.estimate(instruction),
-+        )
-+        canonical = self.transposition_table.put(hash_instruction(instruction), child)
-+        if canonical != child:
-+            self._emitter.emit_log("    [Transposition Merge] Nó alinhado com nó existente em DAG.")
-+            child = canonical
-+        with leaf.lock:
-+            if child not in leaf.children:
-+                leaf.children.append(child)
-+        with self.lock:
-+            self._expand_count += 1
-+            self._expansion_order.append({
-+                'expand_num': self._expand_count, 'strategy_key': strategy,
-+                'strategy_desc': strategy_desc, 'depth': child.depth,
-+                'parent_score': leaf.q_value / max(1, leaf.visits) if leaf != child else 0.0,
-+            })
-+        self.notify_node(child)
-+        return child
-+
-     def _expand_node(self, leaf: MCTSNode) -> MCTSNode:
-         strategy = self.mutation_bandit.select()
--
-         if strategy == '__DISCOVER__':
-             strategy = self._discover_strategy(leaf)
- 
-         strategy_prompt = self._strategy_registry.get_prompt(strategy)
-         strategy_desc = self._strategy_registry.get_name(strategy) or strategy
--
-         experience_context = self._get_lessons_context(leaf.feedback)
--
-         critica = leaf.feedback
--        nova_instrucao = leaf.instruction
--        failed_strategies = set()
-+        failed_strategies: set[str] = set()
- 
-         for tentativa in range(3):
-             if self._emitter.is_cancelled():
-@@ -432,79 +479,23 @@ class Optimizer:
-             nota = str(leaf.q_value / max(1, leaf.visits))
-             self._emitter.emit_log(f'[*] Expandindo nó (Tentativa {tentativa + 1}/3) | Estratégia: {strategy_desc} | Nota: {nota}')
- 
--            feedback_completo = critica
--            if experience_context:
--                feedback_completo += experience_context
--
-+            feedback_completo = critica + (experience_context or '')
-             candidata, nova_critica, sucesso = self._try_generate_mutation(
-                 leaf, strategy, strategy_prompt, feedback_completo, nota, critica
-             )
-             critica = nova_critica
--            if sucesso:
--                if candidata.strip() == leaf.instruction.strip():
--                    self._emitter.emit_log(f'    [Action Reduction] Candidato gerado pela estratégia {strategy_desc} é idêntico ao instrução original. Descartando.')
--                    sucesso = False
--                elif len(candidata.strip()) < 10:
--                    self._emitter.emit_log(f'    [Action Reduction] Candidato gerado pela estratégia {strategy_desc} é muito curto (<10 caracteres). Descartando.')
--                    sucesso = False
--                else:
--                    nova_instrucao = candidata
--                    break
- 
--            # Trocar de estratégia entre tentativas — a atual falhou
-+            if sucesso and self._is_candidate_valid(candidata, leaf.instruction, strategy_desc):
-+                return self._register_child_node(leaf, candidata, critica, strategy, strategy_desc)
-+
-             failed_strategies.add(strategy)
--            self._emitter.emit_log(f'    [!] Estratégia {strategy_desc} falhou. Selecionando nova estratégia...')
--            fallback_found = False
--            for _ in range(5):
--                strategy = self.mutation_bandit.select()
--                if strategy == '__DISCOVER__':
--                    strategy = self._discover_strategy(leaf)
--                if strategy not in failed_strategies:
--                    strategy_prompt = self._strategy_registry.get_prompt(strategy)
--                    strategy_desc = self._strategy_registry.get_name(strategy)
--                    fallback_found = True
--                    break
--            if not fallback_found:
--                # BUG-1 fix: sem nova estratégia disponível e a atual já falhou.
--                # Retornar leaf evita criar filho idêntico ao pai (instrucao=leaf.instruction).
-+            strategy, strategy_prompt, strategy_desc = self._select_fallback_strategy(leaf, failed_strategies)
-+            if strategy is None:
-                 self._emitter.emit_log('    [!] Todas as estratégias falharam. Retornando nó pai sem expansão.')
-                 return leaf
--        else:
--            # BUG-1 fix: todas as 3 tentativas usadas sem sucesso.
--            # Retorna o próprio nó pai sem criar filho inútil.
--            self._emitter.emit_error('[!] Falha em gerar nova instrução após 3 tentativas. Retornando nó pai sem expansão.')
--            return leaf
- 
--        child = MCTSNode(
--            nova_instrucao,
--            parent=leaf,
--            feedback='',
--            critica=critica,
--            mutation_strategy=strategy,
--            depth=leaf.depth + 1,
--            prior=self.value_estimator.estimate(nova_instrucao),
--        )
--        hash_key = hash_instruction(nova_instrucao)
--        canonical_node = self.transposition_table.put(hash_key, child)
--        if canonical_node != child:
--            self._emitter.emit_log("    [Transposition Merge] Nó de instrução alinhado com nó existente em DAG.")
--            child = canonical_node
--        with leaf.lock:
--            if child not in leaf.children:
--                leaf.children.append(child)
--
--        with self.lock:
--            self._expand_count += 1
--            self._expansion_order.append({
--                'expand_num': self._expand_count,
--                'strategy_key': strategy,
--                'strategy_desc': strategy_desc,
--                'depth': child.depth,
--                'parent_score': leaf.q_value / max(1, leaf.visits) if leaf != child else 0.0,
--            })
--
--        self.notify_node(child)
--        return child
-+        self._emitter.emit_error('[!] Falha em gerar nova instrução após 3 tentativas. Retornando nó pai sem expansão.')
-+        return leaf
- 
-     def _evaluate_and_prune(self, child: MCTSNode) -> Tuple[bool, dict]:
-         """Returns (is_pruned, heuristic_result)"""
-@@ -565,54 +556,81 @@ class Optimizer:
+@@ -554,25 +571,64 @@ class Optimizer:
              self._emitter.emit_log(f"    [{direction}] Fator: {density_mult:.2f}")
          return reward * density_mult
  
@@ -664,15 +277,7 @@ index 3cc72df..9f59138 100644
              if child != leaf:
                  child.remove_virtual_loss()
              return True, 0.0
- 
--        # BUG-2 fix: se a expansão falhou e retornou o próprio leaf,
--        # não há filho novo para simular. Evita iteração desperdiçada.
-         if child == leaf:
--            self._emitter.emit_log('    [Iteração Descartada] Nó pai retornado sem filho. Nenhuma estratégia gerou candidato novo.')
-+            self._emitter.emit_log('    [Iteração Descartada] Nó pai retornado sem filho.')
-             return False, 0.0
- 
-         is_pruned, heuristic_result = self._evaluate_and_prune(child)
+@@ -587,21 +643,11 @@ class Optimizer:
          if is_pruned:
              return False, 0.0
  
@@ -696,7 +301,7 @@ index 3cc72df..9f59138 100644
  
          child.feedback = feedback
          child.last_reward = reward
-@@ -621,27 +639,7 @@ class Optimizer:
+@@ -610,27 +656,7 @@ class Optimizer:
              if reward > self.best_reward_so_far:
                  self.best_reward_so_far = reward
  
@@ -725,429 +330,96 @@ index 3cc72df..9f59138 100644
          return False, reward
  
      def _get_all_nodes(self, node: MCTSNode) -> list[MCTSNode]:
+@@ -799,7 +825,10 @@ class Optimizer:
+             nonlocal consecutive_zeros, consecutive_api_errors
+             if self._emitter.is_cancelled() or self._abort_flag:
+                 return True
+-            should_break, z, e = self._run_single_iteration(root, i, consecutive_zeros, consecutive_api_errors)
++            with self.lock:
++                local_zeros = consecutive_zeros
++                local_errors = consecutive_api_errors
++            should_break, z, e = self._run_single_iteration(root, i, local_zeros, local_errors)
+             with self.lock:
+                 consecutive_zeros = z
+                 consecutive_api_errors = e
 diff --git a/src/routers/jobs.py b/src/routers/jobs.py
-index e56be61..43796d8 100644
+index 34ea09b..4ab8558 100644
 --- a/src/routers/jobs.py
 +++ b/src/routers/jobs.py
-@@ -238,10 +238,10 @@ def _format_result_event(job) -> dict:
+@@ -244,19 +244,42 @@ def _check_terminal_events(job) -> list[dict]:
+     return events
+ 
+ 
++def _drain_pending_events(job):
++    """Drena e formata todos os eventos pendentes na fila do job.
++    Retorna (events_list, first_event_received)."""
++    first_event_received = not job.events_queue.empty()
++    events = []
++    while not job.events_queue.empty():
++        event = job.events_queue.get_nowait()
++        formatted = _format_event(event)
++        if formatted:
++            events.append(formatted)
++    return events, first_event_received
++
++
++async def _try_consume_event(job):
++    """Tenta consumir um evento da fila. Retorna (event_dict, should_exit)."""
++    try:
++        event = await asyncio.wait_for(job.events_queue.get(), timeout=0.1)
++        formatted = _format_event(event)
++        job.events_queue.task_done()
++        return formatted, False
++    except TimeoutError:
++        return None, False
++    except asyncio.CancelledError:
++        logger.info("SSE stream do job {} cancelado (CancelledError)", id(job))
++        return {"event": "end", "data": "cancelled"}, True
++
++
  async def _live_event_generator(job):
      """Gera eventos SSE com heartbeat, timeout dinâmico e cleanup de conexões órfãs."""
      start_time = asyncio.get_event_loop().time()
-+    HEARTBEAT_INTERVAL = 15.0
-+    ORPHAN_TIMEOUT = 120.0
-+    ORPHAN_GRACE_PERIOD = 120.0
      last_heartbeat = start_time
--    HEARTBEAT_INTERVAL = 15.0  # envia keepalive a cada 15s para evitar timeout de proxy/load balancer
--    ORPHAN_TIMEOUT = 120.0  # considera job órfão se status='running' mas sem eventos por 120s
--    ORPHAN_GRACE_PERIOD = 120.0  # só ativa detecção de órfão após 120s (startup do job é lento)
+     HEARTBEAT_INTERVAL = 15.0
  
-     # Drena eventos já enfileirados
-     first_event_received = not job.events_queue.empty()
-@@ -251,30 +251,22 @@ async def _live_event_generator(job):
-         if formatted:
-             yield formatted
+-    # Drena eventos já enfileirados
+-    first_event_received = not job.events_queue.empty()
+-    while not job.events_queue.empty():
+-        event = job.events_queue.get_nowait()
+-        formatted = _format_event(event)
+-        if formatted:
+-            yield formatted
++    drained, first_event_received = _drain_pending_events(job)
++    for formatted in drained:
++        yield formatted
  
--    last_event_time = start_time
-+    last_event_time = start_time if not first_event_received else asyncio.get_event_loop().time()
+     last_event_time = start_time
  
-     while True:
-         now = asyncio.get_event_loop().time()
-         elapsed = now - start_time
- 
--        # Heartbeat: mantém conexão viva mesmo sem eventos de negócio
-         if now - last_heartbeat >= HEARTBEAT_INTERVAL:
-             last_heartbeat = now
-             yield {"comment": "heartbeat"}
- 
--        # Timeout máximo do job
-         if elapsed > MAX_JOB_DURATION_SECONDS:
-             logger.warning("Job {} excedeu timeout máximo de {}s — encerrando SSE", job, MAX_JOB_DURATION_SECONDS)
-             yield {"event": "end", "data": "timeout"}
+@@ -276,20 +299,14 @@ async def _live_event_generator(job):
              return
  
--        # Cleanup de jobs órfãos: só ativa após grace period e primeiro evento
--        if (
--            job.status == "running"
--            and first_event_received
--            and elapsed > ORPHAN_GRACE_PERIOD
--            and (now - last_event_time) > ORPHAN_TIMEOUT
--        ):
-+        if _is_job_orphan(job, first_event_received, now, last_event_time, elapsed, ORPHAN_GRACE_PERIOD, ORPHAN_TIMEOUT):
-             logger.warning(
-                 "Job {} parece órfão: status=running mas {}s sem eventos — encerrando SSE",
-                 id(job), int(now - last_event_time),
-@@ -302,7 +294,7 @@ async def _live_event_generator(job):
-         if job.status == "completed" and queue_empty:
-             yield _format_result_event(job)
- 
--        if job.status in ("completed", "error", "cancelled") and queue_empty:
-+        if _is_job_done(job) and queue_empty:
-             yield {"event": "end", "data": job.status}
-             await asyncio.sleep(0.5)
-             return
-diff --git a/src/teleprompter.py b/src/teleprompter.py
-index 2bbe259..f8c0056 100644
---- a/src/teleprompter.py
-+++ b/src/teleprompter.py
-@@ -1,6 +1,7 @@
- import dspy
- import threading
- from pathlib import Path
-+from typing import Any, Callable
- from src.experience_store import ExperienceStore
- from src.infrastructure.dspy_impl import AvaliadorModoBSignature
- from src.config import get_drift_thresholds
-@@ -22,9 +23,123 @@ _compile_lock = threading.Lock()
- #   "measurement_error"  — falha ao medir drift com golden presente.
- #   "golden_required"    — golden ausente; candidato DESCARTADO (fail-closed). Juiz anterior preservado.
- 
-+# ── helpers de acesso polimórfico (objeto + dicionário DSPy 3.x) ──────────────
-+
-+def _safe_get(pred: Any, key: str, default: Any = None) -> Any:
-+    """Obtém atributo de objeto ou chave de dicionário, com fallback."""
-+    val = getattr(pred, key, None)
-+    if val is None and isinstance(pred, dict):
-+        val = pred.get(key, default)
-+    return val
-+
-+
-+# ── decomposição da quality_metric (antes CC=26 → cada função CC≈3) ──────────
-+
-+def _check_manteve_regras(pred: Any) -> bool:
-+    """Verifica se o candidato manteve as regras críticas."""
-+    manteve = _safe_get(pred, 'manteve_regras_criticas', False)
-+    if isinstance(manteve, str):
-+        return manteve.lower() in ('true', '1', 'sim')
-+    return bool(manteve)
-+
-+
-+def _check_defeitos(pred: Any, max_defeitos: int = 3) -> bool:
-+    """Penaliza candidatos com excesso de defeitos estruturais."""
-+    defeitos = _safe_get(pred, 'defeitos_encontrados', [])
-+    return not (defeitos and len(defeitos) > max_defeitos)
-+
-+
-+def _check_feedback(pred: Any, min_len: int = 5) -> bool:
-+    """Verifica se o feedback detalhado é significativo."""
-+    feedback = _safe_get(pred, 'feedback_detalhado', '')
-+    if not feedback:
-+        return False
-+    return len(str(feedback).strip()) >= min_len
-+
-+
-+def _check_nota(pred: Any) -> bool:
-+    """Verifica se a nota de qualidade é >= 0."""
-+    nota = _safe_get(pred, 'nota_qualidade', None)
-+    if nota is None:
-+        return True
-+    try:
-+        return float(nota) >= 0.0
-+    except (ValueError, TypeError):
-+        return True
-+
-+
-+def _make_quality_metric() -> Callable:
-+    """Fabrica a função quality_metric usada pelos teleprompters DSPy."""
-+    def quality_metric(example, pred, trace=None):
-+        if not pred:
-+            return False
-+        if not _check_manteve_regras(pred):
-+            return False
-+        if not _check_defeitos(pred):
-+            return False
-+        if not _check_feedback(pred):
-+            return False
-+        return _check_nota(pred)
-+    return quality_metric
-+
-+
-+# ── fábricas de optimizers (fallback chain) ───────────────────────────────────
-+
-+def _try_gepa(metric, module, trainset):
-+    from dspy.teleprompt import GEPA
-+    print("Iniciando compilação (Teleprompting) via GEPA...")
-+    teleprompter = GEPA(metric=metric, auto="light")
-+    return teleprompter.compile(module, trainset=trainset)
-+
-+
-+def _try_miprov2(metric, module, trainset):
-+    from dspy.teleprompt import MIPROv2
-+    print("Iniciando compilação (Teleprompting) via MIPROv2...")
-+    teleprompter = MIPROv2(metric=metric, auto="light")
-+    return teleprompter.compile(module, trainset=trainset)
-+
-+
-+def _try_bootstrap_rs(metric, module, trainset):
-+    from dspy.teleprompt import BootstrapFewShotWithRandomSearch
-+    print("Iniciando compilação (Teleprompting) via BootstrapFewShotWithRandomSearch...")
-+    teleprompter = BootstrapFewShotWithRandomSearch(
-+        metric=metric, max_bootstrapped_demos=3,
-+        max_labeled_demos=0, num_candidate_sets=4,
-+    )
-+    return teleprompter.compile(module, trainset=trainset)
-+
-+
-+_OPTIMIZERS = [
-+    (('gepa',), 'GEPA', _try_gepa),
-+    (('mipro', 'miprov2'), 'MIPROv2', _try_miprov2),
-+    (('bootstrap_rs', 'bootstrapfewshotwithrandomsearch', 'random_search'),
-+     'BootstrapFewShotWithRandomSearch', _try_bootstrap_rs),
-+]
-+
-+
-+def _instantiate_optimizer(optimizer_type: str,
-+                           metric: Callable,
-+                           module: dspy.Module,
-+                           trainset: list) -> dspy.Module | None:
-+    """Tenta compilar com o optimizer solicitado; None = caller deve usar fallback."""
-+    opt_lower = optimizer_type.lower() if optimizer_type else ''
-+    for keys, label, factory in _OPTIMIZERS:
-+        if opt_lower in keys:
-+            try:
-+                return factory(metric, module, trainset)
-+            except Exception as e:
-+                print(f"[!] Fallback de {label} devido a: {e}")
-+                return None
-+    return None
-+
-+
-+# ── pipeline principal ────────────────────────────────────────────────────────
- 
- def _build_trainset(store: ExperienceStore, min_reward: float) -> list:
--    melhores = [exp for exp in store.experiences if exp.absolute_reward >= min_reward and exp.instruction and exp.parent_instruction]
-+    melhores = [exp for exp in store.experiences
-+                if exp.absolute_reward >= min_reward
-+                and exp.instruction
-+                and exp.parent_instruction]
-     if not melhores:
-         return []
- 
-@@ -38,89 +153,22 @@ def _build_trainset(store: ExperienceStore, min_reward: float) -> list:
-         trainset.append(exemplo)
-     return trainset
- 
--def _run_teleprompt(trainset: list, candidate_path: Path, optimizer_type: str = "bootstrap"):
--    def quality_metric(example, pred, trace=None):
--        if not pred:
--            return False
--        # Suporta tanto objetos quanto dicionários (flexibilidade DSPy 3.x)
--        manteve = getattr(pred, 'manteve_regras_criticas', None)
--        if manteve is None and isinstance(pred, dict):
--            manteve = pred.get('manteve_regras_criticas', False)
--        if isinstance(manteve, str):
--            manteve = manteve.lower() in ('true', '1', 'sim')
--        if not manteve:
--            return False
- 
--        # Penalizar candidatos com defeitos críticos estruturais ou contradições
--        defeitos = getattr(pred, 'defeitos_encontrados', None)
--        if defeitos is None and isinstance(pred, dict):
--            defeitos = pred.get('defeitos_encontrados', [])
--        if defeitos and len(defeitos) > 3:
--            return False
-+def _run_teleprompt(trainset: list, candidate_path: Path, optimizer_type: str = "bootstrap"):
-+    """Executa o teleprompt com fallback progressivo: GEPA → MIPROv2 → BootstrapRS → BootstrapFewShot."""
-+    metric = _make_quality_metric()
-+    avaliador_module = dspy.Predict(AvaliadorModoBSignature)
- 
--        feedback = getattr(pred, 'feedback_detalhado', '')
--        if not feedback and isinstance(pred, dict):
--            feedback = pred.get('feedback_detalhado', '')
--        if not feedback or len(str(feedback).strip()) < 5:
--            return False
-+    compiled = _instantiate_optimizer(optimizer_type, metric, avaliador_module, trainset)
-+    if compiled is None:
-+        print("Iniciando compilação (Teleprompting) via BootstrapFewShot...")
-+        teleprompter = BootstrapFewShot(metric=metric, max_bootstrapped_demos=3, max_labeled_demos=0)
-+        compiled = teleprompter.compile(avaliador_module, trainset=trainset)
- 
--        nota = getattr(pred, 'nota_qualidade', None)
--        if nota is None and isinstance(pred, dict):
--            nota = pred.get('nota_qualidade', None)
--        if nota is not None:
--            try:
--                val = float(nota)
--                if val < 0.0:
--                    return False
--            except (ValueError, TypeError):
--                pass
-+    compiled.save(str(candidate_path))
- 
--        return True
- 
--    avaliador_module = dspy.Predict(AvaliadorModoBSignature)
--
--    if optimizer_type and optimizer_type.lower() == "gepa":
+         # Consome próximo evento da fila
 -        try:
--            from dspy.teleprompt import GEPA
--            print("Iniciando compilação (Teleprompting) via GEPA...")
--            teleprompter = GEPA(metric=quality_metric, auto="light")
--            compilado = teleprompter.compile(avaliador_module, trainset=trainset)
--            compilado.save(str(candidate_path))
--            return
--        except Exception as e:
--            print(f"[!] Fallback para BootstrapFewShot devido a erro ou indisponibilidade em GEPA: {e}")
--
--    if optimizer_type and optimizer_type.lower() in ("mipro", "miprov2"):
--        try:
--            from dspy.teleprompt import MIPROv2
--            print("Iniciando compilação (Teleprompting) via MIPROv2...")
--            teleprompter = MIPROv2(metric=quality_metric, auto="light")
--            compilado = teleprompter.compile(avaliador_module, trainset=trainset)
--            compilado.save(str(candidate_path))
--            return
--        except Exception as e:
--            print(f"[!] Fallback para BootstrapFewShot devido a erro ou indisponibilidade em MIPROv2: {e}")
--
--    if optimizer_type and optimizer_type.lower() in ("bootstrap_rs", "bootstrapfewshotwithrandomsearch", "random_search"):
--        try:
--            from dspy.teleprompt import BootstrapFewShotWithRandomSearch
--            print("Iniciando compilação (Teleprompting) via BootstrapFewShotWithRandomSearch...")
--            teleprompter = BootstrapFewShotWithRandomSearch(
--                metric=quality_metric,
--                max_bootstrapped_demos=3,
--                max_labeled_demos=0,
--                num_candidate_sets=4,
--            )
--            compilado = teleprompter.compile(avaliador_module, trainset=trainset)
--            compilado.save(str(candidate_path))
--            return
--        except Exception as e:
--            print(f"[!] Fallback para BootstrapFewShot devido a erro ou indisponibilidade em BootstrapFewShotWithRandomSearch: {e}")
--
--    print("Iniciando compilação (Teleprompting) via BootstrapFewShot...")
--    teleprompter = BootstrapFewShot(metric=quality_metric, max_bootstrapped_demos=3, max_labeled_demos=0)
--    compilado = teleprompter.compile(avaliador_module, trainset=trainset)
--    compilado.save(str(candidate_path))
-+# ── avaliação de drift ────────────────────────────────────────────────────────
- 
- def _measure_drift(candidate_path: Path, golden: GoldenSet, repetitions: int, thresholds: DriftThresholds) -> DriftReport:
-     """RN-07: Mede o drift do candidato carregado a partir do candidate_path."""
-@@ -143,12 +191,48 @@ def _persist_candidate(candidate_path: Path, out_path: Path, output_dir: Path, r
-     save_drift_cache(report_cand)
- 
- 
-+def _handle_golden_absent(candidate_path: Path) -> str:
-+    """Fail-closed quando golden set está ausente ou vazio."""
-+    try:
-+        candidate_path.unlink(missing_ok=True)
-+    except Exception:
-+        pass
-+    print(
-+        "\n" + "=" * 72 + "\n"
-+        "❌ PORTÃO DE DRIFT: CANDIDATO DESCARTADO (fail-closed)\n"
-+        "   Golden set ausente ou vazio. O candidato NÃO foi persistido.\n"
-+        "   Juíz anterior preservado para evitar model collapse.\n"
-+        "   AÇÃO NECESSÁRIA: crie o golden set antes de treinar o avaliador.\n"
-+        "   Use: POST /api/generate-golden ou edite manualmente\n"
-+        "   src/outputs/golden/golden_set.json\n"
-+        + "=" * 72 + "\n"
-+    )
-+    return "golden_required"
-+
-+
-+def _load_report_atual(out_path: Path, golden: GoldenSet, repetitions: int, thresholds: DriftThresholds) -> DriftReport | None:
-+    """Carrega ou mede o report de drift do juiz atual."""
-+    report_atual = load_drift_cache()
-+    if report_atual is not None:
-+        return report_atual
-+    runner_atual = JudgeProbeRunner("atual")
-+    if out_path.exists():
-+        runner_atual.load_candidate(str(out_path))
-+    else:
-+        runner_atual.as_zero()
-+    try:
-+        return medir_drift(runner_atual, golden, repetitions, thresholds)
-+    except DriftMeasurementError as e:
-+        print(f"[!] Não foi possível medir o juiz atual ({e.message}); usando floors absolutos.")
-+        return None
-+
-+
- def _evaluate_drift_gate(candidate_path: Path, out_path: Path, output_dir: Path) -> str:
-     """
-     RN-07: Fail-closed em erro de medição
-     RN-08 (revertido): Fail-CLOSED se golden vazio.
- 
--    Razão: fail-open permitia persitir um juíz treinado com dados sintéticos
-+    Razão: fail-open permitia persistir um juíz treinado com dados sintéticos
-     sem validação, criando um ciclo vicioso de model collapse:
-       ExperienceStore (sintético) → treina Juíz → Juíz viesado pontua
-       novas skills → mais dados sintéticos viesados → loop fechado.
-@@ -156,49 +240,19 @@ def _evaluate_drift_gate(candidate_path: Path, out_path: Path, output_dir: Path)
-     """
-     golden = GoldenSet()
-     if golden.is_empty():
--        # Fail-closed: descarta candidato e preserva juíz atual.
--        try:
--            candidate_path.unlink(missing_ok=True)
--        except Exception:
+-            event = await asyncio.wait_for(job.events_queue.get(), timeout=0.1)
++        formatted, should_exit = await _try_consume_event(job)
++        if should_exit:
++            yield formatted
++            return
++        if formatted:
+             first_event_received = True
+             last_event_time = now
+-            formatted = _format_event(event)
+-            if formatted:
+-                yield formatted
+-            job.events_queue.task_done()
+-        except TimeoutError:
 -            pass
--        print(
--            "\n" + "=" * 72 + "\n"
--            "❌ PORTÃO DE DRIFT: CANDIDATO DESCARTADO (fail-closed)\n"
--            "   Golden set ausente ou vazio. O candidato NÃO foi persistido.\n"
--            "   Juíz anterior preservado para evitar model collapse.\n"
--            "   AÇÃO NECESSÁRIA: crie o golden set antes de treinar o avaliador.\n"
--            "   Use: POST /api/generate-golden ou edite manualmente\n"
--            "   src/outputs/golden/golden_set.json\n"
--            + "=" * 72 + "\n"
--        )
--        return "golden_required"
-+        return _handle_golden_absent(candidate_path)
+-        except asyncio.CancelledError:
+-            logger.info("SSE stream do job {} cancelado (CancelledError)", id(job))
+-            yield {"event": "end", "data": "cancelled"}
+-            return
++            yield formatted
  
-     cfg = get_drift_thresholds()
-     thresholds = DriftThresholds.from_config(cfg)
-     repetitions = cfg['repetitions']
- 
-     try:
--        # Medir candidato (instância DSPy isolada) usando a função extraída.
-         report_cand = _measure_drift(candidate_path, golden, repetitions, thresholds)
--
--        # Medir/recuperar juiz atual.
--        report_atual = load_drift_cache()
--        if report_atual is None:
--            runner_atual = JudgeProbeRunner("atual")
--            if out_path.exists():
--                runner_atual.load_candidate(str(out_path))
--            else:
--                runner_atual.as_zero()
--            try:
--                report_atual = medir_drift(runner_atual, golden, repetitions, thresholds)
--            except DriftMeasurementError as e:
--                print(f"[!] Não foi possível medir o juiz atual ({e.message}); usando floors absolutos.")
--                report_atual = None
-+        report_atual = _load_report_atual(out_path, golden, repetitions, thresholds)
- 
-         decision = _gate_decision(report_cand, report_atual, thresholds)
- 
-         if not decision.accept:
--            # Veto — NÃO sobrescreve o juiz em produção.
-             try:
-                 candidate_path.unlink()
-             except Exception:
-@@ -206,15 +260,12 @@ def _evaluate_drift_gate(candidate_path: Path, out_path: Path, output_dir: Path)
-             print(f"[!] PORTÃO REJEITOU candidato: {decision.reason}")
-             return "drift_rejected"
- 
--        # Aceito — snapshot do anterior, persistência, cache.
-         _persist_candidate(candidate_path, out_path, output_dir, report_cand)
--
-         print(f"[*] Modelo avaliador recompilado, validado e salvo em: {out_path}")
-         print(f"    Drift do novo juiz: spearman={report_cand.spearman_composite:.3f} offset={report_cand.offset_scale:.2f}")
-         return "compiled"
- 
-     except DriftMeasurementError as e:
--        # Golden presente mas medição falhou → fail-closed (não degrada p/ save cego).
-         try:
-             candidate_path.unlink()
-         except Exception:
-@@ -222,6 +273,9 @@ def _evaluate_drift_gate(candidate_path: Path, out_path: Path, output_dir: Path)
-         print(f"[!] Erro de medição de drift ({e.message}). Fail-closed: candidato descartado.")
-         return "measurement_error"
- 
-+
-+# ── entry point ───────────────────────────────────────────────────────────────
-+
- def compilar_avaliador(lm=None, min_reward: float = 0.8, optimizer_type: str = "bootstrap") -> str:
-     """
-     Recompila o juiz via BootstrapFewShot ou MIPROv2 e valida o candidato contra o golden
+         # Verifica estado terminal após processar evento
+         terminal_events = _check_terminal_events(job)
