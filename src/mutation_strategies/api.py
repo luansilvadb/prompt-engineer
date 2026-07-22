@@ -13,9 +13,5 @@ Extraído de `src/mutations.py` (Phase 1 densification, ARC-03/D-01).
 from src.mutation_strategies.registry import registry
 
 
-def get_mutation_prompt(strategy: str) -> str:
-    return registry.get_prompt(strategy)
-
-
 def get_strategy_description(strategy: str) -> str:
     return registry.get_name(strategy)

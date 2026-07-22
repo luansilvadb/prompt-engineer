@@ -157,21 +157,8 @@ def _run_watch(skill_file: Path, skill_text: str) -> None:
                 nodes, calls = state["node_count"], state["llm_calls"]
                 elapsed = time_mod.time() - start_time
 
-            sys.stdout.write("\033[2J\033[H")
-            sys.stdout.write(f"  SKILL OPTIMIZER — {skill_file.name}\n")
-            sys.stdout.write(f"  {'=' * 56}\n\n")
-            pct = min(100, int((it / max(1, total)) * 100))
-            bar = "█" * int(40 * pct / 100) + "░" * (40 - int(40 * pct / 100))
-            sys.stdout.write(f"  Iteração:  [{bar}] {pct}%  ({it}/{total})\n\n")
-            sys.stdout.write(f"  Melhor Recompensa:  {best:.3f}\n")
-            sys.stdout.write(f"  Última Recompensa:  {last:.3f}\n")
-            sys.stdout.write(f"  Nós na Árvore:      {nodes}\n")
-            sys.stdout.write(f"  Chamadas LLM:       {calls}\n")
-            sys.stdout.write(f"  Tempo Decorrido:    {elapsed:.0f}s\n")
-            if latest := state.get("latest_log", "")[-120:]:
-                sys.stdout.write(f"\n  ── Último evento ──\n  {latest[:120]}\n")
-            sys.stdout.write(f"\n  {'─' * 56}\n  Pressione Ctrl+C para interromper\n")
-            sys.stdout.flush()
+            _render_dashboard(skill_file.name, it, total, best, last, nodes, calls, elapsed,
+                              state.get("latest_log", ""))
             time_mod.sleep(1.0)
     except KeyboardInterrupt:
         sys.stdout.write("\n\n[!] Interrompendo otimização...\n")
@@ -185,6 +172,26 @@ def _run_watch(skill_file: Path, skill_text: str) -> None:
 
     if melhor := result_holder["instruction"]:
         _display_diff_and_prompt(skill_text, melhor, skill_file)
+
+
+def _render_dashboard(skill_name: str, it: int, total: int, best: float, last: float,
+                      nodes: int, calls: int, elapsed: float, latest_log: str) -> None:
+    """Renderiza o dashboard interativo no terminal."""
+    sys.stdout.write("\033[2J\033[H")
+    sys.stdout.write(f"  SKILL OPTIMIZER — {skill_name}\n")
+    sys.stdout.write(f"  {'=' * 56}\n\n")
+    pct = min(100, int((it / max(1, total)) * 100))
+    bar = "█" * int(40 * pct / 100) + "░" * (40 - int(40 * pct / 100))
+    sys.stdout.write(f"  Iteração:  [{bar}] {pct}%  ({it}/{total})\n\n")
+    sys.stdout.write(f"  Melhor Recompensa:  {best:.3f}\n")
+    sys.stdout.write(f"  Última Recompensa:  {last:.3f}\n")
+    sys.stdout.write(f"  Nós na Árvore:      {nodes}\n")
+    sys.stdout.write(f"  Chamadas LLM:       {calls}\n")
+    sys.stdout.write(f"  Tempo Decorrido:    {elapsed:.0f}s\n")
+    if latest_log:
+        sys.stdout.write(f"\n  ── Último evento ──\n  {latest_log[-120:]}\n")
+    sys.stdout.write(f"\n  {'─' * 56}\n  Pressione Ctrl+C para interromper\n")
+    sys.stdout.flush()
 
 
 def main():

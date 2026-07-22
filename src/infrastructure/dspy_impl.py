@@ -44,33 +44,6 @@ class MutadorCognitivoAgentSignature(dspy.Signature):
         desc="A nova skill reescrita em Markdown. DEVE conter ## Raciocínio, ## Regras, ## Conclusão derivados do raciocinio_estruturado."
     )
 
-class MetricsGeneratorSignature(dspy.Signature):
-    """
-    Gera perguntas especificas de avaliacao para uma instrucao.
-    Essas perguntas serao usadas como checklist durante a avaliacao
-    para garantir foco em instruction following.
-    """
-    instruction: str = dspy.InputField(desc="A instrucao para a qual gerar perguntas de avaliacao.")
-    regras_adicionais: str = dspy.InputField(desc="Regras adicionais especificadas pelo usuario.")
-    pergunta_1: str = dspy.OutputField(desc="Primeira pergunta (mais importante) sobre o que constitui um bom output para esta instrucao.")
-    pergunta_2: str = dspy.OutputField(desc="Segunda pergunta sobre o que constitui um bom output para esta instrucao.")
-    pergunta_3: str = dspy.OutputField(desc="Terceira pergunta (menos importante) sobre o que constitui um bom output para esta instrucao.")
-
-
-class SwapSynthesisSignature(dspy.Signature):
-    """
-    Sintese de preferencias conflitantes do Swap.
-    Recebe dois reasonings conflitantes e decide qual e o correto,
-    priorizando instruction following sobre estilo.
-    """
-    instruction: str = dspy.InputField(desc="A instrucao original.")
-    output_a: str = dspy.InputField(desc="Output (a).")
-    output_b: str = dspy.InputField(desc="Output (b).")
-    reasoning_a_better: str = dspy.InputField(desc="Reasoning que defende que Output (a) e melhor.")
-    reasoning_b_better: str = dspy.InputField(desc="Reasoning que defende que Output (b) e melhor.")
-    decisao_final: str = dspy.OutputField(desc="'Output (a)' ou 'Output (b)' — qual e objetivamente melhor em instruction following.")
-
-
 class AvaliadorDeSkillSignature(dspy.Signature):
     """
     Avalia se uma skill otimizada para agentes de IA é estruturalmente superior à original.
