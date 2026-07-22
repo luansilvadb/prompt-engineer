@@ -3,14 +3,16 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
-from src.infrastructure.logging_config import setup_logging
 from src.infrastructure.exception_handlers import register_exception_handlers
-from src.routers import jobs, frontend
+from src.infrastructure.logging_config import setup_logging
+from src.metrics import get_metrics
+from src.routers import frontend, jobs
 
 # ── Logging estruturado ──────────────────────────────────────────────────────
 setup_logging()
@@ -51,3 +53,10 @@ if (frontend_dir / "src").exists():
 # ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(jobs.router)
 app.include_router(frontend.router)
+
+
+# ── Metrics endpoint (Prometheus) ──────────────────────────────────────────
+@app.get("/metrics")
+async def metrics():
+    """Exposição de métricas no formato Prometheus text exposition."""
+    return Response(content=get_metrics(), media_type="text/plain; charset=utf-8")

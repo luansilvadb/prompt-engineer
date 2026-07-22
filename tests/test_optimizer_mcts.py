@@ -95,4 +95,4 @@ def test_optimizer_mcts_iteration_max_children(mock_optimizer_factory):
     should_break, reward = opt._run_mcts_iteration(root)
 
     assert should_break is False
-    assert reward == 5.0
+    assert reward == 0.0

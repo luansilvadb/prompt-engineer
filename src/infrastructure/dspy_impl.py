@@ -1,6 +1,6 @@
 import dspy
 from pathlib import Path
-from src.signatures import Avaliacao, AvaliacaoModoB
+from src.signatures import Avaliacao, AvaliacaoModoB, _sanitize_unicode_for_api
 from src.domain.agent_interfaces import (
     DiscoveredStrategy,
     SelfReflectiveOutput,
@@ -85,7 +85,7 @@ class AvaliadorDeSkillSignature(dspy.Signature):
     nota_clareza: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando se a instrução é clara e direta.")
     nota_formatacao: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando o uso de markdown, listas e negritos.")
     nota_robustez: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando a imunidade a 'lost in the middle' e ambiguidades.")
-    nota_densidade_informacional: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando a razão sinal/ruído — penaliza verbosidade vazia e repetição sem valor.")
+    nota_densidade_informacional: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando a razão sinal/ruído - penaliza verbosidade vazia e repetição sem valor.")
     nota_acionabilidade: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando se as instruções são claras o suficiente para um agente de IA executar sem ambiguidade.")
     nota_anti_fragilidade: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando se a skill resiste a edge cases, inputs adversariais e contextos ambíguos.")
     feedback_detalhado: str = dspy.OutputField(desc="Explicação detalhada dos pontos fortes e fracos, justificando as notas.")
@@ -109,7 +109,7 @@ class AvaliadorModoBSignature(dspy.Signature):
         contem restricoes que DEVEM ser preservadas na skill_otimizada.
         Se a skill_otimizada violar QUALQUER restricao das regras_adicionais,
         manteve_regras_criticas DEVE ser False. Nao ha excecoes nem
-        interpretacoes criativas — a violacao e binaria e inegociavel.
+        interpretacoes criativas - a violacao e binaria e inegociavel.
     """
     skill_original: str = dspy.InputField()
     skill_otimizada: str = dspy.InputField()
@@ -120,7 +120,7 @@ class AvaliadorModoBSignature(dspy.Signature):
     nota_clareza: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando se a instrução é clara e direta.")
     nota_formatacao: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando o uso de markdown, listas e negritos.")
     nota_robustez: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando a imunidade a 'lost in the middle' e ambiguidades.")
-    nota_densidade_informacional: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando a razão sinal/ruído — penaliza verbosidade vazia e repetição sem valor.")
+    nota_densidade_informacional: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando a razão sinal/ruído - penaliza verbosidade vazia e repetição sem valor.")
     nota_acionabilidade: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando se as instruções são claras o suficiente para um agente de IA executar sem ambiguidade.")
     nota_anti_fragilidade: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando se a skill resiste a edge cases, inputs adversariais e contextos ambíguos.")
     feedback_detalhado: str = dspy.OutputField(desc="Explicação detalhada dos pontos fortes e fracos, justificando as notas.")
@@ -134,9 +134,9 @@ class DSPyStrategyDiscoverer(IStrategyDiscoverer):
 
     def __call__(self, skill_atual: str, feedbacks_recentes: str, estrategias_conhecidas: str) -> DiscoveredStrategy:
         res = self._predictor(
-            skill_atual=skill_atual,
-            feedbacks_recentes=feedbacks_recentes,
-            estrategias_conhecidas=estrategias_conhecidas
+            skill_atual=_sanitize_unicode_for_api(skill_atual),
+            feedbacks_recentes=_sanitize_unicode_for_api(feedbacks_recentes),
+            estrategias_conhecidas=_sanitize_unicode_for_api(estrategias_conhecidas)
         )
         return DiscoveredStrategy(
             nome_estrategia=res.nome_estrategia,
@@ -149,6 +149,11 @@ class DSPySelfReflectiveAgent(ISelfReflectiveAgent):
         self._fast_predictor = dspy.Predict(SelfReflectiveAgentSignature)
 
     def __call__(self, instrucao_anterior: str, nota_anterior: str, feedback_juiz: str, estrategia_mutacao: str) -> SelfReflectiveOutput:
+        # Sanitização para APIs que não aceitam Unicode (ex: Zhipu/Zai)
+        instrucao_anterior = _sanitize_unicode_for_api(instrucao_anterior)
+        feedback_juiz = _sanitize_unicode_for_api(feedback_juiz)
+        estrategia_mutacao = _sanitize_unicode_for_api(estrategia_mutacao)
+
         # Uso avançado de módulos: selecionar arquitetura baseada na heurística
         if "direto" in estrategia_mutacao.lower() or "simples" in estrategia_mutacao.lower():
             predictor = self._fast_predictor
@@ -183,6 +188,11 @@ class DSPyMutadorCognitivoAgent(IMutadorCognitivoAgent):
         self._predict_predictor = dspy.Predict(MutadorCognitivoAgentSignature)
 
     def __call__(self, instrucao_anterior: str, nota_anterior: str, feedback_juiz: str, estrategia_mutacao: str) -> MutadorCognitivoAgentOutput:
+        # Sanitização para APIs que não aceitam Unicode (ex: Zhipu/Zai)
+        instrucao_anterior = _sanitize_unicode_for_api(instrucao_anterior)
+        feedback_juiz = _sanitize_unicode_for_api(feedback_juiz)
+        estrategia_mutacao = _sanitize_unicode_for_api(estrategia_mutacao)
+
         # Se a estratégia já exige raciocínio explícito estruturado, 
         # ChainOfThought pode causar redundância dupla. Podemos usar Predict em heurísticas lógicas.
         if "premissas" in estrategia_mutacao.lower() or "dedução" in estrategia_mutacao.lower():
@@ -222,9 +232,9 @@ class DSPyAvaliadorModoB(IAvaliadorModoB):
             regras_adicionais = 'Preservar todas as regras comportamentais anteriores.'
 
         res = self._predictor(
-            skill_original=skill_original,
-            skill_otimizada=skill_otimizada,
-            regras_adicionais=regras_adicionais
+            skill_original=_sanitize_unicode_for_api(skill_original),
+            skill_otimizada=_sanitize_unicode_for_api(skill_otimizada),
+            regras_adicionais=_sanitize_unicode_for_api(regras_adicionais)
         )
 
         return AvaliacaoModoB(

@@ -200,6 +200,30 @@ def test_drift_thresholds_override(monkeypatch):
     assert cfg['repetitions'] == 5
 
 
+def test_litellm_sanitization_patch():
+    import litellm
+    with setup_dspy_mocks():
+        setup(model_name='glm-4', model_prefix='zhipu', api_key='zhipu-key')
+
+    captured = {}
+    orig = getattr(litellm, '_orig_completion', litellm.completion)
+    def mock_inner_completion(*args, **kwargs):
+        captured['kwargs'] = kwargs
+        return {"choices": [{"message": {"content": "ok"}}]}
+
+    with patch('litellm.completion', side_effect=mock_inner_completion):
+        # Trigger setup to wrap litellm.completion
+        litellm._sanitization_patched = False
+        setup(model_name='glm-4', model_prefix='zhipu', api_key='zhipu-key')
+        messages = [{"role": "user", "content": "teste — com travessão \u2014 e ácentôs"}]
+        litellm.completion(model="gpt-3.5-turbo", api_key="sk-mock", messages=messages)
+
+    sanitized_content = captured['kwargs']['messages'][0]['content']
+    assert '\u2014' not in sanitized_content
+    assert '—' not in sanitized_content
+    assert '--' in sanitized_content
+
+
 @contextmanager
 def setup_dspy_mocks(configure_side_effect=None):
     """Isola setup() de efeitos colaterais reais do DSPy e litellm."""

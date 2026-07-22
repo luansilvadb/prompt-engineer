@@ -45,6 +45,35 @@ def setup(model_name=None, model_prefix=None, api_base=None, api_key=None):
     os.environ['LITELLM_LOG'] = 'DEBUG' # Habilita logs reais de debug do litellm
     litellm.drop_params = True
 
+    # Patch litellm.completion para sanitizar mensagens Unicode/non-ASCII que quebram o SDK da Zai/Zhipu
+    if not getattr(litellm, "_sanitization_patched", False):
+        from src.signatures import _sanitize_unicode_for_api
+        _orig_completion = litellm.completion
+
+        def _deep_sanitize(obj):
+            if isinstance(obj, str):
+                return _sanitize_unicode_for_api(obj)
+            elif isinstance(obj, list):
+                return [_deep_sanitize(item) for item in obj]
+            elif isinstance(obj, dict):
+                return {k: _deep_sanitize(v) for k, v in obj.items()}
+            return obj
+
+        def _patched_completion(*args, **kwargs):
+            _safe_keys = {"api_key", "api_base"}
+            sanitized_kwargs = {}
+            for k, v in kwargs.items():
+                if k in _safe_keys:
+                    sanitized_kwargs[k] = v
+                else:
+                    sanitized_kwargs[k] = _deep_sanitize(v)
+            
+            sanitized_args = tuple(_deep_sanitize(a) for a in args)
+            return _orig_completion(*sanitized_args, **sanitized_kwargs)
+
+        litellm.completion = _patched_completion
+        litellm._sanitization_patched = True
+
     final_api_key = _resolve_api_key(api_key)
     final_model_name = _resolve_model_name(model_name, model_prefix)
     final_api_base = api_base or os.environ.get("API_BASE")

@@ -1,0 +1,11 @@
+{
+  "id": "job-3",
+  "status": "completed",
+  "original_skill": "skill 3",
+  "result": null,
+  "logs": [],
+  "mcts_nodes": 0,
+  "model_name": "gpt-4",
+  "model_prefix": "prefix",
+  "regras_adicionais": ""
+}

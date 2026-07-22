@@ -15,6 +15,7 @@ pywebview>=4.4.0         # Native desktop window (desktop.py)
 
 loguru>=0.7.0            # Structured logging (src/infrastructure/logging_config.py)
 slowapi>=0.1.9           # Rate limiting (src/api.py)
+prometheus-client>=0.20.0  # Metrics export (src/metrics.py)
 
 # ── Dev / Test ────────────────────────────────────────────────────────────────
 pytest>=8.0.0

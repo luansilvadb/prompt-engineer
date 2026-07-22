@@ -32,6 +32,27 @@
     --transition-snappy: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* Light mode override */
+[data-theme="light"] {
+    --bg-base: #FAFAFA;
+    --bg-surface: #FFFFFF;
+    --bg-panel: #F5F5F5;
+
+    --color-primary: #0070F3;
+    --color-primary-hover: #0056b3;
+
+    --text-main: #1A1A1A;
+    --text-muted: #666666;
+    --text-dark: #FFFFFF;
+
+    --border-glass: rgba(0, 0, 0, 0.08);
+    --border-active: rgba(0, 0, 0, 0.2);
+
+    --shadow-subtle: 0 8px 24px rgba(0, 0, 0, 0.08);
+    --shadow-inset: inset 0 1px 0 0 rgba(0, 0, 0, 0.04);
+    --shadow-glow: 0 0 0 1px rgba(0, 0, 0, 0.1), 0 12px 32px rgba(0, 0, 0, 0.12);
+}
+
 /* Global Reset & Base */
 * {
     margin: 0;
@@ -390,64 +411,6 @@ select option:checked,
 
 .input-password-wrapper button:hover {
     color: var(--color-primary);
-}
-
-/* Rules Section */
-.rules-input-wrapper {
-    display: flex;
-    gap: 8px;
-}
-
-.btn-add-rule {
-    background: var(--bg-panel);
-    border: 1px solid var(--border-glass);
-    color: var(--text-main);
-    width: 40px;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: var(--transition-snappy);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.btn-add-rule:hover {
-    background: var(--bg-surface);
-    border-color: var(--border-active);
-    color: var(--color-primary);
-}
-
-.rules-list {
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    max-height: 150px;
-    overflow-y: auto;
-}
-
-.rules-list li {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: var(--bg-base);
-    border: 1px solid var(--border-glass);
-    border-radius: 6px;
-    padding: 8px 12px;
-    font-size: 12px;
-}
-
-.rules-list li button {
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    cursor: pointer;
-    font-size: 13px;
-    transition: var(--transition-snappy);
-}
-
-.rules-list li button:hover {
-    color: var(--color-danger);
 }
 
 /* Editor Input Area */

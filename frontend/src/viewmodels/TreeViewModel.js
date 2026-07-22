@@ -9,9 +9,9 @@ export class TreeViewModel extends ViewModelBase {
 
     addNode(node) {
         if (!node || !node.id) return;
-        
+
         this.mctsNodes[node.id] = node;
-        
+
         let newBestScore = 0.0;
         Object.values(this.mctsNodes).forEach(n => {
             if (n.score > newBestScore) {
@@ -36,6 +36,14 @@ export class TreeViewModel extends ViewModelBase {
                 }
             }));
         }
+    }
+
+    getStats() {
+        return {
+            nodeCount: Object.keys(this.mctsNodes).length,
+            dagHits: 0, // será populado pelo backend via SSE futuramente
+            bestScore: this.bestScore,
+        };
     }
 
     clearTree() {

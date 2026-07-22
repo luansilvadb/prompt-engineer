@@ -10,6 +10,16 @@ except ImportError:
     sys.modules['sentence_transformers'] = sentence_transformers
     sentence_transformers.SentenceTransformer = MagicMock()
 
+@pytest.fixture(autouse=True)
+def clear_semantic_cache():
+    import src.semantic_evaluator as sem
+    sem._embedder = None
+    sem._cached_encode.cache_clear()
+    yield
+    sem._embedder = None
+    sem._cached_encode.cache_clear()
+
+
 @pytest.fixture
 def mock_heavy_evaluators():
     """Provides mocked heavy evaluators so tests avoid real LLM/network calls.
@@ -35,10 +45,21 @@ def mock_heavy_evaluators():
     )
     mock_avaliador = MagicMock(return_value=mock_resultado)
 
+    import torch
+
+    def mock_encode(text, convert_to_tensor=True):
+        h = abs(hash(text))
+        vec = torch.zeros(384)
+        vec[h % 384] = 1.0
+        return vec
+
+    mock_st_instance = MagicMock()
+    mock_st_instance.encode.side_effect = mock_encode
+
     with patch('src.infrastructure.dspy_impl.DSPyAvaliadorModoB', mock_avaliador), \
          patch('sentence_transformers.SentenceTransformer'), \
          patch('src.semantic_evaluator.SentenceTransformer') as mock_st_module:
-        mock_st_module.return_value = MagicMock()
+        mock_st_module.return_value = mock_st_instance
         yield {
             'AvaliadorModoB': mock_avaliador,
             'SentenceTransformer': mock_st_module,

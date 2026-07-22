@@ -1,20 +1,19 @@
-import uuid
 import asyncio
 import json
 import os
-from typing import Optional
-
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
-from sse_starlette.sse import EventSourceResponse
-from slowapi import Limiter
-from slowapi.util import get_remote_address
-from loguru import logger
+import uuid
 
 from dotenv import load_dotenv as _reload_dotenv
-from src.schemas import OtimizacaoRequestDTO, ConfigRequestDTO, ConfigResponseDTO, AuditRequestDTO, CompileRequestDTO
-from src.state import JobState, jobs
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
+from loguru import logger
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from sse_starlette.sse import EventSourceResponse
+
 import src.store as job_store
 from src.config import _get_env_path
+from src.schemas import AuditRequestDTO, CompileRequestDTO, ConfigRequestDTO, ConfigResponseDTO, OtimizacaoRequestDTO
+from src.state import JobState, jobs
 
 # ── Router ────────────────────────────────────────────────────────────────────
 router = APIRouter(prefix="/api", tags=["Jobs"])
@@ -167,7 +166,7 @@ async def stop_optimization(job_id: str):
 
 # ── List / Delete / Get ───────────────────────────────────────────────────────
 @router.get("/jobs")
-async def get_all_jobs(skip: int = 0, limit: int = 50, status: Optional[str] = None):
+async def get_all_jobs(skip: int = 0, limit: int = 50, status: str | None = None):
     return job_store.load_all_jobs(skip=skip, limit=limit, status=status)
 
 
@@ -237,31 +236,62 @@ def _format_result_event(job) -> dict:
 
 
 async def _live_event_generator(job):
-    """Gera eventos SSE com timeout máximo dinâmico (calculado a partir de max_iterations)."""
+    """Gera eventos SSE com heartbeat, timeout dinâmico e cleanup de conexões órfãs."""
     start_time = asyncio.get_event_loop().time()
+    last_heartbeat = start_time
+    HEARTBEAT_INTERVAL = 15.0  # envia keepalive a cada 15s para evitar timeout de proxy/load balancer
+    ORPHAN_TIMEOUT = 120.0  # considera job órfão se status='running' mas sem eventos por 120s
+    ORPHAN_GRACE_PERIOD = 120.0  # só ativa detecção de órfão após 120s (startup do job é lento)
 
     # Drena eventos já enfileirados
+    first_event_received = not job.events_queue.empty()
     while not job.events_queue.empty():
         event = job.events_queue.get_nowait()
         formatted = _format_event(event)
         if formatted:
             yield formatted
 
+    last_event_time = start_time
+
     while True:
-        # Verifica timeout máximo
-        elapsed = asyncio.get_event_loop().time() - start_time
+        now = asyncio.get_event_loop().time()
+        elapsed = now - start_time
+
+        # Heartbeat: mantém conexão viva mesmo sem eventos de negócio
+        if now - last_heartbeat >= HEARTBEAT_INTERVAL:
+            last_heartbeat = now
+            yield {"comment": "heartbeat"}
+
+        # Timeout máximo do job
         if elapsed > MAX_JOB_DURATION_SECONDS:
             logger.warning("Job {} excedeu timeout máximo de {}s — encerrando SSE", job, MAX_JOB_DURATION_SECONDS)
             yield {"event": "end", "data": "timeout"}
             return
 
+        # Cleanup de jobs órfãos: só ativa após grace period e primeiro evento
+        if (
+            job.status == "running"
+            and first_event_received
+            and elapsed > ORPHAN_GRACE_PERIOD
+            and (now - last_event_time) > ORPHAN_TIMEOUT
+        ):
+            logger.warning(
+                "Job {} parece órfão: status=running mas {}s sem eventos — encerrando SSE",
+                id(job), int(now - last_event_time),
+            )
+            job.status = "error"
+            yield {"event": "end", "data": "error"}
+            return
+
         try:
             event = await asyncio.wait_for(job.events_queue.get(), timeout=0.1)
+            first_event_received = True
+            last_event_time = now
             formatted = _format_event(event)
             if formatted:
                 yield formatted
             job.events_queue.task_done()
-        except asyncio.TimeoutError:
+        except TimeoutError:
             pass
         except asyncio.CancelledError:
             logger.info("SSE stream do job {} cancelado (CancelledError)", id(job))
@@ -373,8 +403,8 @@ async def save_config(body: ConfigRequestDTO):
 @router.get("/drift-status")
 async def get_drift_status():
     """Retorna o relatório do Drift Gate e o número de elementos do Golden Set."""
-    from src.drift.golden import GoldenSet
     from src.drift.cache import load_drift_cache
+    from src.drift.golden import GoldenSet
 
     golden = GoldenSet()
     report = load_drift_cache()
@@ -397,7 +427,7 @@ async def get_drift_status():
 async def compile_evaluator_endpoint(request: Request, body: CompileRequestDTO, background_tasks: BackgroundTasks):
     """Compila os agentes usando DSPy Optimizers (BootstrapFewShot, MIPROv2, GEPA) com memórias passadas."""
     from src.teleprompter import compilar_avaliador
-    
+
     def _do_compile():
         compilar_avaliador(
             min_reward=body.minReward or 0.8,

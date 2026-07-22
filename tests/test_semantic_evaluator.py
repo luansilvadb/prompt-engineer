@@ -17,8 +17,11 @@ def _make_mock_embedder(sim_value: float):
     """
     import math
     theta = math.acos(max(-1.0, min(1.0, sim_value)))
-    vec_a = torch.tensor([1.0, 0.0])
-    vec_b = torch.tensor([math.cos(theta), math.sin(theta)])
+    vec_a = torch.zeros(384)
+    vec_a[0] = 1.0
+    vec_b = torch.zeros(384)
+    vec_b[0] = math.cos(theta)
+    vec_b[1] = math.sin(theta)
 
     call_count = [0]
 

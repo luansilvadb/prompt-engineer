@@ -113,6 +113,12 @@ export function connectSSE(jobId, treeVm, consoleVm, onResult, onEnd, updateStat
                         const total = parseInt(match[2]);
                         const percent = Math.min(95, Math.round((current / total) * 100));
                         el.progressBarFill.style.width = `${percent}%`;
+
+                        // Atualiza título do painel de progresso com iteração real
+                        const panelHeader = el.progressPanel?.querySelector('.panel-header h2');
+                        if (panelHeader) {
+                            panelHeader.innerHTML = `<i class="fa-solid fa-terminal"></i> Console de Execução <small>(${current}/${total})</small>`;
+                        }
                     }
                 }
             }
@@ -121,6 +127,16 @@ export function connectSSE(jobId, treeVm, consoleVm, onResult, onEnd, updateStat
         node: (e) => {
             const node = JSON.parse(e.data);
             treeVm.addNode(node);
+
+            // Atualiza métricas em tempo real no header da árvore MCTS
+            const stats = treeVm.getStats();
+            if (stats) {
+                if (el.mctsNodeCount) el.mctsNodeCount.textContent = stats.nodeCount;
+                if (el.mctsDagHits) el.mctsDagHits.textContent = stats.dagHits || 0;
+                if (el.mctsBestScore) {
+                    el.mctsBestScore.textContent = (stats.bestScore * 100).toFixed(1) + '%';
+                }
+            }
         },
 
         result: (e) => {

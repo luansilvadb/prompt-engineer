@@ -1,6 +1,7 @@
-import json
 import datetime
+import json
 import os
+import uuid
 from pathlib import Path
 
 JOBS_DIR = Path('src/outputs/jobs')
@@ -38,19 +39,34 @@ def save_job_state(job_id: str, job) -> None:
         "regras_adicionais": job.regras_adicionais
     }
 
-    # Write atomically via temp file to avoid corruption
-    temp_path = file_path.with_suffix('.tmp')
+    # Write atomically via temp file with unique suffix to avoid WinError 32
+    # race condition when SSE and background task write concurrently
+    temp_id = uuid.uuid4().hex[:8]
+    temp_path = file_path.with_suffix(f".{temp_id}.tmp")
     try:
         with open(temp_path, 'w', encoding='utf-8') as f:
             json.dump(state_dict, f, ensure_ascii=False, indent=2)
         os.replace(temp_path, file_path)
+    except OSError as e:
+        # Cleanup temp file on failure
+        if temp_path.exists():
+            try:
+                temp_path.unlink()
+            except OSError:
+                pass
+        print(f"[Store] Failed to save job {job_id}: {e}")
     except Exception as e:
+        if temp_path.exists():
+            try:
+                temp_path.unlink()
+            except OSError:
+                pass
         print(f"[Store] Failed to save job {job_id}: {e}")
 
 def _read_job_summary(file_path: Path, status: str = None) -> dict:
     try:
         mtime = file_path.stat().st_mtime
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, encoding='utf-8') as f:
             data = json.load(f)
             job_status = data.get("status", "unknown")
 
@@ -95,7 +111,7 @@ def load_job(job_id: str) -> dict:
         return None
 
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, encoding='utf-8') as f:
             return json.load(f)
     except Exception as e:
         print(f"[Store] Error loading job {job_id}: {e}")

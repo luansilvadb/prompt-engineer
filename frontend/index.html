@@ -34,6 +34,9 @@
                     <span class="status-indicator idle" id="global-status-indicator"></span>
                     <span id="global-status-text">Pronto</span>
                 </div>
+                <button type="button" class="btn-secondary" id="btn-theme-toggle" title="Alternar tema claro/escuro">
+                    <i class="fa-solid fa-moon"></i>
+                </button>
                 <button type="button" class="btn-secondary" id="btn-open-history"><i
                         class="fa-solid fa-clock-rotate-left"></i> Histórico</button>
             </div>
@@ -105,9 +108,10 @@
                             aria-label="Skill original em formato Markdown"></textarea>
                         <div class="action-bar" style="display: flex; gap: 8px; flex-wrap: wrap;">
                             <button type="button" class="btn-primary" id="btn-start-opt">
-                                <i class="fa-solid fa-rocket animate-pulse"></i> Iniciar Otimização MCTS
+                                <i class="fa-solid fa-rocket"></i> Iniciar Otimização MCTS
                             </button>
-                            <button type="button" class="btn-secondary" id="btn-audit-skill" title="Auditoria rápida pré-flight nos 7 critérios de Engenharia de Contexto">
+                            <button type="button" class="btn-secondary" id="btn-audit-skill"
+                                title="Auditoria rápida pré-flight nos 7 critérios de Engenharia de Contexto">
                                 <i class="fa-solid fa-shield-halved"></i> Auditar Contexto
                             </button>
                             <button type="button" class="btn-danger hidden" id="btn-stop-opt">
@@ -294,7 +298,8 @@
         <div class="modal glass" style="max-width: 720px; width: 90%; max-height: 85vh; overflow-y: auto;">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-shield-halved"></i> Diagnóstico de Contexto (7 Critérios)</h3>
-                <button type="button" class="btn-close-modal" id="btn-close-audit"><i class="fa-solid fa-xmark"></i></button>
+                <button type="button" class="btn-close-modal" id="btn-close-audit"><i
+                        class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="modal-body" style="padding: 20px;" id="audit-modal-body">
                 <div style="text-align: center; padding: 20px;">

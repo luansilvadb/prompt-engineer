@@ -415,7 +415,7 @@ class Optimizer:
             strategy = self._discover_strategy(leaf)
 
         strategy_prompt = self._strategy_registry.get_prompt(strategy)
-        strategy_desc = self._strategy_registry.get_name(strategy)
+        strategy_desc = self._strategy_registry.get_name(strategy) or strategy
 
         experience_context = self._get_lessons_context(leaf.feedback)
 
@@ -587,6 +587,12 @@ class Optimizer:
             if child != leaf:
                 child.remove_virtual_loss()
             return True, 0.0
+
+        # BUG-2 fix: se a expansão falhou e retornou o próprio leaf,
+        # não há filho novo para simular. Evita iteração desperdiçada.
+        if child == leaf:
+            self._emitter.emit_log('    [Iteração Descartada] Nó pai retornado sem filho. Nenhuma estratégia gerou candidato novo.')
+            return False, 0.0
 
         is_pruned, heuristic_result = self._evaluate_and_prune(child)
         if is_pruned:

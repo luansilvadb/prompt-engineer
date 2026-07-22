@@ -36,6 +36,37 @@ consoleVm.addLogsInstant(['[*] Aguardando início do processo...']);
 // ── Carregar configurações do .env (via API) ───────────────────────────────
 configVm.loadFromStorage();
 
+// ── Theme Toggle (Dark/Light) ───────────────────────────────────────────────
+(function initTheme() {
+    const saved = localStorage.getItem('theme');
+    if (saved === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+    }
+
+    const btn = document.getElementById('btn-theme-toggle');
+    if (!btn) return;
+
+    const updateIcon = () => {
+        const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+        btn.innerHTML = isLight
+            ? '<i class="fa-solid fa-sun"></i>'
+            : '<i class="fa-solid fa-moon"></i>';
+    };
+    updateIcon();
+
+    btn.addEventListener('click', () => {
+        const current = document.documentElement.getAttribute('data-theme');
+        if (current === 'light') {
+            document.documentElement.removeAttribute('data-theme');
+            localStorage.setItem('theme', 'dark');
+        } else {
+            document.documentElement.setAttribute('data-theme', 'light');
+            localStorage.setItem('theme', 'light');
+        }
+        updateIcon();
+    });
+})();
+
 // ── Health Check: polling a cada 30s ────────────────────────────────────────
 async function checkApiHealth() {
     try {
