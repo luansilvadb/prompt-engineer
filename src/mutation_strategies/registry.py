@@ -6,7 +6,7 @@ a descoberta autônoma de novas estratégias (Tabula Rasa).
 
 Responsabilidade única deste módulo: persistência e acesso ao catálogo de
 estratégias. A seleção por bandit vive em `bandit.py`; a fachada pública
-(`get_mutation_prompt`/`get_strategy_description`) vive em `api.py`.
+(`get_strategy_description`) vive em `api.py`.
 
 Extraído de `src/mutations.py` (Phase 1 densification, ARC-03/D-01). O
 caminho legado `src.mutations` continua resolvendo via re-export shim
