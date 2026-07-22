@@ -9,14 +9,14 @@ from src.teleprompter import (
     compilar_avaliador,
 )
 from src.drift.exceptions import DriftMeasurementError
-from src.experience_store import ExperienceStore
+from src.domain.store_interfaces import IExperienceStore
 
 
 # ── Fixtures ─────────────────────────────────────────────
 
 @pytest.fixture
 def mock_store():
-    store = MagicMock(spec=ExperienceStore)
+    store = MagicMock(spec=IExperienceStore)
     store.experiences = []
     return store
 
@@ -34,7 +34,7 @@ def mock_experience():
 
 class TestBuildTrainset:
     def test_empty_store_returns_empty(self):
-        store = MagicMock(spec=ExperienceStore)
+        store = MagicMock(spec=IExperienceStore)
         store.experiences = []
         result = _build_trainset(store, min_reward=0.8)
         assert result == []
@@ -234,15 +234,15 @@ class TestEvaluateDriftGate:
 # são: lock já adquirido (no_data) e lock liberado após exceção.
 
 class TestCompilarAvaliador:
-    @patch('src.teleprompter.ExperienceStore')
+    @patch('src.teleprompter.create_experience_store')
     @patch('src.teleprompter._build_trainset')
     @patch('src.teleprompter._run_teleprompt')
     @patch('src.teleprompter._evaluate_drift_gate')
     def test_full_pipeline_returns_compiled(
-        self, mock_evaluate, mock_run, mock_build, mock_store_cls, mock_store
+        self, mock_evaluate, mock_run, mock_build, mock_store_factory, mock_store
     ):
         """Pipeline completo → retorna 'compiled'."""
-        mock_store_cls.return_value = mock_store
+        mock_store_factory.return_value = mock_store
         mock_build.return_value = [MagicMock()]  # não vazio
         mock_evaluate.return_value = 'compiled'
 
@@ -252,11 +252,11 @@ class TestCompilarAvaliador:
         result = compilar_avaliador()
         assert result in ('compiled', 'no_data')  # depende se lock já está em uso
 
-    @patch('src.teleprompter.ExperienceStore')
+    @patch('src.teleprompter.create_experience_store')
     @patch('src.teleprompter._build_trainset')
-    def test_empty_trainset_returns_no_data(self, mock_build, mock_store_cls, mock_store):
+    def test_empty_trainset_returns_no_data(self, mock_build, mock_store_factory, mock_store):
         """Store sem experiências → retorna 'no_data'."""
-        mock_store_cls.return_value = mock_store
+        mock_store_factory.return_value = mock_store
         mock_build.return_value = []
         result = compilar_avaliador()
         assert result == 'no_data'

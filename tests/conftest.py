@@ -83,7 +83,7 @@ def mock_optimizer_factory(mock_heavy_evaluators):
     from src.domain.config import MCTSConfig
     from src.mutation_strategies.bandit import MutationBandit
     from src.mutation_strategies.registry import StrategyRegistry
-    from src.experience_store import ExperienceStore
+    from src.experience_store_sqlite import create_experience_store
     
     def _create_optimizer(skill_original: str = "Test", **overrides):
         mock_emitter = MagicMock()
@@ -96,7 +96,7 @@ def mock_optimizer_factory(mock_heavy_evaluators):
         mock_agent_cognitivo = MagicMock()
         mock_avaliador_modo_b = mock_heavy_evaluators['AvaliadorModoB']
         
-        experience_store = ExperienceStore()
+        experience_store = create_experience_store()
         bandit = MutationBandit()
         strategy_registry = StrategyRegistry()
         
