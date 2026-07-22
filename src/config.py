@@ -47,7 +47,7 @@ def setup(model_name=None, model_prefix=None, api_base=None, api_key=None):
 
     # Patch litellm.completion para sanitizar mensagens Unicode/non-ASCII que quebram o SDK da Zai/Zhipu
     if not getattr(litellm, "_sanitization_patched", False):
-        from src.signatures import _sanitize_unicode_for_api
+        from src.utils.unicode_sanitizer import _sanitize_unicode_for_api
         _orig_completion = litellm.completion
 
         def _deep_sanitize(obj):

@@ -1,27 +1,9 @@
 import textstat
-import re
-from typing import List
 
+from src.evaluators.buzzwords import VAGUE_BUZZWORD_RE as _BUZZWORD_PATTERN
+from src.evaluators.density import compute_lexical_density
 textstat.set_lang('pt')
 
-# ── Vague Buzzword Filter (Layer 0) ──────────────────────────────────────────
-# Clichês e buzzwords de escrita de IA generativa que sinalizam verbosidade oca.
-# Fonte empírica: padrões recorrentes em outputs de LLMs sem cadeia de raciocínio.
-_VAGUE_BUZZWORDS: List[str] = [
-    # Inglês — marcadores de texto AI genérico
-    r"\bdelve\b", r"\btestament\b", r"\bin conclusion\b", r"\bmoreover\b",
-    r"\bfurthermore\b", r"\bnevertheless\b", r"\bit(?:'s| is) worth noting\b",
-    r"\bit(?:'s| is) important to note\b", r"\bin summary\b", r"\bin essence\b",
-    r"\bto summarize\b", r"\bpivotal\b", r"\blandscape\b", r"\bparadigm\b",
-    r"\bseamless(?:ly)?\b", r"\brobust\b", r"\bleverage\b", r"\bsynergy\b",
-    r"\bgroundbreaking\b", r"\bstate-of-the-art\b", r"\bcutting-edge\b",
-    # Português — equivalentes de verbosidade oca
-    r"\bem suma\b", r"\bem conclusão\b", r"\bcabe ressaltar\b",
-    r"\bé importante destacar\b", r"\bé fundamental ressaltar\b",
-    r"\bno contexto atual\b", r"\bno cenário atual\b",
-    r"\bde extrema importância\b", r"\bvalioso\b",
-]
-_BUZZWORD_PATTERN = re.compile("|".join(_VAGUE_BUZZWORDS), re.IGNORECASE)
 _BUZZWORD_THRESHOLD = 3  # ≥ N ocorrências → penalidade
 
 def evaluate_heuristics(
@@ -51,9 +33,7 @@ def evaluate_heuristics(
         }
 
     # Layer 1: Lexical Density (Type-Token Ratio)
-    clean_text = re.sub(r'[^\w\s]', '', text.lower())
-    tokens = clean_text.split()
-    unique_ratio = len(set(tokens)) / max(1, len(tokens))
+    unique_ratio = compute_lexical_density(text)
 
     # Hard prune if highly repetitive (hollow verbosity)
     if unique_ratio < density_min:

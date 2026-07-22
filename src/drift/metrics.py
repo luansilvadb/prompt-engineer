@@ -3,6 +3,8 @@ from typing import List, Tuple
 
 from src.drift.models import DriftReport, DimensionError
 from src.drift.exceptions import DriftMeasurementError
+# Lista configurável de buzzwords pomposas — consolidado em módulo único
+from src.evaluators.buzzwords import STYLE_BUZZWORDS_LOWER as _STYLE_BUZZWORDS_LOWER
 
 
 def _compute_ranks(values: List[float]) -> List[float]:
@@ -108,21 +110,6 @@ def _compute_mae_per_dimension(measurements: list, dims: List[str]) -> List[Dime
             diffs.append(abs(pred_val - exp_val))
         mae_per_dim.append(DimensionError(dimension=d, mae=statistics.mean(diffs) if diffs else 0.0))
     return mae_per_dim
-
-
-# Lista configurável de buzzwords pomposas para detecção de viés estético.
-# Valores iniciais — recalibrar na Fase 4 com dados do golden set expandido (DESIGN.md).
-_STYLE_BUZZWORDS = [
-    'axioma', 'ontológico', 'ontologica', 'espectral', 'oráculo', 'oraculo',
-    'decomposição', 'decomposicao', 'transmutação', 'transmutacao',
-    'exegese', 'catarse', 'gênese', 'genese', 'primária', 'primaria',
-    'epistemológica', 'epistemologica', 'existencial', 'entropia',
-    'cognitiva', 'cognitivo', 'arquitetura ontológica', 'arquitetura ontologica',
-    'dogma', 'falácia', 'falacia', 'capitulação', 'capitulacao',
-    'paradigma', 'transcendência', 'transcendencia',
-]
-
-_STYLE_BUZZWORDS_LOWER = [w.lower() for w in _STYLE_BUZZWORDS]
 
 
 def _detect_style_drift_signal(measurements: list) -> bool:

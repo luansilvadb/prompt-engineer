@@ -47,16 +47,8 @@ class ContextAuditReport:
         }
 
 
-# Buzzwords vadias / verbosidade oca
-_VAGUE_BUZZWORDS = [
-    r"\bdelve\b", r"\btestament\b", r"\bin conclusion\b", r"\bmoreover\b",
-    r"\bfurthermore\b", r"\bnevertheless\b", r"\bit(?:'s| is) worth noting\b",
-    r"\bin summary\b", r"\bpivotal\b", r"\bseamless(?:ly)?\b", r"\brobust\b",
-    r"\bleverage\b", r"\bsynergy\b", r"\bgroundbreaking\b",
-    r"\bem suma\b", r"\bem conclusão\b", r"\bcabe ressaltar\b",
-    r"\bé importante destacar\b", r"\bno contexto atual\b", r"\bde extrema importância\b",
-]
-_BUZZWORD_RE = re.compile("|".join(_VAGUE_BUZZWORDS), re.IGNORECASE)
+# Buzzwords vadias / verbosidade oca — consolidado em módulo único
+from src.evaluators.buzzwords import VAGUE_BUZZWORD_RE as _BUZZWORD_RE
 
 
 # ── critério #1: Role Clarity ───────────────────────────────────────────────

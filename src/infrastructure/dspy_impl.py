@@ -1,6 +1,7 @@
 import dspy
 from pathlib import Path
-from src.signatures import Avaliacao, AvaliacaoModoB, _sanitize_unicode_for_api
+from src.signatures import Avaliacao, AvaliacaoModoB
+from src.utils.unicode_sanitizer import _sanitize_unicode_for_api
 from src.domain.agent_interfaces import (
     DiscoveredStrategy,
     SelfReflectiveOutput,

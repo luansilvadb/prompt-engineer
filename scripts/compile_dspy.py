@@ -1,4 +1,3 @@
-import sys
 from pathlib import Path
 import dspy
 from src.config import setup

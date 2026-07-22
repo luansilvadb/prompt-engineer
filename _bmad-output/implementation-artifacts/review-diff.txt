@@ -1,0 +1,450 @@
+diff --git a/scripts/compile_dspy.py b/scripts/compile_dspy.py
+index 5ec6bf6..cf504b5 100644
+--- a/scripts/compile_dspy.py
++++ b/scripts/compile_dspy.py
+@@ -1,4 +1,3 @@
+-import sys
+ from pathlib import Path
+ import dspy
+ from src.config import setup
+diff --git a/src/api.py b/src/api.py
+index e82d43d..7388340 100644
+--- a/src/api.py
++++ b/src/api.py
+@@ -3,7 +3,6 @@ from pathlib import Path
+ 
+ from fastapi import FastAPI
+ from fastapi.middleware.cors import CORSMiddleware
+-from fastapi.responses import Response
+ from fastapi.staticfiles import StaticFiles
+ from slowapi import Limiter, _rate_limit_exceeded_handler
+ from slowapi.errors import RateLimitExceeded
+@@ -11,7 +10,6 @@ from slowapi.util import get_remote_address
+ 
+ from src.infrastructure.exception_handlers import register_exception_handlers
+ from src.infrastructure.logging_config import setup_logging
+-from src.metrics import get_metrics
+ from src.routers import frontend, jobs
+ 
+ # ÔöÇÔöÇ Logging estruturado ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+@@ -53,10 +51,3 @@ if (frontend_dir / "src").exists():
+ # ÔöÇÔöÇ Routers ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+ app.include_router(jobs.router)
+ app.include_router(frontend.router)
+-
+-
+-# ÔöÇÔöÇ Metrics endpoint (Prometheus) ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+-@app.get("/metrics")
+-async def metrics():
+-    """Exposi├º├úo de m├®tricas no formato Prometheus text exposition."""
+-    return Response(content=get_metrics(), media_type="text/plain; charset=utf-8")
+diff --git a/src/config.py b/src/config.py
+index 28a038a..c8d5b37 100644
+--- a/src/config.py
++++ b/src/config.py
+@@ -47,7 +47,7 @@ def setup(model_name=None, model_prefix=None, api_base=None, api_key=None):
+ 
+     # Patch litellm.completion para sanitizar mensagens Unicode/non-ASCII que quebram o SDK da Zai/Zhipu
+     if not getattr(litellm, "_sanitization_patched", False):
+-        from src.signatures import _sanitize_unicode_for_api
++        from src.utils.unicode_sanitizer import _sanitize_unicode_for_api
+         _orig_completion = litellm.completion
+ 
+         def _deep_sanitize(obj):
+diff --git a/src/context_audit.py b/src/context_audit.py
+index aa49a6b..21f1963 100644
+--- a/src/context_audit.py
++++ b/src/context_audit.py
+@@ -47,16 +47,8 @@ class ContextAuditReport:
+         }
+ 
+ 
+-# Buzzwords vadias / verbosidade oca
+-_VAGUE_BUZZWORDS = [
+-    r"\bdelve\b", r"\btestament\b", r"\bin conclusion\b", r"\bmoreover\b",
+-    r"\bfurthermore\b", r"\bnevertheless\b", r"\bit(?:'s| is) worth noting\b",
+-    r"\bin summary\b", r"\bpivotal\b", r"\bseamless(?:ly)?\b", r"\brobust\b",
+-    r"\bleverage\b", r"\bsynergy\b", r"\bgroundbreaking\b",
+-    r"\bem suma\b", r"\bem conclus├úo\b", r"\bcabe ressaltar\b",
+-    r"\b├® importante destacar\b", r"\bno contexto atual\b", r"\bde extrema import├óncia\b",
+-]
+-_BUZZWORD_RE = re.compile("|".join(_VAGUE_BUZZWORDS), re.IGNORECASE)
++# Buzzwords vadias / verbosidade oca ÔÇö consolidado em m├│dulo ├║nico
++from src.evaluators.buzzwords import VAGUE_BUZZWORD_RE as _BUZZWORD_RE
+ 
+ 
+ # ÔöÇÔöÇ crit├®rio #1: Role Clarity ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+diff --git a/src/drift/metrics.py b/src/drift/metrics.py
+index f5377c5..9654efe 100644
+--- a/src/drift/metrics.py
++++ b/src/drift/metrics.py
+@@ -3,6 +3,8 @@ from typing import List, Tuple
+ 
+ from src.drift.models import DriftReport, DimensionError
+ from src.drift.exceptions import DriftMeasurementError
++# Lista configur├ível de buzzwords pomposas ÔÇö consolidado em m├│dulo ├║nico
++from src.evaluators.buzzwords import STYLE_BUZZWORDS_LOWER as _STYLE_BUZZWORDS_LOWER
+ 
+ 
+ def _compute_ranks(values: List[float]) -> List[float]:
+@@ -110,21 +112,6 @@ def _compute_mae_per_dimension(measurements: list, dims: List[str]) -> List[Dime
+     return mae_per_dim
+ 
+ 
+-# Lista configur├ível de buzzwords pomposas para detec├º├úo de vi├®s est├®tico.
+-# Valores iniciais ÔÇö recalibrar na Fase 4 com dados do golden set expandido (DESIGN.md).
+-_STYLE_BUZZWORDS = [
+-    'axioma', 'ontol├│gico', 'ontologica', 'espectral', 'or├ículo', 'oraculo',
+-    'decomposi├º├úo', 'decomposicao', 'transmuta├º├úo', 'transmutacao',
+-    'exegese', 'catarse', 'g├¬nese', 'genese', 'prim├íria', 'primaria',
+-    'epistemol├│gica', 'epistemologica', 'existencial', 'entropia',
+-    'cognitiva', 'cognitivo', 'arquitetura ontol├│gica', 'arquitetura ontologica',
+-    'dogma', 'fal├ícia', 'falacia', 'capitula├º├úo', 'capitulacao',
+-    'paradigma', 'transcend├¬ncia', 'transcendencia',
+-]
+-
+-_STYLE_BUZZWORDS_LOWER = [w.lower() for w in _STYLE_BUZZWORDS]
+-
+-
+ def _detect_style_drift_signal(measurements: list) -> bool:
+     """
+     Detecta sinal de vi├®s est├®tico analisando os feedbacks textuais do juiz.
+diff --git a/src/evaluators/heuristic.py b/src/evaluators/heuristic.py
+index 1d989e3..c8757b4 100644
+--- a/src/evaluators/heuristic.py
++++ b/src/evaluators/heuristic.py
+@@ -1,27 +1,8 @@
+ import textstat
+-import re
+-from typing import List
+ 
++from src.evaluators.buzzwords import VAGUE_BUZZWORD_RE as _BUZZWORD_PATTERN
+ textstat.set_lang('pt')
+ 
+-# ÔöÇÔöÇ Vague Buzzword Filter (Layer 0) ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+-# Clich├¬s e buzzwords de escrita de IA generativa que sinalizam verbosidade oca.
+-# Fonte emp├¡rica: padr├Áes recorrentes em outputs de LLMs sem cadeia de racioc├¡nio.
+-_VAGUE_BUZZWORDS: List[str] = [
+-    # Ingl├¬s ÔÇö marcadores de texto AI gen├®rico
+-    r"\bdelve\b", r"\btestament\b", r"\bin conclusion\b", r"\bmoreover\b",
+-    r"\bfurthermore\b", r"\bnevertheless\b", r"\bit(?:'s| is) worth noting\b",
+-    r"\bit(?:'s| is) important to note\b", r"\bin summary\b", r"\bin essence\b",
+-    r"\bto summarize\b", r"\bpivotal\b", r"\blandscape\b", r"\bparadigm\b",
+-    r"\bseamless(?:ly)?\b", r"\brobust\b", r"\bleverage\b", r"\bsynergy\b",
+-    r"\bgroundbreaking\b", r"\bstate-of-the-art\b", r"\bcutting-edge\b",
+-    # Portugu├¬s ÔÇö equivalentes de verbosidade oca
+-    r"\bem suma\b", r"\bem conclus├úo\b", r"\bcabe ressaltar\b",
+-    r"\b├® importante destacar\b", r"\b├® fundamental ressaltar\b",
+-    r"\bno contexto atual\b", r"\bno cen├írio atual\b",
+-    r"\bde extrema import├óncia\b", r"\bvalioso\b",
+-]
+-_BUZZWORD_PATTERN = re.compile("|".join(_VAGUE_BUZZWORDS), re.IGNORECASE)
+ _BUZZWORD_THRESHOLD = 3  # ÔëÑ N ocorr├¬ncias ÔåÆ penalidade
+ 
+ def evaluate_heuristics(
+@@ -50,10 +31,9 @@ def evaluate_heuristics(
+             "reason": f"Vague Buzzwords ({len(buzzword_hits)} hits: {unique_hits[:5]})",
+         }
+ 
+-    # Layer 1: Lexical Density (Type-Token Ratio)
+-    clean_text = re.sub(r'[^\w\s]', '', text.lower())
+-    tokens = clean_text.split()
+-    unique_ratio = len(set(tokens)) / max(1, len(tokens))
++    # Layer 1: Lexical Density (Type-Token Ratio) ÔÇö delegado para density.py
++    from src.evaluators.density import compute_lexical_density
++    unique_ratio = compute_lexical_density(text)
+ 
+     # Hard prune if highly repetitive (hollow verbosity)
+     if unique_ratio < density_min:
+diff --git a/src/infrastructure/dspy_impl.py b/src/infrastructure/dspy_impl.py
+index 45b6f56..d1dd6e8 100644
+--- a/src/infrastructure/dspy_impl.py
++++ b/src/infrastructure/dspy_impl.py
+@@ -1,6 +1,7 @@
+ import dspy
+ from pathlib import Path
+-from src.signatures import Avaliacao, AvaliacaoModoB, _sanitize_unicode_for_api
++from src.signatures import Avaliacao, AvaliacaoModoB
++from src.utils.unicode_sanitizer import _sanitize_unicode_for_api
+ from src.domain.agent_interfaces import (
+     DiscoveredStrategy,
+     SelfReflectiveOutput,
+diff --git a/src/metrics.py b/src/metrics.py
+deleted file mode 100644
+index 3658c3a..0000000
+--- a/src/metrics.py
++++ /dev/null
+@@ -1,57 +0,0 @@
+-"""M├®tricas Prometheus para observabilidade do MCTS.
+-
+-Exp├Áe contadores e histogramas para monitoramento em produ├º├úo.
+-Endpoint /metrics no FastAPI (src/api.py).
+-"""
+-
+-from prometheus_client import REGISTRY, Counter, Histogram, generate_latest
+-
+-# ÔöÇÔöÇ Contadores ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+-
+-mcts_iterations_total = Counter(
+-    "skill_optimizer_mcts_iterations_total",
+-    "Total de itera├º├Áes MCTS executadas",
+-    ["job_id"],
+-)
+-
+-mcts_simulations_total = Counter(
+-    "skill_optimizer_mcts_simulations_total",
+-    "Total de simula├º├Áes (avalia├º├Áes LLM) executadas",
+-    ["job_id"],
+-)
+-
+-mcts_cache_hits_total = Counter(
+-    "skill_optimizer_mcts_cache_hits_total",
+-    "Cache hits (Transposition Table + simulation cache)",
+-    ["job_id", "cache_type"],
+-)
+-
+-mcts_pruned_nodes_total = Counter(
+-    "skill_optimizer_mcts_pruned_nodes_total",
+-    "N├│s podados antes da simula├º├úo",
+-    ["job_id", "prune_reason"],
+-)
+-
+-llm_calls_total = Counter(
+-    "skill_optimizer_llm_calls_total",
+-    "Total de chamadas ├á API LLM",
+-    ["job_id", "phase"],
+-)
+-
+-optimization_duration_seconds = Histogram(
+-    "skill_optimizer_optimization_duration_seconds",
+-    "Dura├º├úo total da otimiza├º├úo",
+-    ["job_id"],
+-    buckets=(30, 60, 120, 300, 600, 900, 1800, 3600),
+-)
+-
+-jobs_total = Counter(
+-    "skill_optimizer_jobs_total",
+-    "Total de jobs processados",
+-    ["status"],
+-)
+-
+-
+-def get_metrics() -> bytes:
+-    """Retorna m├®tricas no formato Prometheus text exposition."""
+-    return generate_latest(REGISTRY)
+diff --git a/src/services.py b/src/services.py
+index 4dfcf1f..bad2141 100644
+--- a/src/services.py
++++ b/src/services.py
+@@ -139,10 +139,4 @@ class OptimizationService:
+                 job.status = 'error'
+                 self.job_store.save_job_state(job_id, job)
+ 
+-    def audit_skill(self, skill_text: str) -> dict:
+-        """Executa auditoria pr├®-flight dos 7 crit├®rios de contexto."""
+-        from src.context_audit import audit_context_heuristics
+-        report = audit_context_heuristics(skill_text)
+-        return report.to_dict()
+-
+ 
+diff --git a/src/signatures.py b/src/signatures.py
+index cf69a6a..9c39a7a 100644
+--- a/src/signatures.py
++++ b/src/signatures.py
+@@ -1,58 +1,8 @@
+ import re
+ from dataclasses import dataclass
+ 
+-# ÔöÇÔöÇ Sanitiza├º├úo Unicode para APIs que n├úo aceitam caracteres n├úo-ASCII ÔöÇÔöÇÔöÇÔöÇÔöÇ
+-
+-_UNICODE_REPLACEMENTS = {
+-    '\u2014': '--',    # em dash
+-    '\u2013': '-',     # en dash
+-    '\u2018': "'",     # left single quote
+-    '\u2019': "'",     # right single quote
+-    '\u201c': '"',     # left double quote
+-    '\u201d': '"',     # right double quote
+-    '\u2026': '...',   # ellipsis
+-    '\u00a0': ' ',     # non-breaking space
+-    '\u00e1': 'a',     # ├í
+-    '\u00e9': 'e',     # ├®
+-    '\u00ed': 'i',     # ├¡
+-    '\u00f3': 'o',     # ├│
+-    '\u00fa': 'u',     # ├║
+-    '\u00e0': 'a',     # ├á
+-    '\u00e2': 'a',     # ├ó
+-    '\u00ea': 'e',     # ├¬
+-    '\u00f4': 'o',     # ├┤
+-    '\u00e3': 'a',     # ├ú
+-    '\u00f5': 'o',     # ├Á
+-    '\u00e7': 'c',     # ├º
+-    '\u00c1': 'A',     # ├ü
+-    '\u00c9': 'E',     # ├ë
+-    '\u00cd': 'I',     # ├ì
+-    '\u00d3': 'O',     # ├ô
+-    '\u00da': 'U',     # ├Ü
+-    '\u00c0': 'A',     # ├Ç
+-    '\u00c2': 'A',     # ├é
+-    '\u00ca': 'E',     # ├è
+-    '\u00d4': 'O',     # ├ö
+-    '\u00c3': 'A',     # ├â
+-    '\u00d5': 'O',     # ├ò
+-    '\u00c7': 'C',     # ├ç
+-    '\u00ba': 'o',     # ┬║
+-    '\u00aa': 'a',     # ┬¬
+-}
+-
+-def _sanitize_unicode_for_api(text: str) -> str:
+-    """Substitui caracteres Unicode problem├íticos por equivalentes ASCII.
+-
+-    APIs como Zhipu/Zai rejeitam caracteres n├úo-ASCII em certos endpoints
+-    com erro 'ascii' codec can't encode character. Esta fun├º├úo garante que
+-    o texto passado para a API seja seguro.
+-    """
+-    if not text:
+-        return text
+-    for unicode_char, ascii_replacement in _UNICODE_REPLACEMENTS.items():
+-        text = text.replace(unicode_char, ascii_replacement)
+-    # Fallback: remove qualquer caractere n├úo-ASCII remanescente
+-    return text.encode('ascii', errors='replace').decode('ascii')
++# ÔöÇÔöÇ Sanitiza├º├úo Unicode (movida para src/utils/unicode_sanitizer.py) ÔöÇÔöÇÔöÇÔöÇÔöÇ
++from src.utils.unicode_sanitizer import _sanitize_unicode_for_api, _UNICODE_REPLACEMENTS  # noqa: F401 ÔÇö re-export para compatibilidade
+ 
+ @dataclass
+ class RaciocinioCognitivo:
+@@ -285,14 +235,6 @@ def calcular_composite(notas) -> float:
+     return weighted_sum / total_weight
+ 
+ 
+-def _calculate_score(resultado: Avaliacao) -> float:
+-    """
+-    Calcula score composicional de 6 dimens├Áes.
+-    Delega para calcular_composite (fonte ├║nica de pesos).
+-    """
+-    return calcular_composite(resultado)
+-
+-
+ def calcular_delta_reward(reward_filho: float, reward_pai: float, alpha: float = 0.6) -> float:
+     """
+     Reward shaping com delta comparativo.
+@@ -326,7 +268,7 @@ def funcao_de_recompensa(avaliador_modo_b, skill_original: str, skill_otimizada:
+         if not resultado.manteve_regras_criticas:
+             return 0.0, resultado.feedback_detalhado
+ 
+-        score = _calculate_score(resultado)
++        score = calcular_composite(resultado)
+ 
+         if resultado.defeitos_encontrados:
+             # BUG-4 fix: teto de 0.5 evita colapso catastr├│fico por defeitos cosm├®ticos.
+
+
+=== NEW FILE: src/evaluators/buzzwords.py ===
+"""Buzzwords e clichês de IA — fonte única de verdade para todos os módulos de avaliação.
+
+Consolidado de:
+  - src/context_audit.py  (18 padrões regex, inglês + pt-BR)
+  - src/evaluators/heuristic.py (28 padrões regex, inglês + pt-BR)
+  - src/drift/metrics.py   (23 strings literais, pt-BR estilo pomposo)
+"""
+
+import re
+
+# ── Vague Buzzwords (regex patterns) ───────────────────────────────────────
+# Padrões de verbosidade oca em outputs de LLM. Cada entrada é um padrão regex
+# compilável com re.compile(..., re.IGNORECASE).
+
+VAGUE_BUZZWORD_PATTERNS: list[str] = [
+    # Inglês — marcadores de texto AI genérico
+    r"\bdelve\b", r"\btestament\b", r"\bin conclusion\b", r"\bmoreover\b",
+    r"\bfurthermore\b", r"\bnevertheless\b", r"\bit(?:'s| is) worth noting\b",
+    r"\bit(?:'s| is) important to note\b", r"\bin summary\b", r"\bin essence\b",
+    r"\bto summarize\b", r"\bpivotal\b", r"\blandscape\b", r"\bparadigm\b",
+    r"\bseamless(?:ly)?\b", r"\brobust\b", r"\bleverage\b", r"\bsynergy\b",
+    r"\bgroundbreaking\b", r"\bstate-of-the-art\b", r"\bcutting-edge\b",
+    # Português — equivalentes de verbosidade oca
+    r"\bem suma\b", r"\bem conclusão\b", r"\bcabe ressaltar\b",
+    r"\bé importante destacar\b", r"\bé fundamental ressaltar\b",
+    r"\bno contexto atual\b", r"\bno cenário atual\b",
+    r"\bde extrema importância\b", r"\bvalioso\b",
+]
+
+VAGUE_BUZZWORD_RE = re.compile("|".join(VAGUE_BUZZWORD_PATTERNS), re.IGNORECASE)
+
+# ── Style Buzzwords (literal strings) ──────────────────────────────────────
+# Palavras pomposas em pt-BR usadas para detecção de viés estético no drift.
+# Uso: verificação de substring (bw in text.lower()).
+
+STYLE_BUZZWORDS: list[str] = [
+    'axioma', 'ontológico', 'ontologica', 'espectral', 'oráculo', 'oraculo',
+    'decomposição', 'decomposicao', 'transmutação', 'transmutacao',
+    'exegese', 'catarse', 'gênese', 'genese', 'primária', 'primaria',
+    'epistemológica', 'epistemologica', 'existencial', 'entropia',
+    'cognitiva', 'cognitivo', 'arquitetura ontológica', 'arquitetura ontologica',
+    'dogma', 'falácia', 'falacia', 'capitulação', 'capitulacao',
+    'paradigma', 'transcendência', 'transcendencia',
+]
+
+STYLE_BUZZWORDS_LOWER = [w.lower() for w in STYLE_BUZZWORDS]
+
+
+=== NEW FILE: src/utils/__init__.py ===
+
+
+=== NEW FILE: src/utils/unicode_sanitizer.py ===
+"""Sanitização Unicode para APIs que não aceitam caracteres não-ASCII.
+
+Extraído de src/signatures.py para quebrar dependência circular config ↔ signatures.
+"""
+
+_UNICODE_REPLACEMENTS = {
+    '\u2014': '--',    # em dash
+    '\u2013': '-',     # en dash
+    '\u2018': "'",     # left single quote
+    '\u2019': "'",     # right single quote
+    '\u201c': '"',     # left double quote
+    '\u201d': '"',     # right double quote
+    '\u2026': '...',   # ellipsis
+    '\u00a0': ' ',     # non-breaking space
+    '\u00e1': 'a',     # á
+    '\u00e9': 'e',     # é
+    '\u00ed': 'i',     # í
+    '\u00f3': 'o',     # ó
+    '\u00fa': 'u',     # ú
+    '\u00e0': 'a',     # à
+    '\u00e2': 'a',     # â
+    '\u00ea': 'e',     # ê
+    '\u00f4': 'o',     # ô
+    '\u00e3': 'a',     # ã
+    '\u00f5': 'o',     # õ
+    '\u00e7': 'c',     # ç
+    '\u00c1': 'A',     # Á
+    '\u00c9': 'E',     # É
+    '\u00cd': 'I',     # Í
+    '\u00d3': 'O',     # Ó
+    '\u00da': 'U',     # Ú
+    '\u00c0': 'A',     # À
+    '\u00c2': 'A',     # Â
+    '\u00ca': 'E',     # Ê
+    '\u00d4': 'O',     # Ô
+    '\u00c3': 'A',     # Ã
+    '\u00d5': 'O',     # Õ
+    '\u00c7': 'C',     # Ç
+    '\u00ba': 'o',     # º
+    '\u00aa': 'a',     # ª
+}
+
+
+def _sanitize_unicode_for_api(text: str) -> str:
+    """Substitui caracteres Unicode problemáticos por equivalentes ASCII.
+
+    APIs como Zhipu/Zai rejeitam caracteres não-ASCII em certos endpoints
+    com erro 'ascii' codec can't encode character. Esta função garante que
+    o texto passado para a API seja seguro.
+    """
+    if not text:
+        return text
+    for unicode_char, ascii_replacement in _UNICODE_REPLACEMENTS.items():
+        text = text.replace(unicode_char, ascii_replacement)
+    # Fallback: remove qualquer caractere não-ASCII remanescente
+    return text.encode('ascii', errors='replace').decode('ascii')
+
