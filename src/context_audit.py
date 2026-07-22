@@ -7,7 +7,7 @@ Baseado nos 7 critérios empíricos do artigo:
 
 import re
 from dataclasses import dataclass
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 import textstat
 
 textstat.set_lang('pt')
