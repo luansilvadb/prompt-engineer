@@ -35,12 +35,15 @@ class SqliteExperienceStore:
     Suporta migração automática do formato antigo JSON Lines na primeira execução.
     """
 
-    def __init__(self, gamma: float = 0.995, max_experiences: int = 500):
+    def __init__(self, gamma: float = 0.995, max_experiences: int = 500, db_path: Path | str | None = None):
         self.gamma = gamma
         self.max_experiences = max_experiences
-        EXPERIENCES_DIR.mkdir(parents=True, exist_ok=True)
+        path = db_path if db_path is not None else DB_PATH
+        if isinstance(path, Path):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path = str(path)
 
-        self._conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
+        self._conn = sqlite3.connect(path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL")  # Write-Ahead Logging
         self._conn.execute("PRAGMA synchronous=NORMAL")
@@ -247,15 +250,16 @@ class SqliteExperienceStore:
 # ── Fallback Factory ─────────────────────────────────────────────────────────
 
 
-def create_experience_store(gamma: float = 0.995, max_experiences: int = 500):
+def create_experience_store(gamma: float = 0.995, max_experiences: int = 500, db_path = None):
     """
     Factory que retorna o backend SQLite.
 
     Args:
         gamma: Fator de decaimento temporal
         max_experiences: Número máximo de experiências mantidas
+        db_path: Caminho opcional para o arquivo SQLite (usa DB_PATH padrão se None)
 
     Returns:
         Instância compatível com IExperienceStore (Protocol).
     """
-    return SqliteExperienceStore(gamma=gamma, max_experiences=max_experiences)
+    return SqliteExperienceStore(gamma=gamma, max_experiences=max_experiences, db_path=db_path)

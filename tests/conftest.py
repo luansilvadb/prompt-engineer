@@ -96,7 +96,7 @@ def mock_optimizer_factory(mock_heavy_evaluators):
         mock_agent_cognitivo = MagicMock()
         mock_avaliador_modo_b = mock_heavy_evaluators['AvaliadorModoB']
         
-        experience_store = create_experience_store()
+        experience_store = create_experience_store(db_path=":memory:")
         bandit = MutationBandit()
         strategy_registry = StrategyRegistry()
         
