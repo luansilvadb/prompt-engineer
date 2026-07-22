@@ -38,10 +38,10 @@ def _make_mock_embedder(sim_value: float):
 
 def test_singleton_loading():
     """get_embedder() must always return the same instance (singleton pattern)."""
-    with patch('src.semantic_evaluator.SentenceTransformer') as mock_st:
+    with patch('src.evaluators.semantic.SentenceTransformer') as mock_st:
         mock_st.return_value = MagicMock()
         # Reset singleton so our mock is used
-        import src.semantic_evaluator as sem
+        import src.evaluators.semantic as sem
         original = sem._embedder
         sem._embedder = None
         try:
@@ -57,7 +57,7 @@ def test_no_penalty():
     """Texts with cosine similarity well below the threshold get penalty = 1.0."""
     # sim = 0.3 → far below the default threshold of 0.85 → no penalty
     mock_embedder = _make_mock_embedder(0.3)
-    with patch('src.semantic_evaluator._embedder', mock_embedder):
+    with patch('src.evaluators.semantic._embedder', mock_embedder):
         penalty = calculate_semantic_penalty("text1", "text2", threshold=0.85)
     assert penalty == 1.0
 
@@ -66,7 +66,7 @@ def test_continuous_decay():
     """Texts with similarity just above threshold should return a value in (0.01, 1.0)."""
     # sim = 0.92 → slightly above 0.85 → quadratic decay kicks in
     mock_embedder = _make_mock_embedder(0.92)
-    with patch('src.semantic_evaluator._embedder', mock_embedder):
+    with patch('src.evaluators.semantic._embedder', mock_embedder):
         penalty = calculate_semantic_penalty("text1", "text2", threshold=0.85)
     assert 0.01 <= penalty < 1.0, f"Expected decay, got penalty={penalty}"
 
@@ -75,7 +75,7 @@ def test_max_penalty():
     """Identical texts (sim=1.0) should get the minimum possible penalty (0.01)."""
     # sim = 1.0 → max cosine → maximum decay → floor at 0.01
     mock_embedder = _make_mock_embedder(1.0)
-    with patch('src.semantic_evaluator._embedder', mock_embedder):
+    with patch('src.evaluators.semantic._embedder', mock_embedder):
         penalty = calculate_semantic_penalty("same text", "same text", threshold=0.85)
     assert penalty == 0.01, f"Expected minimum penalty 0.01, got {penalty}"
 

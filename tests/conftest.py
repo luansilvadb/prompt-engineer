@@ -12,7 +12,7 @@ except ImportError:
 
 @pytest.fixture(autouse=True)
 def clear_semantic_cache():
-    import src.semantic_evaluator as sem
+    import src.evaluators.semantic as sem
     sem._embedder = None
     sem._cached_encode.cache_clear()
     yield
@@ -58,7 +58,7 @@ def mock_heavy_evaluators():
 
     with patch('src.infrastructure.dspy_impl.DSPyAvaliadorModoB', mock_avaliador), \
          patch('sentence_transformers.SentenceTransformer'), \
-         patch('src.semantic_evaluator.SentenceTransformer') as mock_st_module:
+         patch('src.evaluators.semantic.SentenceTransformer') as mock_st_module:
         mock_st_module.return_value = mock_st_instance
         yield {
             'AvaliadorModoB': mock_avaliador,
