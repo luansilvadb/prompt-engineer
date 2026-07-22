@@ -62,6 +62,9 @@ class StrategyRegistry:
             pass
 
     def add_strategy(self, key: str, name: str, prompt: str):
+        existing_names = {s['name'] for s in self.strategies.values()}
+        if name in existing_names:
+            return
         self.strategies[key] = {'name': name, 'prompt': prompt}
         self.save()
 

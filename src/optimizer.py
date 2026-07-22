@@ -320,37 +320,37 @@ class Optimizer:
 
     def _discover_strategy(self, leaf: MCTSNode) -> str:
         self._emitter.emit_log('[*] Bandit escolheu __DISCOVER__. Inventando nova heurística de mutação...')
-        try:
-            estrategias_conhecidas = ", ".join([
-                self._strategy_registry.get_name(k)
-                for k in self._strategy_registry.get_all_keys()
-                if k != '__DISCOVER__'
-            ])
-            if not estrategias_conhecidas:
-                estrategias_conhecidas = "Nenhuma. Você é livre para criar a primeira heurística (Tabula Rasa)."
+        with self.lock:
+            try:
+                estrategias_conhecidas = ", ".join([
+                    self._strategy_registry.get_name(k)
+                    for k in self._strategy_registry.get_all_keys()
+                    if k != '__DISCOVER__'
+                ])
+                if not estrategias_conhecidas:
+                    estrategias_conhecidas = "Nenhuma. Você é livre para criar a primeira heurística (Tabula Rasa)."
 
-            self._count_llm_call()  # 1 chamada LLM (strategy_discoverer)
-            nova_estrat = self.strategy_discoverer(
-                skill_atual=leaf.instruction,
-                feedbacks_recentes=leaf.feedback or "Nenhum feedback ainda. Invente algo inovador.",
-                estrategias_conhecidas=estrategias_conhecidas
-            )
+                self._count_llm_call()  # 1 chamada LLM (strategy_discoverer)
+                nova_estrat = self.strategy_discoverer(
+                    skill_atual=leaf.instruction,
+                    feedbacks_recentes=leaf.feedback or "Nenhum feedback ainda. Invente algo inovador.",
+                    estrategias_conhecidas=estrategias_conhecidas
+                )
 
-            key_raw = nova_estrat.nome_estrategia.lower()
-            key = re.sub(r'[^a-z0-9_]', '_', key_raw)[:30] + '_' + str(uuid.uuid4())[:4]
+                key_raw = nova_estrat.nome_estrategia.lower()
+                key = re.sub(r'[^a-z0-9_]', '_', key_raw)[:30] + '_' + str(uuid.uuid4())[:4]
 
-            self._strategy_registry.add_strategy(key, nova_estrat.nome_estrategia, nova_estrat.prompt_estrategia)
-            self._emitter.emit_log(f'[+] Nova estratégia descoberta! {nova_estrat.nome_estrategia}')
-            return key
-        except Exception as e:
-            if "RateLimit" in str(e) or "429" in str(e):
-                self._emitter.emit_error('[!] Rate limit atingido na descoberta. Pausando 15s...')
-                time.sleep(15)
-            else:
-                self._emitter.emit_error(f'[!] Falha ao inventar estratégia: {e}. Usando fallback.')
-            # Retorna uma estratégia segura real (fallback) para evitar quebrar o loop
-            fallback_keys = [k for k in self._strategy_registry.get_all_keys() if k != '__DISCOVER__']
-            return fallback_keys[0] if fallback_keys else 'mutador_cognitivo'
+                self._strategy_registry.add_strategy(key, nova_estrat.nome_estrategia, nova_estrat.prompt_estrategia)
+                self._emitter.emit_log(f'[+] Nova estratégia descoberta! {nova_estrat.nome_estrategia}')
+                return key
+            except Exception as e:
+                if "RateLimit" in str(e) or "429" in str(e):
+                    self._emitter.emit_error('[!] Rate limit atingido na descoberta. Pausando 15s...')
+                    time.sleep(15)
+                else:
+                    self._emitter.emit_error(f'[!] Falha ao inventar estratégia: {e}. Usando fallback.')
+                fallback_keys = [k for k in self._strategy_registry.get_all_keys() if k != '__DISCOVER__']
+                return fallback_keys[0] if fallback_keys else 'mutador_cognitivo'
 
     def _get_lessons_context(self, feedback: str) -> str:
         similar_experiences = self.experience_store.query_similar(feedback, top_k=3)
