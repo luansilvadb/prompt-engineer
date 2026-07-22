@@ -93,8 +93,11 @@ src/outputs/strategies/
 # Acidente de redirecionamento Windows (nome reservado)
 # ==============================================================================
 nul
+<<<<<<< HEAD
 
 # ==============================================================================
 # Artefatos temporários de pytest
 # ==============================================================================
+=======
+>>>>>>> 0b18914 (chore: remove .pytest_tmp from tracking, add to .gitignore)
 .pytest_tmp/
