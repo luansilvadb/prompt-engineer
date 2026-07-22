@@ -146,32 +146,3 @@ class OptimizationService:
         return report.to_dict()
 
 
-def execute_optimization_task(
-    job_id: str,
-    loop,
-    store: IJobStore,
-    strategy_discoverer: IStrategyDiscoverer,
-    agent: ISelfReflectiveAgent,
-    agent_cognitivo: IMutadorCognitivoAgent,
-    avaliador_modo_b: IAvaliadorModoB,
-    compiler: IAvaliadorCompiler,
-    experience_store: IExperienceStore,
-    ai_framework: IAiFramework,
-    config: MCTSConfig | None = None,
-    bandit: IMutationBandit | None = None,
-    strategy_registry: IStrategyRegistry | None = None,
-) -> None:
-    service = OptimizationService(
-        strategy_discoverer=strategy_discoverer,
-        agent=agent,
-        agent_cognitivo=agent_cognitivo,
-        avaliador_modo_b=avaliador_modo_b,
-        compiler=compiler,
-        experience_store=experience_store,
-        job_store=store,
-        ai_framework=ai_framework,
-        config=config,
-        bandit=bandit,
-        strategy_registry=strategy_registry,
-    )
-    service.execute(job_id, loop)

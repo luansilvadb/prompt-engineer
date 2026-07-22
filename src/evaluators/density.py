@@ -1,45 +1,7 @@
 """Density Evaluator — COGN-04: Densificação Extrema. Calculates a density multiplier that rewards compressed, logically-structured instructions over verbose chain-of-thought."""
 
 import re
-from dataclasses import dataclass
 
-
-@dataclass(frozen=True)
-class DensityContext:
-    child_instruction: str
-    parent_instruction: str
-    min_density_threshold: float
-    multiplier_min: float
-    multiplier_max: float
-    structured_bonus: float
-
-
-@dataclass(frozen=True)
-class DensityResult:
-    multiplier: float
-    child_density: float
-    parent_density: float
-    is_neutral: bool
-    reason: str
-
-    def __post_init__(self) -> None:
-        if not (0.0 <= self.multiplier <= 2.0):
-            raise ValueError(f"multiplier must be in [0.0, 2.0], got {self.multiplier}")
-        if not (0.0 <= self.child_density <= 1.0):
-            raise ValueError(f"child_density must be in [0.0, 1.0], got {self.child_density}")
-        if not (0.0 <= self.parent_density <= 1.0):
-            raise ValueError(f"parent_density must be in [0.0, 1.0], got {self.parent_density}")
-
-class DensityResultFloat(float):
-    """Subclass of float that matches DensityResult interface for backward compatibility."""
-    def __new__(cls, multiplier: float, child_density: float, parent_density: float, is_neutral: bool, reason: str):
-        inst = super().__new__(cls, multiplier)
-        inst.multiplier = multiplier
-        inst.child_density = child_density
-        inst.parent_density = parent_density
-        inst.is_neutral = is_neutral
-        inst.reason = reason
-        return inst
 
 def compute_lexical_density(text: str) -> float:
     clean_text = re.sub(r'[^\w\s]', '', text.lower())
@@ -48,74 +10,11 @@ def compute_lexical_density(text: str) -> float:
         return 0.0
     return len(set(tokens)) / len(tokens)
 
+
 def _has_structured_fields(instruction: str) -> bool:
     normalized = instruction.lower()
-    required = ["## raciocínio", "## regras", "## conclusão"]
-    return all(s in normalized for s in required)
+    return all(s in normalized for s in ("## raciocínio", "## regras", "## conclusão"))
 
-class DensityMultiplier:
-    def calculate(
-        self,
-        context: DensityContext,
-        mutation_strategy: str = "",
-        base_threshold: float = 1.0,
-    ) -> DensityResult:
-        child_len = len(context.child_instruction)
-        parent_len = len(context.parent_instruction)
-        
-        child_density = compute_lexical_density(context.child_instruction)
-        parent_density = compute_lexical_density(context.parent_instruction)
-        
-        # RN-05: Multiplicador DEVE ser 1.0 se:
-        # - min_density_threshold == 0.0 (desabilitado)
-        if context.min_density_threshold == 0.0:
-            return DensityResult(
-                multiplier=1.0,
-                child_density=child_density,
-                parent_density=parent_density,
-                is_neutral=True,
-                reason="Min density threshold is disabled (0.0)"
-            )
-            
-        # - len(child_instruction) == len(parent_instruction) (sem mudança)
-        if child_len == parent_len:
-            if mutation_strategy == "mutador_cognitivo" and _has_structured_fields(context.child_instruction):
-                mult = base_threshold + context.structured_bonus
-                mult = max(context.multiplier_min, min(context.multiplier_max, mult))
-                return DensityResult(
-                    multiplier=mult,
-                    child_density=child_density,
-                    parent_density=parent_density,
-                    is_neutral=False,
-                    reason="Cognitive structured bonus applied at equal length"
-                )
-            return DensityResult(
-                multiplier=base_threshold,
-                child_density=child_density,
-                parent_density=parent_density,
-                is_neutral=True,
-                reason="Same length instructions"
-            )
-            
-        parent_len_val = max(1, parent_len)
-        compression_ratio = child_len / parent_len_val
-        
-        # Base formula: base_threshold / compression_ratio
-        multiplier = base_threshold / max(0.01, compression_ratio)
-        multiplier = max(context.multiplier_min, min(context.multiplier_max, multiplier))
-        
-        # Cognitive structured bonus
-        if mutation_strategy == "mutador_cognitivo" and _has_structured_fields(context.child_instruction):
-            multiplier += context.structured_bonus
-            multiplier = max(context.multiplier_min, min(context.multiplier_max, multiplier))
-            
-        return DensityResult(
-            multiplier=multiplier,
-            child_density=child_density,
-            parent_density=parent_density,
-            is_neutral=False,
-            reason="Compression/expansion multiplier applied"
-        )
 
 def calculate_density_multiplier(
     child_instruction: str,
@@ -126,28 +25,22 @@ def calculate_density_multiplier(
     density_multiplier_max: float = 1.5,
     structured_bonus: float = 0.2,
     min_density: float = 0.35,
-) -> DensityResultFloat:
-    """
-    Calcula multiplicador de densidade que recompensa compressão e penaliza verbosidade.
-    Conforma com o protocolo IDensityMultiplier usando DensityContext e DensityResult.
-    """
-    context = DensityContext(
-        child_instruction=child_instruction,
-        parent_instruction=parent_instruction,
-        min_density_threshold=min_density,
-        multiplier_min=density_multiplier_min,
-        multiplier_max=density_multiplier_max,
-        structured_bonus=structured_bonus,
-    )
-    result = DensityMultiplier().calculate(
-        context,
-        mutation_strategy=mutation_strategy,
-        base_threshold=density_threshold,
-    )
-    return DensityResultFloat(
-        multiplier=result.multiplier,
-        child_density=result.child_density,
-        parent_density=result.parent_density,
-        is_neutral=result.is_neutral,
-        reason=result.reason,
-    )
+) -> float:
+    """Calcula multiplicador de densidade que recompensa compressão e penaliza verbosidade."""
+    child_len, parent_len = len(child_instruction), len(parent_instruction)
+
+    if min_density == 0.0:
+        return 1.0
+
+    if child_len == parent_len:
+        if mutation_strategy == "mutador_cognitivo" and _has_structured_fields(child_instruction):
+            return max(density_multiplier_min, min(density_multiplier_max, density_threshold + structured_bonus))
+        return density_threshold
+
+    multiplier = density_threshold / max(0.01, child_len / max(1, parent_len))
+    multiplier = max(density_multiplier_min, min(density_multiplier_max, multiplier))
+
+    if mutation_strategy == "mutador_cognitivo" and _has_structured_fields(child_instruction):
+        multiplier = max(density_multiplier_min, min(density_multiplier_max, multiplier + structured_bonus))
+
+    return multiplier

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from src.signatures import Avaliacao, AvaliacaoModoB
+from src.signatures import AvaliacaoModoB
 
 
 class IAiFramework(Protocol):
@@ -59,16 +59,6 @@ class IMutadorCognitivoAgent(Protocol):
         feedback_juiz: str,
         estrategia_mutacao: str,
     ) -> MutadorCognitivoAgentOutput:
-        ...
-
-
-class IAvaliadorDeSkill(Protocol):
-    def __call__(
-        self,
-        skill_original: str,
-        skill_otimizada: str,
-        regras_adicionais: str,
-    ) -> Avaliacao:
         ...
 
 
