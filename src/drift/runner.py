@@ -78,6 +78,55 @@ def _abort_fail_fast(consecutive_infra: int, elapsed: float, probe_id: str, labe
         )
 
 
+def _apply_safety_net(probe: GoldenProbe, avaliacao) -> object:
+    """
+    Safety net determinística: se o probe espera violação de regras críticas,
+    aplica verificação textual como camada complementar ao LLM.
+    Retorna a avaliação original ou uma versão corrigida (fail-safe).
+    """
+    if probe.expected.manteve_regras_criticas or not probe.verification_hints:
+        return avaliacao
+
+    confirmed = _apply_verification_hints(
+        probe.skill_otimizada,
+        probe.regras_adicionais,
+        probe.verification_hints,
+    )
+    if not confirmed or not avaliacao.manteve_regras_criticas:
+        return avaliacao
+
+    # LLM falhou em detectar violação, mas safety net confirma.
+    # Força manteve_regras_criticas=False (fail-safe).
+    from src.signatures import AvaliacaoModoB
+    if isinstance(avaliacao, AvaliacaoModoB):
+        return AvaliacaoModoB(
+            manteve_regras_criticas=False,
+            defeitos_encontrados=avaliacao.defeitos_encontrados + [
+                "[SafetyNet] Violação confirmada por verificação textual determinística."
+            ],
+            nota_clareza=avaliacao.nota_clareza,
+            nota_formatacao=avaliacao.nota_formatacao,
+            nota_robustez=avaliacao.nota_robustez,
+            nota_densidade_informacional=avaliacao.nota_densidade_informacional,
+            nota_acionabilidade=avaliacao.nota_acionabilidade,
+            nota_anti_fragilidade=avaliacao.nota_anti_fragilidade,
+            feedback_detalhado=avaliacao.feedback_detalhado,
+        )
+    # Modo A: Avaliacao base — não tem defeitos_encontrados,
+    # mas forçamos manteve_regras_criticas=False
+    from src.signatures import Avaliacao
+    return Avaliacao(
+        manteve_regras_criticas=False,
+        nota_clareza=avaliacao.nota_clareza,
+        nota_formatacao=avaliacao.nota_formatacao,
+        nota_robustez=avaliacao.nota_robustez,
+        nota_densidade_informacional=avaliacao.nota_densidade_informacional,
+        nota_acionabilidade=avaliacao.nota_acionabilidade,
+        nota_anti_fragilidade=avaliacao.nota_anti_fragilidade,
+        feedback_detalhado=avaliacao.feedback_detalhado,
+    )
+
+
 class JudgeProbeRunner:
     """
     Mede um juiz específico contra probes. Instancia seu PRÓPRIO
@@ -145,48 +194,7 @@ class JudgeProbeRunner:
                 predicao = dspy.Prediction(skill_otimizada=probe.skill_otimizada)
                 avaliacao = invoke_fn(exemplo, predicao)
                 
-                # ── Safety net determinística ──────────────────────────────────
-                # Se o probe espera violação de regras críticas, aplica verificação
-                # textual como camada complementar ao LLM (A1 — hard-gate SD-2).
-                if not probe.expected.manteve_regras_criticas and probe.verification_hints:
-                    confirmed = _apply_verification_hints(
-                        probe.skill_otimizada,
-                        probe.regras_adicionais,
-                        probe.verification_hints,
-                    )
-                    if confirmed and avaliacao.manteve_regras_criticas:
-                        # LLM falhou em detectar violação, mas safety net confirma.
-                        # Força manteve_regras_criticas=False (fail-safe).
-                        from src.signatures import AvaliacaoModoB
-                        if isinstance(avaliacao, AvaliacaoModoB):
-                            avaliacao = AvaliacaoModoB(
-                                manteve_regras_criticas=False,
-                                defeitos_encontrados=avaliacao.defeitos_encontrados + [
-                                    "[SafetyNet] Violação confirmada por verificação textual determinística."
-                                ],
-                                nota_clareza=avaliacao.nota_clareza,
-                                nota_formatacao=avaliacao.nota_formatacao,
-                                nota_robustez=avaliacao.nota_robustez,
-                                nota_densidade_informacional=avaliacao.nota_densidade_informacional,
-                                nota_acionabilidade=avaliacao.nota_acionabilidade,
-                                nota_anti_fragilidade=avaliacao.nota_anti_fragilidade,
-                                feedback_detalhado=avaliacao.feedback_detalhado,
-                            )
-                        else:
-                            # Modo A: Avaliacao base — não tem defeitos_encontrados,
-                            # mas podemos forçar manteve_regras_criticas=False
-                            from src.signatures import Avaliacao
-                            avaliacao = Avaliacao(
-                                manteve_regras_criticas=False,
-                                nota_clareza=avaliacao.nota_clareza,
-                                nota_formatacao=avaliacao.nota_formatacao,
-                                nota_robustez=avaliacao.nota_robustez,
-                                nota_densidade_informacional=avaliacao.nota_densidade_informacional,
-                                nota_acionabilidade=avaliacao.nota_acionabilidade,
-                                nota_anti_fragilidade=avaliacao.nota_anti_fragilidade,
-                                feedback_detalhado=avaliacao.feedback_detalhado,
-                            )
-                # ── Fim safety net ─────────────────────────────────────────────
+                avaliacao = _apply_safety_net(probe, avaliacao)
                 
                 measurement.samples.append(avaliacao)
                 consecutive_infra = 0  # sucesso reseta a contagem consecutiva

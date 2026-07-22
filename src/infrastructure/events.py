@@ -39,9 +39,6 @@ class JobEventEmitter(IJobEventEmitter):
     def emit_cost(self, payload: CostEventPayload) -> None:
         self._on_cost(dataclasses.asdict(payload))
 
-    def emit_status(self, status: str) -> None:
-        self._on_log(f'[status] {status}')
-
     def emit_error(self, message: str) -> None:
         self._on_error(message)
 

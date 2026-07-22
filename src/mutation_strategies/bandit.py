@@ -46,7 +46,6 @@ class MutationBandit(IMutationBandit):
         self.temperature_decay = temperature_decay
         self._counts: Dict[str, int] = {'__DISCOVER__': 0}
         self._rewards: Dict[str, float] = {'__DISCOVER__': 0.0}
-        self._total_selects: int = 0
         self._round_robin_index: int = 0
         self._known_strategies: List[str] = []
 
@@ -142,7 +141,6 @@ class MutationBandit(IMutationBandit):
         if self._round_robin_index < len(self._known_strategies):
             chosen = self._known_strategies[self._round_robin_index]
             self._round_robin_index += 1
-            self._total_selects += 1
             self._decay_temperature()
             return chosen
         # ── Fim Round-Robin ──────────────────────────────────────────────────
@@ -151,7 +149,6 @@ class MutationBandit(IMutationBandit):
 
         untried = self._pick_untried()
         if untried is not None:
-            self._total_selects += 1
             self._decay_temperature()
             return untried
 
@@ -159,7 +156,6 @@ class MutationBandit(IMutationBandit):
         probs = self._boltzmann_probs(ucb_scores)
         chosen = self._sample_from_probs(probs)
 
-        self._total_selects += 1
         self._decay_temperature()
         return chosen
 

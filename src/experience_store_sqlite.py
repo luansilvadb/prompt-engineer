@@ -22,8 +22,6 @@ from src.experience_store import Experience, _compute_idf, _compute_tf, _cosine_
 
 EXPERIENCES_DIR = Path("src/outputs/experiences")
 DB_PATH = EXPERIENCES_DIR / "experiences.db"
-SCHEMA_VERSION = 1
-
 
 # ── SQLite Store ─────────────────────────────────────────────────────────────
 

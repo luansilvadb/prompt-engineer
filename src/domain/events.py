@@ -47,9 +47,6 @@ class IJobEventEmitter:
     def emit_cost(self, payload: CostEventPayload) -> None:
         ...
 
-    def emit_status(self, status: str) -> None:
-        ...
-
     def emit_error(self, message: str) -> None:
         ...
 
