@@ -107,10 +107,11 @@ class Optimizer:
 
         strategy_stats = self.experience_store.get_strategy_stats()
         if strategy_stats:
-            self.mutation_bandit.load_priors(strategy_stats)
+            coalesced = self._coalesce_strategy_stats(strategy_stats)
+            self.mutation_bandit.load_priors(coalesced)
             self._emitter.emit_log(
                 f'[*] Memória experiencial carregada: {len(self.experience_store.experiences)} experiências, '
-                f'{len(strategy_stats)} estratégias conhecidas.'
+                f'{len(coalesced)} estratégias conhecidas.'
             )
 
         cognitivo_prior = {
@@ -318,6 +319,26 @@ class Optimizer:
                 if p and p.node_id not in visited:
                     queue.append((p, depth_from_leaf + 1))
 
+    def _coalesce_strategy_stats(self, stats: dict[str, dict[str, float]]) -> dict[str, dict[str, float]]:
+        name_to_key: dict[str, str] = {}
+        coalesced: dict[str, dict[str, float]] = {}
+        for key, info in stats.items():
+            name = self._strategy_registry.get_name(key)
+            name_lower = name.lower().strip()
+            if name_lower in name_to_key:
+                existing_key = name_to_key[name_lower]
+                existing = coalesced[existing_key]
+                count = info.get("count", 0)
+                total_delta = info.get("total_delta", 0)
+                existing["count"] = existing.get("count", 0) + count
+                existing["total_delta"] = existing.get("total_delta", 0) + total_delta
+                existing["total_reward"] = existing.get("total_reward", 0) + info.get("total_reward", 0)
+                existing["mean_delta"] = existing["total_delta"] / max(1, existing["count"])
+            else:
+                name_to_key[name_lower] = key
+                coalesced[key] = dict(info)
+        return coalesced
+
     def _discover_strategy(self, leaf: MCTSNode) -> str:
         self._emitter.emit_log('[*] Bandit escolheu __DISCOVER__. Inventando nova heurística de mutação...')
         with self.lock:
@@ -340,7 +361,10 @@ class Optimizer:
                 key_raw = nova_estrat.nome_estrategia.lower()
                 key = re.sub(r'[^a-z0-9_]', '_', key_raw)[:30] + '_' + str(uuid.uuid4())[:4]
 
-                self._strategy_registry.add_strategy(key, nova_estrat.nome_estrategia, nova_estrat.prompt_estrategia)
+                existing_key = self._strategy_registry.add_strategy(key, nova_estrat.nome_estrategia, nova_estrat.prompt_estrategia)
+                if existing_key:
+                    self._emitter.emit_log(f'[i] Estratégia "{nova_estrat.nome_estrategia}" já descoberta. Reaproveitando chave existente.')
+                    return existing_key
                 self._emitter.emit_log(f'[+] Nova estratégia descoberta! {nova_estrat.nome_estrategia}')
                 return key
             except Exception as e:

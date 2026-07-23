@@ -41,7 +41,8 @@ class IStrategyRegistry(ABC):
         ...
 
     @abstractmethod
-    def add_strategy(self, key: str, name: str, prompt: str) -> None:
+    def add_strategy(self, key: str, name: str, prompt: str) -> str | None:
+        """Adds a strategy. Returns the existing key if name already registered, else None."""
         ...
 
     @abstractmethod

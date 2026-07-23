@@ -47,7 +47,18 @@ class StrategyRegistry:
         if path.exists():
             try:
                 with open(path, 'r', encoding='utf-8') as f:
-                    self.strategies = json.load(f)
+                    raw = json.load(f)
+                seen_names: set[str] = set()
+                deduplicated: dict[str, dict[str, str]] = {}
+                for key, entry in raw.items():
+                    name = entry.get('name', '')
+                    if name in seen_names:
+                        continue
+                    seen_names.add(name)
+                    deduplicated[key] = entry
+                self.strategies = deduplicated
+                if len(deduplicated) < len(raw):
+                    self.save()
             except Exception:
                 pass
 
@@ -61,12 +72,13 @@ class StrategyRegistry:
         except Exception:
             pass
 
-    def add_strategy(self, key: str, name: str, prompt: str):
-        existing_names = {s['name'] for s in self.strategies.values()}
-        if name in existing_names:
-            return
+    def add_strategy(self, key: str, name: str, prompt: str) -> str | None:
+        for existing_key, s in self.strategies.items():
+            if s['name'] == name:
+                return existing_key
         self.strategies[key] = {'name': name, 'prompt': prompt}
         self.save()
+        return None
 
     def get_prompt(self, key: str) -> str:
         if key == '__DISCOVER__':
