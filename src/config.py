@@ -93,6 +93,10 @@ def setup(model_name=None, model_prefix=None, api_base=None, api_key=None):
     # rate limits ou erros transientes sem estourar o budget do MCTS excessivamente.
     dspy_num_retries = int(os.environ.get("DSPY_NUM_RETRIES", "1"))
     lm = dspy.LM(**kwargs, num_retries=dspy_num_retries)
+    # Wrappa o LM global com NormalizingLM para corrigir hífens em chaves JSON
+    # antes do DSPy parsear — injetado globalmente para todo Predict/ChainOfThought.
+    from src.infrastructure.dspy_impl import NormalizingLM
+    lm = NormalizingLM(lm)
     try:
         dspy.configure(lm=lm)
     except RuntimeError:

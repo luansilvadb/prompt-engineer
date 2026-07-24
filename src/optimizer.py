@@ -114,12 +114,17 @@ class Optimizer:
         self._expansion_failure: dict[str, int] = {}  # contagem de falha por estratégia
         self._density_floor_history: list[bool] = []
         self._iteration_start_time: float = 0.0
+        self._iteration_deadline: float = 0.0
         self._iteration_circuit_broken: bool = False
+        self._last_iter_parent_raw: float = 0.0
         self._gates_without_test_cases: int = 0
         self._post_evals_without_test_cases: int = 0
         self._discovered_strategies: set = set()  # rastreia estratégias vindas do __DISCOVER__
+        self._incremental_checkpoint: dict | None = None  # checkpoint entre estágios de gate/descoberta
+        self._technical_error_count: int = 0  # contador de avaliações que falharam por erro técnico (não score zero real)
 
         strategy_stats = self.experience_store.get_strategy_stats()
+        coalesced: dict | None = None
         if strategy_stats:
             coalesced = self._coalesce_strategy_stats(strategy_stats)
             self.mutation_bandit.load_priors(coalesced)
@@ -128,17 +133,33 @@ class Optimizer:
                 f'{len(coalesced)} estratégias conhecidas.'
             )
 
-        cognitivo_prior = {
-            'mutador_cognitivo': {
-                'count': config.cognitivo_prior_count,
-                'mean_delta': config.cognitivo_prior_mean_delta,
+        # SubTask 5.1: estatística observada de mutador_cognitivo no coalesced
+        observed_mean_delta = None
+        if coalesced and 'mutador_cognitivo' in coalesced:
+            observed_mean_delta = coalesced['mutador_cognitivo'].get('mean_delta')
+
+        # SubTask 5.2: prior boosting condicional — só aplica se não há histórico ou mean_delta > 0
+        if observed_mean_delta is None or observed_mean_delta > 0:
+            cognitivo_prior = {
+                'mutador_cognitivo': {
+                    'count': config.cognitivo_prior_count,
+                    'mean_delta': config.cognitivo_prior_mean_delta,
+                }
             }
-        }
-        self.mutation_bandit.load_priors(cognitivo_prior)
-        self._emitter.emit_log(
-            f'[*] Mutador Cognitivo prior boosting: {config.cognitivo_prior_count} virtual count, '
-            f'delta={config.cognitivo_prior_mean_delta}'
-        )
+            self.mutation_bandit.load_priors(cognitivo_prior)
+            # SubTask 5.3: espelha a regra efetiva de load_priors para o log.
+            if config.cognitivo_prior_mean_delta < 0:
+                effective_virtual_count = 1
+            else:
+                effective_virtual_count = max(1, min(int(config.cognitivo_prior_count * 0.5), 10))
+            self._emitter.emit_log(
+                f'[*] Mutador Cognitivo prior boosting: {effective_virtual_count} virtual count, '
+                f'delta={config.cognitivo_prior_mean_delta}'
+            )
+        else:
+            self._emitter.emit_log(
+                f'[*] Mutador Cognitivo prior boosting suprimido: mean_delta histórico={observed_mean_delta:.3f} <= 0'
+            )
 
     def _count_llm_call(self, n: int = 1, latency_ms: float = 0.0) -> None:
         """Registra chamadas LLM para metricas de custo."""
@@ -230,6 +251,9 @@ class Optimizer:
             self._count_llm_call(latency_ms=latency)  # 1 chamada LLM (avaliador_modo_b)
             if reward == 0.0:
                 self._emitter.emit_error(f"    [Simulação] Recompensa 0.00! Motivo: {feedback}")
+                # Distingue erro técnico de score zero real
+                if feedback.startswith("Erro interno na avaliação"):
+                    self._technical_error_count += 1
             else:
                 self._emitter.emit_log(f"    [Simulação] Recompensa obtida: {reward:.2f}")
 
@@ -267,8 +291,8 @@ class Optimizer:
             self._emitter.emit_log(f"    [Poda Absoluta] Value estimator: {estimated:.2f} < threshold {self.config.value_threshold}. Podando.")
             return True
 
-        if self.best_reward_so_far > 0.6 and (estimated + 0.15) < self.best_reward_so_far:
-            self._emitter.emit_log(f"    [Poda Relativa] Estimado ({estimated:.2f} + 0.15) < melhor recompensa ({self.best_reward_so_far:.2f}). Podando.")
+        if self.best_reward_so_far > 0.6 and (estimated + self.config.prune_relative_margin) < self.best_reward_so_far:
+            self._emitter.emit_log(f"    [Poda Relativa] Estimado ({estimated:.2f} [raw] + {self.config.prune_relative_margin:.2f}) < melhor recompensa ({self.best_reward_so_far:.2f} [raw]). Podando.")
             return True
 
         return False
@@ -369,27 +393,29 @@ class Optimizer:
             estrategias_conhecidas = "Nenhuma. Você é livre para criar a primeira heurística (Tabula Rasa)."
 
         try:
-            enriched_feedback = (leaf.feedback or "Nenhum feedback ainda. Invente algo inovador.") + """
+            enriched_feedback = (leaf.feedback or "Nenhum feedback ainda. Invente algo inovador.") + f"""
 
-EIXOS DE MUTAÇÃO DISPONÍVEIS (escolha um eixo DIFERENTE do que as estratégias conhecidas já cobrem):
+INSTRUÇÃO DE DESCOBERTA: Você deve inventar uma NOVA estratégia de mutação coerente com a skill, cobrindo um EIXO de mutação ainda NÃO explorado pelas estratégias já registradas.
 
-1. COMPRIMIR: Remover prosa, metáforas, exemplos narrativos. Converter em regras densas SE→ENTÃO. 
-   Exemplo: "Destilação em Código de Conduta" — extrai apenas comandos imperativos.
+Estratégias já registradas (evite duplicar estes eixos):
+{estrategias_conhecidas}
 
-2. EXPANDIR: Adicionar exemplos concretos, cenários de borda, anti-padrões, e contexto situacional.
-   Exemplo: "Enriquecimento por Casos de Borda" — para cada regra, adicionar 2 exemplos de edge case.
-
-3. REORDENAR: Mudar a ordem das seções/regras por criticidade, fluxo lógico, ou frequência de uso.
-   Exemplo: "Reordenação por Frequência de Falha" — regras que mais falham vêm primeiro.
-
-4. ENRIQUECER: Adicionar metadados, justificativas, pré-condições e pós-condições para cada regra.
-   Exemplo: "Anotação Semântica de Regras" — cada regra ganha um campo "Motivo:" explicando o porquê.
-
-5. ESPECIALIZAR: Criar variantes da skill para contextos específicos (agente reativo vs. planejador, etc).
-   Exemplo: "Adaptação por Perfil de Agente" — bifurcar regras para agente síncrono vs. assíncrono.
+Exemplos de eixos que você pode explorar (não se limite a estes): variação de tom/registro, reestruturação de formato, especificação de contexto de uso, decomposição em passos, adição de justificativas, parametrização de configuração, especialização por perfil de agente, ou qualquer outro eixo coerente.
 
 IMPORTANTE: Gere uma estratégia de um eixo DIFERENTE dos que as estratégias conhecidas já implementam."""
+            timeout_s = self._remaining_time(self.config.llm_timeout)
+            if timeout_s <= 0:
+                self._iteration_circuit_broken = True
+                self._emitter.emit_log('    [Circuit Breaker] Deadline já passado, abortando submissão de discovery')
+                with self.lock:
+                    fallback_keys = [k for k in self._strategy_registry.get_all_keys() if k != '__DISCOVER__']
+                return fallback_keys[0] if fallback_keys else 'mutador_cognitivo'
+
             t0 = time.perf_counter()
+            if self._check_iteration_abort():
+                with self.lock:
+                    fallback_keys = [k for k in self._strategy_registry.get_all_keys() if k != '__DISCOVER__']
+                return fallback_keys[0] if fallback_keys else 'mutador_cognitivo'
             future = self._llm_executor.submit(
                 self.strategy_discoverer,
                 skill_atual=leaf.instruction,
@@ -397,9 +423,18 @@ IMPORTANTE: Gere uma estratégia de um eixo DIFERENTE dos que as estratégias co
                 estrategias_conhecidas=estrategias_conhecidas
             )
             try:
-                nova_estrat = future.result(timeout=self.config.llm_timeout)
+                nova_estrat = future.result(timeout=timeout_s)
+                if not nova_estrat.nome_estrategia:
+                    self._emitter.emit_log('[Discovery] nome_estrategia vazio/None, usando fallback')
+                    with self.lock:
+                        fallback_keys = [k for k in self._strategy_registry.get_all_keys() if k != '__DISCOVER__']
+                    return fallback_keys[0] if fallback_keys else 'mutador_cognitivo'
             except concurrent.futures.TimeoutError:
-                self._emitter.emit_error(f'[!] Timeout ({self.config.llm_timeout}s) ao descobrir estratégia. Usando fallback.')
+                self._iteration_circuit_broken = True
+                self._emitter.emit_log(
+                    f'    [Circuit Breaker] Descoberta excedeu timeout ({timeout_s:.2f}s). '
+                    f'Thread em background continuará mas resultado será descartado.'
+                )
                 with self.lock:
                     fallback_keys = [k for k in self._strategy_registry.get_all_keys() if k != '__DISCOVER__']
                 return fallback_keys[0] if fallback_keys else 'mutador_cognitivo'
@@ -415,9 +450,19 @@ IMPORTANTE: Gere uma estratégia de um eixo DIFERENTE dos que as estratégias co
             if existing_key:
                 self._emitter.emit_log(f'[i] Estratégia "{nova_estrat.nome_estrategia}" já descoberta. Reaproveitando chave existente.')
                 self._discovered_strategies.add(existing_key)
+                self._save_incremental_checkpoint(
+                    stage='discovery',
+                    strategy_key=existing_key,
+                    strategy_desc=nova_estrat.nome_estrategia,
+                )
                 return existing_key
             self._emitter.emit_log(f'[+] Nova estratégia descoberta! {nova_estrat.nome_estrategia}')
             self._discovered_strategies.add(key)
+            self._save_incremental_checkpoint(
+                stage='discovery',
+                strategy_key=key,
+                strategy_desc=nova_estrat.nome_estrategia,
+            )
             return key
         except Exception as e:
             if "RateLimit" in str(e) or "429" in str(e):
@@ -478,6 +523,13 @@ IMPORTANTE: Gere uma estratégia de um eixo DIFERENTE dos que as estratégias co
         effective_timeout = timeout_override if timeout_override is not None else self.config.llm_timeout
         for local_attempt in range(3):
             try:
+                if self._check_iteration_abort():
+                    return '', critica, False
+                timeout_s = self._remaining_time(effective_timeout)
+                if timeout_s <= 0:
+                    self._iteration_circuit_broken = True
+                    self._emitter.emit_log('    [Circuit Breaker] Sem tempo restante para nova chamada LLM. Abortando expansão.')
+                    return '', critica, False
                 t0 = time.perf_counter()
                 if strategy == 'mutador_cognitivo':
                     future = self._llm_executor.submit(
@@ -487,7 +539,7 @@ IMPORTANTE: Gere uma estratégia de um eixo DIFERENTE dos que as estratégias co
                         feedback_juiz=feedback_completo,
                         estrategia_mutacao=strategy_prompt,
                     )
-                    predicao = future.result(timeout=effective_timeout)
+                    predicao = future.result(timeout=timeout_s)
                     self._validate_cognitive_output(predicao)
                 else:
                     future = self._llm_executor.submit(
@@ -497,7 +549,7 @@ IMPORTANTE: Gere uma estratégia de um eixo DIFERENTE dos que as estratégias co
                         feedback_juiz=feedback_completo,
                         estrategia_mutacao=strategy_prompt,
                     )
-                    predicao = future.result(timeout=effective_timeout)
+                    predicao = future.result(timeout=timeout_s)
                 latency = (time.perf_counter() - t0) * 1000
                 self._count_llm_call(latency_ms=latency)  # 1 chamada LLM (agent ou agent_cognitivo)
                 candidata = predicao.nova_instrucao
@@ -512,7 +564,17 @@ IMPORTANTE: Gere uma estratégia de um eixo DIFERENTE dos que as estratégias co
                 else:
                     return self._handle_empty_candidate(critica)
             except concurrent.futures.TimeoutError:
-                self._emitter.emit_error(f'    [!] Timeout ({effective_timeout}s) na geração. Tentando novamente... ({local_attempt + 1}/3)')
+                if timeout_s < effective_timeout:
+                    self._iteration_circuit_broken = True
+                    self._emitter.emit_log(
+                        f'    [Circuit Breaker] Geração excedeu a janela restante ({timeout_s:.2f}s). '
+                        f'Thread em background continuará mas resultado será descartado.'
+                    )
+                    return '', critica, False
+                self._emitter.emit_error(
+                    f'    [!] Timeout ({timeout_s:.2f}s) na geração. '
+                    f'Thread em background continuará. Tentando novamente... ({local_attempt + 1}/3)'
+                )
                 continue
             except Exception as e:
                 if "RateLimit" in str(e) or "429" in str(e):
@@ -857,74 +919,104 @@ IMPORTANTE: Gere uma estratégia de um eixo DIFERENTE dos que as estratégias co
                 parts = strategy_key[len('composite:'):].split('+')
                 if not strategy_desc:
                     strategy_desc = self._strategy_registry.get_name(strategy_key)
-                self._emitter.emit_log(f'[*] Expandindo nó (Tentativa {tentativa + 1}/3) | Estratégia: {strategy_desc} | Nota: {nota}')
-
-                current_instruction = leaf.instruction
-                accumulated_critica = critica
-                composicao_sucesso = True
-
-                for s in parts:
-                    prompt_s = self._strategy_registry.get_prompt(s)
-                    prompt_s = self._inject_dynamic_data(s, prompt_s)
-
-                    candidata, nova_critica, sucesso = self._try_generate_mutation(
-                        leaf, s, prompt_s, feedback_completo, nota, accumulated_critica,
-                        current_instruction=current_instruction,
-                        timeout_override=self.config.composite_timeout_s
+                if not self._try_reserve_strategy(leaf, strategy_key):
+                    self._emitter.emit_log(
+                        f'    [Reserva] Estratégia {strategy_desc} já reservada por outra thread. Tentando outra estratégia...'
                     )
-                    accumulated_critica = nova_critica
-
-                    if not sucesso:
-                        composicao_sucesso = False
-                        break
-
-                    current_instruction = candidata
-                    feedback_completo = accumulated_critica + (experience_context if experience_context else '')
-
-                if not composicao_sucesso:
-                    with self.lock:
-                        leaf.tried_strategies.add(strategy_key)
-                        failed_strategies.add(strategy_key)
-                        self._expansion_failure[strategy_key] = self._expansion_failure.get(strategy_key, 0) + 1
-                    self._emitter.emit_log(f'    [!] Composição {strategy_desc} falhou em etapa intermediária. Selecionando nova estratégia...')
                     continue
+                self._emitter.emit_log(f'[*] Expandindo nó (Tentativa {tentativa + 1}/3) | Estratégia: {strategy_desc} | Nota: {nota}')
+                try:
+                    current_instruction = leaf.instruction
+                    accumulated_critica = critica
+                    composicao_sucesso = True
 
-                candidata_final = current_instruction
-                critica = accumulated_critica
+                    for s in parts:
+                        prompt_s = self._strategy_registry.get_prompt(s)
+                        prompt_s = self._inject_dynamic_data(s, prompt_s)
 
-                if self._is_candidate_valid(candidata_final, leaf, strategy_desc):
-                    ab_cases = self.experience_store.get_ab_test_cases(hash_instruction(self.skill_original), top_k=5)
-                    ab_approved, score_orig, score_mut = self._run_ab_gate(leaf.instruction, candidata_final, ab_cases)
-                    if ab_approved:
-                        post_cases = self.experience_store.get_ab_test_cases(
-                            hash_instruction(self.skill_original), top_k=self.config.post_eval_sample_size
+                        candidata, nova_critica, sucesso = self._try_generate_mutation(
+                            leaf, s, prompt_s, feedback_completo, nota, accumulated_critica,
+                            current_instruction=current_instruction,
+                            timeout_override=self.config.composite_timeout_s
                         )
-                        post_approved, post_score_orig, post_score_mut, post_def_orig, post_def_mut = self._run_post_eval(
-                            leaf.instruction, candidata_final, post_cases
-                        )
-                        if post_approved:
-                            child = self._create_child_node(leaf, candidata_final, critica, strategy_key, strategy_desc)
-                            with self.lock:
-                                self._expansion_success[strategy_key] = self._expansion_success.get(strategy_key, 0) + 1
-                                leaf.tried_strategies.discard(strategy_key)
-                            return child
+                        if self._iteration_circuit_broken or self._check_iteration_abort():
+                            return leaf
+                        accumulated_critica = nova_critica
+
+                        if not sucesso:
+                            composicao_sucesso = False
+                            break
+
+                        current_instruction = candidata
+                        feedback_completo = accumulated_critica + (experience_context if experience_context else '')
+
+                    if not composicao_sucesso:
+                        with self.lock:
+                            leaf.tried_strategies.add(strategy_key)
+                            failed_strategies.add(strategy_key)
+                            self._expansion_failure[strategy_key] = self._expansion_failure.get(strategy_key, 0) + 1
+                        self._emitter.emit_log(f'    [!] Composição {strategy_desc} falhou em etapa intermediária. Selecionando nova estratégia...')
+                        continue
+
+                    candidata_final = current_instruction
+                    critica = accumulated_critica
+
+                    if self._is_candidate_valid(candidata_final, leaf, strategy_desc):
+                        ab_cases = self.experience_store.get_ab_test_cases(hash_instruction(self.skill_original), top_k=5)
+                        ab_approved, score_orig, score_mut = self._run_ab_gate(leaf.instruction, candidata_final, ab_cases)
+                        if ab_approved:
+                            # Checkpoint incremental: preserva candidato aprovado pelo Gate A/B
+                            self._save_incremental_checkpoint(
+                                stage='gate_ab',
+                                instruction=candidata_final,
+                                strategy_key=strategy_key,
+                                strategy_desc=strategy_desc,
+                                gate_ab_score=score_mut,
+                            )
+                            post_cases = self.experience_store.get_ab_test_cases(
+                                hash_instruction(self.skill_original), top_k=self.config.post_eval_sample_size
+                            )
+                            post_approved, post_score_orig, post_score_mut, post_def_orig, post_def_mut = self._run_post_eval(
+                                leaf.instruction, candidata_final, post_cases
+                            )
+                            if post_approved:
+                                child = self._create_child_node(leaf, candidata_final, critica, strategy_key, strategy_desc)
+                                child.gate_ab_score = score_mut
+                                child.gate_post_eval_score = post_score_mut
+                                # Atualiza checkpoint incremental com Post-Eval
+                                self._save_incremental_checkpoint(
+                                    stage='post_eval',
+                                    instruction=candidata_final,
+                                    strategy_key=strategy_key,
+                                    strategy_desc=strategy_desc,
+                                    gate_ab_score=score_mut,
+                                    gate_post_eval_score=post_score_mut,
+                                )
+                                with self.lock:
+                                    self._expansion_success[strategy_key] = self._expansion_success.get(strategy_key, 0) + 1
+                                    leaf.tried_strategies.discard(strategy_key)
+                                return child
+                            else:
+                                # Post-Eval reprovou: descarta checkpoint incremental
+                                self._discard_incremental_checkpoint()
+                                with self.lock:
+                                    leaf.tried_strategies.add(strategy_key)
+                                    failed_strategies.add(strategy_key)
+                                    self._expansion_failure[strategy_key] = self._expansion_failure.get(strategy_key, 0) + 1
+                                self._emitter.emit_log(f'    [!] Post-Eval comportamental rejeitou composição {strategy_desc}. Tentando outra estratégia...')
                         else:
                             with self.lock:
                                 leaf.tried_strategies.add(strategy_key)
                                 failed_strategies.add(strategy_key)
                                 self._expansion_failure[strategy_key] = self._expansion_failure.get(strategy_key, 0) + 1
-                            self._emitter.emit_log(f'    [!] Post-Eval comportamental rejeitou composição {strategy_desc}. Tentando outra estratégia...')
+                            self._emitter.emit_log(f'    [!] Gate A/B rejeitou composição {strategy_desc}. Tentando outra estratégia...')
                     else:
                         with self.lock:
                             leaf.tried_strategies.add(strategy_key)
                             failed_strategies.add(strategy_key)
                             self._expansion_failure[strategy_key] = self._expansion_failure.get(strategy_key, 0) + 1
-                        self._emitter.emit_log(f'    [!] Gate A/B rejeitou composição {strategy_desc}. Tentando outra estratégia...')
-                else:
-                    with self.lock:
-                        leaf.tried_strategies.add(strategy_key)
-                        failed_strategies.add(strategy_key)
-                        self._expansion_failure[strategy_key] = self._expansion_failure.get(strategy_key, 0) + 1
+                finally:
+                    self._release_reserved_strategy(leaf, strategy_key)
                 # Track for gradative escalation
                 if tentativa == 1 and len(parts) == 2:
                     prev_was_2comp_rejected = True
@@ -935,65 +1027,96 @@ IMPORTANTE: Gere uma estratégia de um eixo DIFERENTE dos que as estratégias co
                 strategy_desc = self._strategy_registry.get_name(strategy_key) or strategy_key
             strategy_prompt = self._strategy_registry.get_prompt(strategy_key)
             strategy_prompt = self._inject_dynamic_data(strategy_key, strategy_prompt)
+            if not self._try_reserve_strategy(leaf, strategy_key):
+                self._emitter.emit_log(
+                    f'    [Reserva] Estratégia {strategy_desc} já reservada por outra thread. Tentando outra estratégia...'
+                )
+                continue
 
-            self._emitter.emit_log(f'[*] Expandindo nó (Tentativa {tentativa + 1}/3) | Estratégia: {strategy_desc} | Nota: {nota}')
+            try:
+                self._emitter.emit_log(f'[*] Expandindo nó (Tentativa {tentativa + 1}/3) | Estratégia: {strategy_desc} | Nota: {nota}')
 
-            candidata, nova_critica, sucesso = self._try_generate_mutation(
-                leaf, strategy_key, strategy_prompt, feedback_completo, nota, critica
-            )
-            critica = nova_critica
+                candidata, nova_critica, sucesso = self._try_generate_mutation(
+                    leaf, strategy_key, strategy_prompt, feedback_completo, nota, critica
+                )
+                if self._iteration_circuit_broken or self._check_iteration_abort():
+                    return leaf
+                critica = nova_critica
 
-            if sucesso and self._is_candidate_valid(candidata, leaf, strategy_desc):
-                # Gate A/B: aprova apenas mutações com melhoria mensurável
-                ab_cases = self.experience_store.get_ab_test_cases(hash_instruction(self.skill_original), top_k=5)
-                ab_approved, score_orig, score_mut = self._run_ab_gate(leaf.instruction, candidata, ab_cases)
-                if ab_approved:
-                    # Post-Eval Comportamental: valida comportamento real do agente
-                    post_cases = self.experience_store.get_ab_test_cases(
-                        hash_instruction(self.skill_original), top_k=self.config.post_eval_sample_size
-                    )
-                    post_approved, post_score_orig, post_score_mut, post_def_orig, post_def_mut = self._run_post_eval(
-                        leaf.instruction, candidata, post_cases
-                    )
-                    if post_approved:
-                        child = self._create_child_node(leaf, candidata, critica, strategy_key, strategy_desc)
-                        with self.lock:
-                            self._expansion_success[strategy_key] = self._expansion_success.get(strategy_key, 0) + 1
-                            leaf.tried_strategies.discard(strategy_key)  # sucesso: remove da lista de falhas
-                        return child
+                if sucesso and self._is_candidate_valid(candidata, leaf, strategy_desc):
+                    # Gate A/B: aprova apenas mutações com melhoria mensurável
+                    ab_cases = self.experience_store.get_ab_test_cases(hash_instruction(self.skill_original), top_k=5)
+                    ab_approved, score_orig, score_mut = self._run_ab_gate(leaf.instruction, candidata, ab_cases)
+                    if ab_approved:
+                        # Checkpoint incremental: preserva candidato aprovado pelo Gate A/B
+                        self._save_incremental_checkpoint(
+                            stage='gate_ab',
+                            instruction=candidata,
+                            strategy_key=strategy_key,
+                            strategy_desc=strategy_desc,
+                            gate_ab_score=score_mut,
+                        )
+                        # Post-Eval Comportamental: valida comportamento real do agente
+                        post_cases = self.experience_store.get_ab_test_cases(
+                            hash_instruction(self.skill_original), top_k=self.config.post_eval_sample_size
+                        )
+                        post_approved, post_score_orig, post_score_mut, post_def_orig, post_def_mut = self._run_post_eval(
+                            leaf.instruction, candidata, post_cases
+                        )
+                        if post_approved:
+                            child = self._create_child_node(leaf, candidata, critica, strategy_key, strategy_desc)
+                            child.gate_ab_score = score_mut
+                            child.gate_post_eval_score = post_score_mut
+                            # Atualiza checkpoint incremental com Post-Eval
+                            self._save_incremental_checkpoint(
+                                stage='post_eval',
+                                instruction=candidata,
+                                strategy_key=strategy_key,
+                                strategy_desc=strategy_desc,
+                                gate_ab_score=score_mut,
+                                gate_post_eval_score=post_score_mut,
+                            )
+                            with self.lock:
+                                self._expansion_success[strategy_key] = self._expansion_success.get(strategy_key, 0) + 1
+                                leaf.tried_strategies.discard(strategy_key)  # sucesso: remove da lista de falhas
+                            return child
+                        else:
+                            # Post-Eval comportamental reprovou
+                            self._discard_incremental_checkpoint()
+                            with self.lock:
+                                leaf.tried_strategies.add(strategy_key)
+                                failed_strategies.add(strategy_key)
+                                self._expansion_failure[strategy_key] = self._expansion_failure.get(strategy_key, 0) + 1
+                            self._emitter.emit_log(f'    [!] Post-Eval comportamental rejeitou mutação de {strategy_desc}. Tentando outra estratégia...')
+                            # Track for gradative approach
+                            if tentativa == 0 and not is_composite:
+                                prev_was_isolated_rejected = True
+                            continue
                     else:
-                        # Post-Eval comportamental reprovou
+                        # Gate A/B reprovou: estratégia falhou para este nó
                         with self.lock:
                             leaf.tried_strategies.add(strategy_key)
                             failed_strategies.add(strategy_key)
                             self._expansion_failure[strategy_key] = self._expansion_failure.get(strategy_key, 0) + 1
-                        self._emitter.emit_log(f'    [!] Post-Eval comportamental rejeitou mutação de {strategy_desc}. Tentando outra estratégia...')
+                        self._emitter.emit_log(f'    [!] Gate A/B rejeitou mutação de {strategy_desc}. Tentando outra estratégia...')
                         # Track for gradative approach
                         if tentativa == 0 and not is_composite:
                             prev_was_isolated_rejected = True
-                else:
-                    # Gate A/B reprovou: estratégia falhou para este nó
-                    with self.lock:
-                        leaf.tried_strategies.add(strategy_key)
-                        failed_strategies.add(strategy_key)
-                        self._expansion_failure[strategy_key] = self._expansion_failure.get(strategy_key, 0) + 1
-                    self._emitter.emit_log(f'    [!] Gate A/B rejeitou mutação de {strategy_desc}. Tentando outra estratégia...')
-                    # Track for gradative approach
-                    if tentativa == 0 and not is_composite:
-                        prev_was_isolated_rejected = True
-                    # Continue loop to try next strategy
+                        continue
 
-            # Estratégia falhou — registra e tenta próxima
-            with self.lock:
-                leaf.tried_strategies.add(strategy_key)
-                failed_strategies.add(strategy_key)
-                self._expansion_failure[strategy_key] = self._expansion_failure.get(strategy_key, 0) + 1
-                if strategy_key in self._discovered_strategies:
-                    total_attempts = self._expansion_success.get(strategy_key, 0) + self._expansion_failure.get(strategy_key, 0)
-                    if total_attempts >= 3 and self._expansion_success.get(strategy_key, 0) == 0:
-                        self._emitter.emit_log(f'    [Discover Deprioritize] Estratégia "{strategy_desc}" com 0% de sucesso após {total_attempts} tentativas. Reduzindo prior.')
-                        self.mutation_bandit.update(strategy_key, -0.5)  # penalidade forte no bandit
-            self._emitter.emit_log(f'    [!] Estratégia {strategy_desc} falhou. Selecionando nova estratégia...')
+                # Estratégia falhou — registra e tenta próxima
+                with self.lock:
+                    leaf.tried_strategies.add(strategy_key)
+                    failed_strategies.add(strategy_key)
+                    self._expansion_failure[strategy_key] = self._expansion_failure.get(strategy_key, 0) + 1
+                    if strategy_key in self._discovered_strategies:
+                        total_attempts = self._expansion_success.get(strategy_key, 0) + self._expansion_failure.get(strategy_key, 0)
+                        if total_attempts >= 3 and self._expansion_success.get(strategy_key, 0) == 0:
+                            self._emitter.emit_log(f'    [Discover Deprioritize] Estratégia "{strategy_desc}" com 0% de sucesso após {total_attempts} tentativas. Reduzindo prior.')
+                            self.mutation_bandit.update(strategy_key, -0.5)  # penalidade forte no bandit
+                self._emitter.emit_log(f'    [!] Estratégia {strategy_desc} falhou. Selecionando nova estratégia...')
+            finally:
+                self._release_reserved_strategy(leaf, strategy_key)
 
             # Track for gradative approach
             if tentativa == 0 and not is_composite:
@@ -1092,9 +1215,37 @@ IMPORTANTE: Gere uma estratégia de um eixo DIFERENTE dos que as estratégias co
     def _is_cancelled(self) -> bool:
         return self._emitter.is_cancelled() or getattr(self, '_abort_flag', False)
 
+    def _remaining_time(self, timeout_cap: float | None = None) -> float:
+        if self._iteration_deadline > 0:
+            remaining = self._iteration_deadline - time.perf_counter()
+        elif self._iteration_start_time > 0:
+            remaining = self.config.iteration_timeout_s - (time.perf_counter() - self._iteration_start_time)
+        else:
+            remaining = self.config.iteration_timeout_s
+        remaining = max(0.0, remaining)
+        if timeout_cap is None:
+            return remaining
+        return max(0.0, min(timeout_cap, remaining))
+
+    def _try_reserve_strategy(self, leaf: MCTSNode, strategy_key: str) -> bool:
+        with leaf.lock:
+            if strategy_key in leaf.reserved_strategies:
+                return False
+            leaf.reserved_strategies.add(strategy_key)
+            return True
+
+    def _release_reserved_strategy(self, leaf: MCTSNode, strategy_key: str) -> None:
+        with leaf.lock:
+            leaf.reserved_strategies.discard(strategy_key)
+
     def _check_iteration_abort(self) -> bool:
         """Verifica se a iteração deve ser abortada: cancelamento pelo usuário, abort flag, ou circuit breaker."""
         if self._is_cancelled():
+            return True
+
+        if self._iteration_deadline > 0 and time.perf_counter() > self._iteration_deadline:
+            self._iteration_circuit_broken = True
+            self._emitter.emit_log('    [Circuit Breaker] Deadline já passado, abortando.')
             return True
 
         # Circuit breaker: verifica teto de tempo
@@ -1146,7 +1297,8 @@ IMPORTANTE: Gere uma estratégia de um eixo DIFERENTE dos que as estratégias co
 
     def _commit_iteration(self, child: MCTSNode, reward: float, feedback: str):
         """Persiste resultados da iteração: bandit update e experience store."""
-        parent_reward = child.parent.last_reward if child.parent else 0.0
+        parent_reward = child.parent.raw_reward if child.parent else 0.0
+        self._last_iter_parent_raw = parent_reward  # exposto para log [Score Chain]
         shaped_reward = calcular_delta_reward(reward, parent_reward)
         child.shaped_reward = shaped_reward
         self.backpropagation(child, shaped_reward)
@@ -1186,6 +1338,8 @@ IMPORTANTE: Gere uma estratégia de um eixo DIFERENTE dos que as estratégias co
             'score': reward,
             'strategy': child.mutation_strategy or 'unknown',
             'depth': child.depth,
+            'gate_ab_score': child.gate_ab_score,
+            'gate_post_eval_score': child.gate_post_eval_score,
             'timestamp': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S'),
             'iteration': self._expand_count,  # approximate iteration counter
         }
@@ -1198,6 +1352,91 @@ IMPORTANTE: Gere uma estratégia de um eixo DIFERENTE dos que as estratégias co
             f'strategy={child.mutation_strategy or "unknown"}, depth={child.depth}'
         )
 
+    def _save_incremental_checkpoint(
+        self, stage: str, instruction: str = "",
+        strategy_key: str = "", strategy_desc: str = "",
+        gate_ab_score: float = 0.0, gate_post_eval_score: float = 0.0,
+    ) -> None:
+        """Salva/atualiza checkpoint incremental entre estágios de gate ou descoberta."""
+        from datetime import datetime, timezone
+
+        is_update = self._incremental_checkpoint is not None
+
+        self._incremental_checkpoint = {
+            'instruction': instruction,
+            'strategy_key': strategy_key,
+            'strategy_desc': strategy_desc,
+            'gate_ab_score': gate_ab_score,
+            'gate_post_eval_score': gate_post_eval_score,
+            'stage': stage,
+            'timestamp': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S'),
+        }
+
+        if stage == 'gate_ab':
+            self._emitter.emit_log(
+                f'    [Checkpoint Incremental] Gate A/B aprovado: score={gate_ab_score:.3f}, '
+                f'strat={strategy_desc}'
+            )
+        elif stage == 'post_eval':
+            self._emitter.emit_log(
+                f'    [Checkpoint Incremental] Post-Eval aprovado: score={gate_post_eval_score:.3f} '
+                f'(completo: A/B={gate_ab_score:.3f}, Post-Eval={gate_post_eval_score:.3f})'
+            )
+        elif stage == 'discovery':
+            self._emitter.emit_log(
+                f'    [Checkpoint Incremental] Descoberta salva: strat={strategy_desc}, '
+                f'eixo={strategy_key}'
+            )
+
+    def _discard_incremental_checkpoint(self) -> None:
+        """Descarta o checkpoint incremental (ex.: Post-Eval reprovou)."""
+        if self._incremental_checkpoint:
+            self._emitter.emit_log(
+                '    [Checkpoint Incremental] Descartado (Post-Eval reprovou)'
+            )
+            self._incremental_checkpoint = None
+
+    def _apply_gate_fallback(self, child, reason: str, heuristic_result: dict):
+        """Gate Fallback: preserva candidato aprovado pelos gates quando simulação não é possível."""
+        fallback_raw = child.gate_ab_score
+        child.raw_reward = fallback_raw
+        child.last_reward = fallback_raw
+        child.feedback = f"fallback: {reason}, gate-approved"
+
+        if reason == "simulação timeout":
+            self._emitter.emit_log(
+                f'    [Gate Fallback] Simulação timeout. '
+                f'Usando fallback_raw={fallback_raw:.3f} do Gate A/B '
+                f'(score_mut={child.gate_ab_score:.3f}). '
+                f'Post-Eval={child.gate_post_eval_score:.3f}'
+            )
+        else:
+            self._emitter.emit_log(
+                f'    [Gate Fallback] Circuit breaker pré-simulação. '
+                f'Usando fallback_raw={fallback_raw:.3f} do Gate A/B '
+                f'(A/B={child.gate_ab_score:.3f}). '
+                f'Post-Eval={child.gate_post_eval_score:.3f}'
+            )
+
+        reward = self._apply_reward_multipliers(fallback_raw, heuristic_result, child)
+        child.multiplied_reward = reward
+        self._commit_iteration(child, reward, child.feedback)
+        with self.lock:
+            if fallback_raw > self.best_reward_so_far:
+                self._save_checkpoint(child, fallback_raw)
+                self.best_reward_so_far = fallback_raw
+        self._last_iter_mult = child.multiplied_reward
+        self._last_iter_shaped = child.shaped_reward
+        parent_raw = getattr(self, '_last_iter_parent_raw', 0.0)
+        score = child.q_value / max(1, child.visits)
+        self._emitter.emit_log(
+            f'    [Score Chain] CANONICAL raw-scale parent_raw={parent_raw:.3f} | '
+            f'child_raw={child.raw_reward:.3f} → mult={child.multiplied_reward:.3f} → '
+            f'shaped={child.shaped_reward:.3f} (0.6*mult + 0.4*(mult - parent_raw)) → '
+            f'γ-discount → Q/visits={score:.3f}'
+        )
+        return False, fallback_raw
+
     def _run_mcts_iteration(self, root: MCTSNode) -> Tuple[bool, float]:
         """RN-06: Verifica cancelamento em 3 checkpoints obrigatórios."""
         self._last_iter_strategy = 'N/A'
@@ -1207,9 +1446,23 @@ IMPORTANTE: Gere uma estratégia de um eixo DIFERENTE dos que as estratégias co
             return True, 0.0
 
         leaf = self.selection(root)
+
+        # Time-gate preventivo: verificar se há tempo para gates + simulação
+        if self._remaining_time() < self.config.min_time_for_gates_s + 60:
+            self._emitter.emit_log(
+                '    [Circuit Breaker] Tempo restante insuficiente para '
+                'gates + simulação. Abortando.'
+            )
+            return True, 0.0
+
         child = leaf  # fallback caso _expand_child lance exceção
         try:
             child = self._expand_child(leaf)
+            # Atribuir IMEDIATAMENTE após _expand_child, antes de qualquer checkpoint,
+            # para que o log sempre reflita a estratégia real usada na expansão
+            if child != leaf:
+                self._last_iter_strategy = child.mutation_strategy or 'unknown'
+                self._last_iter_depth = child.depth
         finally:
             if leaf != child:
                 leaf.remove_virtual_loss()
@@ -1227,44 +1480,89 @@ IMPORTANTE: Gere uma estratégia de um eixo DIFERENTE dos que as estratégias co
             self._emitter.emit_log('    [Iteração Descartada] Nó pai retornado sem filho. Nenhuma estratégia gerou candidato novo.')
             return False, 0.0
 
-        self._last_iter_strategy = child.mutation_strategy or 'unknown'
-        self._last_iter_depth = child.depth
-
         is_pruned, heuristic_result = self._evaluate_and_prune(child)
         if is_pruned:
             return False, 0.0
 
+        # Checkpoint provisório para candidatos aprovados pelos gates
+        if child.gate_ab_score > 0 and child.gate_post_eval_score > 0:
+            self._save_checkpoint(child, child.gate_ab_score)
+            self._emitter.emit_log(
+                f'    [Checkpoint Provisório] Candidato gate-approved salvo: '
+                f'A/B={child.gate_ab_score:.3f}, Post-Eval={child.gate_post_eval_score:.3f}'
+            )
+
         if self._check_iteration_abort():
+            if child.gate_post_eval_score > 0:
+                return self._apply_gate_fallback(child, "circuit breaker pré-simulação", heuristic_result)
             return True, 0.0
 
-        raw_reward, feedback = self.simulation(child.instruction)
+        remaining = self._remaining_time()
+        if remaining <= 0:
+            if child.gate_post_eval_score > 0:
+                return self._apply_gate_fallback(child, "circuit breaker pré-simulação", heuristic_result)
+            self._iteration_circuit_broken = True
+            self._emitter.emit_log('    [Circuit Breaker] Sem tempo restante para iniciar simulation(). Abortando.')
+            return True, 0.0
+
+        simulation_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        future = simulation_executor.submit(self.simulation, child.instruction)
+        try:
+            raw_reward, feedback = future.result(timeout=remaining)
+        except concurrent.futures.TimeoutError:
+            # Gate Fallback: preservar candidato aprovado pelos gates
+            if child.gate_ab_score > 0:
+                return self._apply_gate_fallback(child, "simulação timeout", heuristic_result)
+
+            self._iteration_circuit_broken = True
+            self._emitter.emit_log(
+                f'    [Circuit Breaker] simulation() excedeu a janela restante ({remaining:.2f}s). '
+                f'Thread em background continuará mas resultado será descartado.'
+            )
+            return True, 0.0
+        finally:
+            simulation_executor.shutdown(wait=False, cancel_futures=True)
+
         child.raw_reward = raw_reward
         reward = self._apply_reward_multipliers(raw_reward, heuristic_result, child)
         child.multiplied_reward = reward
+
+        if raw_reward == 0.0 and feedback.startswith("Erro interno na avaliação"):
+            child.had_technical_error = True
 
         if reward >= self.config.sufficiency_threshold:
             self._emitter.emit_log(f'    [Sufficiency] Nó atingiu limiar de suficiência ({reward:.3f} >= {self.config.sufficiency_threshold}). Marcando como terminal.')
             child.is_sufficient = True
 
         child.feedback = feedback
-        child.last_reward = reward
+        child.last_reward = raw_reward  # escala raw (canônica) ao longo do DAG
 
+        # best_reward_so_far agora rastreia raw_reward (escala canônica de qualidade),
+        # não multiplied_reward. Isso unifica a régua usada pela poda relativa,
+        # checkpoint e seleção final.
         with self.lock:
-            if reward > self.best_reward_so_far:
+            if raw_reward > self.best_reward_so_far:
                 old_best = self.best_reward_so_far
                 # Save checkpoint BEFORE updating best_reward_so_far
-                self._save_checkpoint(child, reward)
-                self.best_reward_so_far = reward
+                self._save_checkpoint(child, raw_reward)
+                self.best_reward_so_far = raw_reward
 
         self._commit_iteration(child, reward, feedback)
 
+        # Armazena métricas para o log [ITER X/Y]
+        self._last_iter_mult = child.multiplied_reward
+        self._last_iter_shaped = child.shaped_reward
+        parent_raw = getattr(self, '_last_iter_parent_raw', 0.0)
+
         score = child.q_value / max(1, child.visits)
         self._emitter.emit_log(
-            f'    [Score Chain] raw={child.raw_reward:.3f} → mult={child.multiplied_reward:.3f} → '
-            f'shaped={child.shaped_reward:.3f} → γ-discount → Q/visits={score:.3f}'
+            f'    [Score Chain] CANONICAL raw-scale parent_raw={parent_raw:.3f} | '
+            f'child_raw={child.raw_reward:.3f} → mult={child.multiplied_reward:.3f} → '
+            f'shaped={child.shaped_reward:.3f} (0.6*mult + 0.4*(mult - parent_raw)) → '
+            f'γ-discount → Q/visits={score:.3f}'
         )
 
-        return False, reward
+        return False, raw_reward
 
     def _get_all_nodes(self, node: MCTSNode) -> list[MCTSNode]:
         nodes = [node]
@@ -1283,9 +1581,18 @@ IMPORTANTE: Gere uma estratégia de um eixo DIFERENTE dos que as estratégias co
     ) -> Tuple[bool, int, int]:
         if self._abort_flag:
             return True, consecutive_zeros, consecutive_api_errors
+        if self._remaining_time(1.0) <= 0:
+            self._iteration_circuit_broken = True
+            remaining_iters = self.config.max_iterations - i
+            if remaining_iters > 0:
+                self._emitter.emit_log(
+                    f'[Batch Abort] Deadline esgotado, pulando iterações {i+1}-{self.config.max_iterations}'
+                )
+            return True, consecutive_zeros, consecutive_api_errors
         from datetime import datetime, timezone
         t_start = time.perf_counter()
         self._iteration_start_time = t_start
+        self._iteration_deadline = t_start + self.config.iteration_timeout_s
         self._iteration_circuit_broken = False
         self._emitter.emit_log(f'\n--- Iteração MCTS {i + 1}/{self.config.max_iterations} ---')
         strategy_used = 'N/A'
@@ -1297,11 +1604,21 @@ IMPORTANTE: Gere uma estratégia de um eixo DIFERENTE dos que as estratégias co
             self._emit_cost_event(i)  # emite metricas de custo apos a iteracao
 
             # Log de progressão com timestamp e latência
+            # raw_reward é a escala canônica de qualidade; mult e shaped são
+            # exibidos apenas quando divergem significativamente (|diff| > 0.05)
             elapsed = time.perf_counter() - t_start
             ts = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S')
+            mult_reward = getattr(self, '_last_iter_mult', None)
+            shaped_reward = getattr(self, '_last_iter_shaped', None)
+            extra_parts = []
+            if mult_reward is not None and abs(mult_reward - iter_reward) > 0.05:
+                extra_parts.append(f'mult={mult_reward:.3f}')
+            if shaped_reward is not None and abs(shaped_reward - iter_reward) > 0.05:
+                extra_parts.append(f'shaped={shaped_reward:.3f}')
+            extra = (' | ' + ' | '.join(extra_parts)) if extra_parts else ''
             self._emitter.emit_log(
                 f'[ITER {i + 1:>3}/{self.config.max_iterations}] {ts} | {elapsed:.2f}s | '
-                f'strat={strategy_used} | reward={iter_reward:.3f} | depth={depth_reached}'
+                f'strat={strategy_used} | raw={iter_reward:.3f}{extra} | depth={depth_reached}'
             )
 
             # Circuit breaker abort: não conta como plateau nem como zero
@@ -1417,22 +1734,47 @@ IMPORTANTE: Gere uma estratégia de um eixo DIFERENTE dos que as estratégias co
                 )
 
         best_score = best_node.q_value / max(1, best_node.visits)
-        if best_node != root and best_score < root_score:
-            self._emitter.emit_error(
-                f'[!] GUARDA ANTI-REGRESSÃO: Melhor nó (score={best_score:.3f}) '
-                f'é pior que a raiz (score={root_score:.3f}). '
-                f'Retornando skill original.'
-            )
-            return root.instruction
+
+        # Expor para _report_technical_errors
+        self._best_node = best_node
+
+        # Guarda anti-regressão: compara raw_reward (escala canônica), não Q/visits.
+        # Raw_reward é a saída direta de funcao_de_recompensa, comparável entre
+        # raiz e filhos (raiz não passa por multipliers nem delta-shaping).
+        # Se raw_reward == 0 (checkpoint incompleto), usa gate_ab_score como proxy.
+        if best_node != root:
+            comparison_value = best_node.raw_reward
+            if comparison_value == 0.0 and best_node.gate_ab_score > 0:
+                comparison_value = best_node.gate_ab_score
+                self._emitter.emit_log(
+                    f'[Guarda Anti-Regressão] Usando gate_ab_score={comparison_value:.3f} '
+                    f'como proxy (checkpoint incompleto, sem simulação)'
+                )
+            if comparison_value < root.raw_reward:
+                self._emitter.emit_error(
+                    f'[!] GUARDA ANTI-REGRESSÃO: Melhor nó (raw={comparison_value:.3f}) '
+                    f'é pior que a raiz (raw={root.raw_reward:.3f}). '
+                    f'Retornando skill original.'
+                )
+                self._emitter.emit_log(
+                    f'[Veredito Final] GUARDA ANTI-REGRESSÃO: melhor nó rejeitado '
+                    f'(raw={comparison_value:.3f} < raiz raw={root.raw_reward:.3f}). '
+                    f'Retornando skill original.'
+                )
+                return root.instruction
         elif best_node == root:
             self._emitter.emit_log(
                 f'[!] ATENCAO: Nenhuma otimizacao superou a skill original. '
                 f'O otimizador nao encontrou melhoria significativa. '
-                f'score={best_score:.3f}, visits={best_node.visits}'
+                f'raw={best_node.raw_reward:.3f}, visits={best_node.visits}'
+            )
+            self._emitter.emit_log(
+                f'[Veredito Final] Nenhum filho superou a raiz. '
+                f'Retornando skill original. raw={root.raw_reward:.3f}, visits={root.visits}'
             )
         else:
             self._emitter.emit_log(
-                f'[+] Melhor no selecionado: score={best_score:.3f}, visits={best_node.visits}, '
+                f'[Veredito Final] Nó aceito: score={best_score:.3f}, raw={best_node.raw_reward:.3f}, '
                 f'strategy={get_strategy_description(best_node.mutation_strategy)}, '
                 f'depth={best_node.depth}'
             )
@@ -1456,7 +1798,8 @@ IMPORTANTE: Gere uma estratégia de um eixo DIFERENTE dos que as estratégias co
             reward, feedback = rewards[idx], feedbacks[idx]
             self._emitter.emit_log(f'    [Raiz] {n_samples} avaliacoes: {[f"{v:.3f}" for v in rewards]}, mediana={reward:.3f}')
         root.feedback = feedback
-        root.last_reward = reward
+        root.raw_reward = reward  # escala canônica de qualidade para comparação com filhos
+        root.last_reward = root.raw_reward  # raiz propaga a mesma escala raw para o primeiro nível
         self.backpropagation(root, reward)
 
     def _run_threaded_search(self, root: MCTSNode) -> None:
@@ -1546,16 +1889,19 @@ IMPORTANTE: Gere uma estratégia de um eixo DIFERENTE dos que as estratégias co
         bandit_stats = self.mutation_bandit.get_stats()
         strategies_with_cost = [
             (k, v) for k, v in bandit_stats.items()
-            if v.successful_expansions > 0 and v.total_llm_calls > 0
+            if v.successful_expansions > 0
         ]
         if strategies_with_cost:
             self._emitter.emit_log('[*] Custo por aprovação (chamadas LLM):')
-            for key, stats in sorted(strategies_with_cost, key=lambda x: x[1].total_llm_calls / x[1].successful_expansions):
-                custo = stats.total_llm_calls / stats.successful_expansions
+            for key, stats in sorted(strategies_with_cost, key=lambda x: (
+                x[1].total_llm_calls / max(1, x[1].successful_expansions)
+            )):
+                custo = stats.total_llm_calls / max(1, stats.successful_expansions)
                 desc = get_strategy_description(key)
+                llm_info = f'{stats.total_llm_calls} chamadas LLM, ' if stats.total_llm_calls > 0 else 'sem custo LLM registrado, '
                 self._emitter.emit_log(
                     f'    {desc}: {stats.successful_expansions} aprovações, '
-                    f'{stats.total_llm_calls} chamadas LLM, '
+                    f'{llm_info}'
                     f'custo/aprov={custo:.1f}'
                 )
 
@@ -1564,6 +1910,45 @@ IMPORTANTE: Gere uma estratégia de um eixo DIFERENTE dos que as estratégias co
                 f'[*] Avaliações sem dados reais: Gate A/B={self._gates_without_test_cases}, '
                 f'Post-Eval={self._post_evals_without_test_cases} — '
                 f'considere adicionar casos de teste ao experience store para reduzir incerteza.'
+            )
+
+    def _report_technical_errors(self) -> None:
+        """Reporta erros técnicos de infraestrutura que invalidaram avaliações.
+        Distingue 'score zero real' de 'avaliação falhou por erro de contrato/configuração'."""
+        total_evaluations = self._total_llm_calls
+        tech_errors = self._technical_error_count
+
+        if tech_errors > 0:
+            pct = (tech_errors / max(1, total_evaluations)) * 100
+            best_node = getattr(self, '_best_node', None)
+            if best_node is not None and best_node.had_technical_error:
+                desc = get_strategy_description(best_node.mutation_strategy) if best_node.mutation_strategy else 'unknown'
+                self._emitter.emit_error(
+                    f'\n[!] ATENÇÃO CRÍTICA: O próprio nó vencedor (strategy={desc}) '
+                    f'teve sua avaliação comprometida por erro técnico. '
+                    f'O resultado desta execução NÃO é confiável. '
+                    f'{tech_errors}/{total_evaluations} avaliações ({pct:.1f}%) falharam no total.\n'
+                    f'    Causas comuns: LM mal configurado, contrato de tipo violado, '
+                    f'schema mismatch não tratado.\n'
+                    f'    Verifique os logs de [Simulação] Recompensa 0.00! para diagnóstico.'
+                )
+            else:
+                desc_part = ''
+                if best_node is not None and best_node.mutation_strategy:
+                    desc = get_strategy_description(best_node.mutation_strategy)
+                    desc_part = f' O nó vencedor (strategy={desc}, raw={best_node.raw_reward:.3f}) foi avaliado com sucesso — o resultado final não está contaminado.'
+                self._emitter.emit_error(
+                    f'\n[!] ATENÇÃO: {tech_errors}/{total_evaluations} avaliações '
+                    f'({pct:.1f}%) falharam por erro técnico de infraestrutura '
+                    f'(não por score baixo).{desc_part}\n'
+                    f'    Causas comuns: LM mal configurado, contrato de tipo violado, '
+                    f'schema mismatch não tratado.\n'
+                    f'    Verifique os logs de [Simulação] Recompensa 0.00! para diagnóstico.'
+                )
+        else:
+            self._emitter.emit_log(
+                f'[*] Nenhum erro técnico de avaliação detectado '
+                f'({total_evaluations} avaliações realizadas).'
             )
 
     def optimize(self) -> str:
@@ -1581,6 +1966,8 @@ IMPORTANTE: Gere uma estratégia de um eixo DIFERENTE dos que as estratégias co
             self._log_final_stats()
 
             self._emitter.emit_log('\n=======================================================\n                OTIMIZAÇÃO CONCLUÍDA                   \n=======================================================\n')
-            return self._format_best_node(root)
+            final_instruction = self._format_best_node(root)
+            self._report_technical_errors()
+            return final_instruction
         finally:
             self._llm_executor.shutdown(wait=False)

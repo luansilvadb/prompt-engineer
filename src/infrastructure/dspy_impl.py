@@ -1,4 +1,6 @@
 import dspy
+import re
+import logging
 from pathlib import Path
 from src.signatures import Avaliacao, AvaliacaoModoB
 from src.utils.unicode_sanitizer import _sanitize_unicode_for_api
@@ -68,12 +70,12 @@ class AvaliadorDeSkillSignature(dspy.Signature):
     regras_adicionais: str = dspy.InputField(desc="Diretrizes, restrições ou métricas extras especificadas pelo usuário que devem ser estritamente seguidas.")
 
     manteve_regras_criticas: bool = dspy.OutputField(desc="True se nenhuma regra comportamental vital (inclusive as regras adicionais) foi omitida. False caso contrário.")
-    nota_clareza: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando se a instrução é clara e direta.")
-    nota_formatacao: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando o uso de markdown, listas e negritos.")
-    nota_robustez: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando a imunidade a 'lost in the middle' e ambiguidades.")
-    nota_densidade_informacional: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando a razão sinal/ruído - penaliza verbosidade vazia e repetição sem valor.")
-    nota_acionabilidade: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando se as instruções são claras o suficiente para um agente de IA executar sem ambiguidade.")
-    nota_anti_fragilidade: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando se a skill resiste a edge cases, inputs adversariais e contextos ambíguos.")
+    nota_clareza: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando se a instrução é clara e direta. (use underscore '_' not hyphen '-' in field names)")
+    nota_formatacao: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando o uso de markdown, listas e negritos. (use underscore '_' not hyphen '-' in field names)")
+    nota_robustez: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando a imunidade a 'lost in the middle' e ambiguidades. (use underscore '_' not hyphen '-' in field names)")
+    nota_densidade_informacional: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando a razão sinal/ruído - penaliza verbosidade vazia e repetição sem valor. (use underscore '_' not hyphen '-' in field names)")
+    nota_acionabilidade: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando se as instruções são claras o suficiente para um agente de IA executar sem ambiguidade. (use underscore '_' not hyphen '-' in field names)")
+    nota_anti_fragilidade: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando se a skill resiste a edge cases, inputs adversariais e contextos ambíguos. (use underscore '_' not hyphen '-' in field names)")
     feedback_detalhado: str = dspy.OutputField(desc="Explicação detalhada dos pontos fortes e fracos, justificando as notas.")
 
 class AvaliadorModoBSignature(dspy.Signature):
@@ -103,12 +105,12 @@ class AvaliadorModoBSignature(dspy.Signature):
 
     manteve_regras_criticas: bool = dspy.OutputField(desc="True se nenhuma regra comportamental vital (inclusive as regras adicionais) foi omitida. False caso contrário.")
     defeitos_encontrados: list[str] = dspy.OutputField(desc="Lista de violações, paradoxos e ambiguidades detectadas.")
-    nota_clareza: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando se a instrução é clara e direta.")
-    nota_formatacao: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando o uso de markdown, listas e negritos.")
-    nota_robustez: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando a imunidade a 'lost in the middle' e ambiguidades.")
-    nota_densidade_informacional: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando a razão sinal/ruído - penaliza verbosidade vazia e repetição sem valor.")
-    nota_acionabilidade: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando se as instruções são claras o suficiente para um agente de IA executar sem ambiguidade.")
-    nota_anti_fragilidade: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando se a skill resiste a edge cases, inputs adversariais e contextos ambíguos.")
+    nota_clareza: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando se a instrução é clara e direta. (use underscore '_' not hyphen '-' in field names)")
+    nota_formatacao: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando o uso de markdown, listas e negritos. (use underscore '_' not hyphen '-' in field names)")
+    nota_robustez: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando a imunidade a 'lost in the middle' e ambiguidades. (use underscore '_' not hyphen '-' in field names)")
+    nota_densidade_informacional: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando a razão sinal/ruído - penaliza verbosidade vazia e repetição sem valor. (use underscore '_' not hyphen '-' in field names)")
+    nota_acionabilidade: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando se as instruções são claras o suficiente para um agente de IA executar sem ambiguidade. (use underscore '_' not hyphen '-' in field names)")
+    nota_anti_fragilidade: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando se a skill resiste a edge cases, inputs adversariais e contextos ambíguos. (use underscore '_' not hyphen '-' in field names)")
     feedback_detalhado: str = dspy.OutputField(desc="Explicação detalhada dos pontos fortes e fracos, justificando as notas.")
 
 
@@ -222,9 +224,76 @@ class DSPyMutadorCognitivoAgent(IMutadorCognitivoAgent):
         )
 
 
+def _normalize_json_keys(text: str) -> str:
+    """Converte hífens em underscores nos nomes de chaves JSON."""
+    # Pattern: match quoted JSON keys containing hyphens
+    # Looks for "key-with-hyphens": pattern
+    pattern = re.compile(r'"([^"]*-[^"]*)"\s*:')
+
+    def replace_hyphens(match):
+        key = match.group(1)
+        normalized = key.replace('-', '_')
+        return f'"{normalized}":'
+
+    return pattern.sub(replace_hyphens, text)
+
+
+class NormalizingLM(dspy.LM):
+    """Wrapper de LM que normaliza chaves JSON com hífen para underscore.
+    Herda de dspy.LM para satisfazer o contrato dspy.BaseLM exigido pelo DSPy
+    (isinstance check em predict.py)."""
+
+    def __init__(self, lm: dspy.LM):
+        super().__init__(
+            model=lm.model,
+            model_type=getattr(lm, "model_type", "chat"),
+            temperature=getattr(lm, "temperature", 0.0),
+            max_tokens=getattr(lm, "max_tokens", 1000),
+            cache=getattr(lm, "cache", True),
+        )
+        self._wrapped_lm = lm
+        self.history = getattr(lm, "history", [])
+        self.num_retries = getattr(lm, "num_retries", 3)
+        self.provider = getattr(lm, "provider", None)
+        self.kwargs = getattr(lm, "kwargs", {})
+
+    def forward(self, prompt=None, messages=None, **kwargs):
+        return self._wrapped_lm.forward(prompt=prompt, messages=messages, **kwargs)
+
+    async def aforward(self, prompt=None, messages=None, **kwargs):
+        return await self._wrapped_lm.aforward(prompt=prompt, messages=messages, **kwargs)
+
+    def __call__(self, prompt=None, messages=None, **kwargs):
+        result = super().__call__(prompt=prompt, messages=messages, **kwargs)
+        if isinstance(result, list):
+            normalized = []
+            for r in result:
+                if isinstance(r, str):
+                    nr = _normalize_json_keys(r)
+                    if nr != r:
+                        logging.info(
+                            "[NormalizingLM] Chaves JSON com hífen foram normalizadas "
+                            "para underscore na resposta do LM."
+                        )
+                    normalized.append(nr)
+                else:
+                    normalized.append(r)
+            return normalized
+        return result
+
+    def __getattr__(self, name):
+        # Fallback para atributos não copiados explicitamente
+        if name.startswith("_"):
+            raise AttributeError(name)
+        return getattr(self._wrapped_lm, name)
+
+
 class DSPyAvaliadorModoB(IAvaliadorModoB):
     def __init__(self, predictor=None):
         self._predictor = predictor or dspy.ChainOfThought(AvaliadorModoBSignature)
+        # Normalização de schema (hyphen→underscore) é injetada globalmente
+        # via NormalizingLM em config.py (dspy.configure), não via monkey-patch aqui.
+        # Isso evita conflitos com Predict que usa settings.lm (None em __init__).
 
     def __call__(self, skill_original: str, skill_otimizada: str, regras_adicionais: str) -> AvaliacaoModoB:
         if not regras_adicionais:

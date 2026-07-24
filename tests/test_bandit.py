@@ -124,19 +124,50 @@ def test_ucb_score_mean_reward_guarded_for_single_pull():
 
 
 def test_select_returns_untried_arm_first_first_play():
-    # UCB1 first-play: qualquer braço inexplorado tem prioridade sobre a
-    # fórmula de exploitation.
+    # Round-Robin: a primeira chamada de select() retorna o primeiro braço
+    # da lista ordenada alfabeticamente (fase Round-Robin inicial).
+    # UCB1 first-play (random.choice) só é usado após esgotar o Round-Robin.
     bandit = MutationBandit()
-    with patch('src.mutation_strategies.bandit.random.choice', return_value='mutador_cognitivo'):
-        chosen = bandit.select()
-    assert chosen == 'mutador_cognitivo'
-    assert bandit._counts['mutador_cognitivo'] == 0  # select NÃO atualiza contadores
+    assert bandit._round_robin_index == 0
+    # Primeiro braço Round-Robin é o primeiro alfabeticamente
+    first_known = sorted([k for k in bandit._counts.keys() if k != '__DISCOVER__'])[0]
+    chosen = bandit.select()
+    assert chosen == first_known
+    assert bandit._counts[chosen] == 0  # select NÃO atualiza contadores
+    assert bandit._round_robin_index == 1  # avançou
+
+    # Após esgotar o Round-Robin, o _pick_untried usa random.choice
+    # Avança até o fim do Round-Robin
+    rr_len = len(bandit._known_strategies)
+    while bandit._round_robin_index < rr_len:
+        bandit.select()
+    # Após Round-Robin, todas as estratégias já foram experimentadas (count=1).
+    # _pick_untried retorna None, então o código cai no UCB1 com Boltzmann.
+    # Evitamos composição (random.random → 1.0) e mockamos _pick_untried
+    # para forçar o retorno de uma estratégia específica.
+    with patch('src.mutation_strategies.bandit.random.random', return_value=1.0):
+        with patch.object(bandit, '_pick_untried', return_value='mutador_cognitivo'):
+            chosen = bandit.select()
+    # select() pode retornar str (isolada) ou list[str] (composição); o teste só
+    # valida estratégias isoladas.
+    if isinstance(chosen, list):
+        assert chosen[0] == 'mutador_cognitivo'
+    else:
+        assert chosen == 'mutador_cognitivo'
 
 
 def test_select_exploits_argmax_ucb_after_all_arms_tried():
     # Com temperatura desprezível, o comportamento é argmax determinístico
     # (equivalente ao UCB1 original).
+    # É preciso avançar o Round-Robin primeiro, que itera por todos os braços
+    # antes de ativar o UCB.
     bandit = MutationBandit(c_param=1.41, temperature=0.0001)
+    # Avança Round-Robin (uma chamada por braço conhecido)
+    rr_len = len(bandit._known_strategies) if bandit._known_strategies else len(
+        [k for k in bandit._counts.keys() if k != '__DISCOVER__']
+    )
+    for _ in range(rr_len):
+        bandit.select()
     # Dá recompensas muito diferentes para forçar um argmax determinístico.
     for key in bandit._counts:
         bandit._counts[key] = 5
@@ -144,12 +175,22 @@ def test_select_exploits_argmax_ucb_after_all_arms_tried():
     bandit._rewards['mutador_cognitivo'] = 0.9 * 5  # mean 0.9 — argmax claro
 
     chosen = bandit.select()
-    assert chosen == 'mutador_cognitivo'
+    # select() pode retornar str (isolada) ou list[str] (composição)
+    if isinstance(chosen, list):
+        assert chosen[0] == 'mutador_cognitivo'
+    else:
+        assert chosen == 'mutador_cognitivo'
 
 
 def test_select_thompson_sampling_is_probabilistic():
     """Thompson Sampling com temperatura > 0 deve explorar braços subótimos."""
     bandit = MutationBandit(c_param=1.41, temperature=10.0, temperature_decay=1.0)
+    # Avança Round-Robin primeiro
+    rr_len = len(bandit._known_strategies) if bandit._known_strategies else len(
+        [k for k in bandit._counts.keys() if k != '__DISCOVER__']
+    )
+    for _ in range(rr_len):
+        bandit.select()
     for key in bandit._counts:
         bandit._counts[key] = 5
     bandit._rewards['__DISCOVER__'] = 0.1 * 5
@@ -159,7 +200,11 @@ def test_select_thompson_sampling_is_probabilistic():
     # quase uniforme. Em 50 seleções, ambos os braços devem aparecer.
     seen = set()
     for _ in range(50):
-        seen.add(bandit.select())
+        result = bandit.select()
+        if isinstance(result, list):
+            seen.update(result)
+        else:
+            seen.add(result)
     assert len(seen) >= 2, f"Thompson Sampling deveria explorar ambos os braços, mas só viu: {seen}"
 
 
@@ -214,6 +259,12 @@ def test_get_stats_mean_delta_zero_for_unpulled_arm():
 def test_select_syncs_new_registry_keys_before_choosing():
     # Estratégia descoberta em runtime deve entrar no bandit durante select().
     bandit = MutationBandit()
+    # Avança Round-Robin primeiro
+    rr_len = len(bandit._known_strategies) if bandit._known_strategies else len(
+        [k for k in bandit._counts.keys() if k != '__DISCOVER__']
+    )
+    for _ in range(rr_len):
+        bandit.select()
     with patch('src.mutation_strategies.bandit.registry.get_all_keys',
                return_value=['mutador_cognitivo', 'estrategia_recem_descoberta']):
         # Força first-play determinístico sobre o novo braço.

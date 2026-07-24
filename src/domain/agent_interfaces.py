@@ -29,6 +29,10 @@ class DiscoveredStrategy:
     nome_estrategia: str
     prompt_estrategia: str
 
+    def __post_init__(self):
+        if self.nome_estrategia is None:
+            object.__setattr__(self, 'nome_estrategia', '')
+
 
 class IStrategyDiscoverer(Protocol):
     def __call__(

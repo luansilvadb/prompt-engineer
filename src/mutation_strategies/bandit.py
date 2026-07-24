@@ -20,6 +20,7 @@ proporcional à incerteza residual.
 
 from __future__ import annotations
 
+import logging
 import math
 import random
 import threading
@@ -75,9 +76,32 @@ class MutationBandit(IMutationBandit):
         with self._lock:
             for strategy, stats in strategy_stats.items():
                 self._ensure_key(strategy)
-                virtual_count = max(1, min(int(stats['count'] * 0.5), 10))
+                mean_delta = stats.get('mean_delta', 0.0)
+                mean_reward = stats.get('mean_reward', None)
+
+                # Validação de escala canônica: valores devem estar em [0, 1]
+                if mean_reward is not None and (mean_reward < 0.0 or mean_reward > 1.0):
+                    logger = logging.getLogger('mcts.bandit')
+                    logger.warning(
+                        f'Possível inconsistência de escala nos priors do bandit: '
+                        f'estratégia={strategy}, mean_reward={mean_reward:.3f} fora de [0, 1]. '
+                        f'Clampando para [0, 1].'
+                    )
+                    mean_reward = max(0.0, min(1.0, mean_reward))
+
+                # Estratégias com desempenho histórico negativo não recebem boost
+                if mean_delta < 0:
+                    virtual_count = 1  # mínimo, sem prior boost
+                    logger = logging.getLogger('mcts.bandit')
+                    logger.warning(
+                        f'Estratégia {strategy} tem desempenho histórico negativo '
+                        f'(mean_delta={mean_delta:.3f}), virtual_count reduzido para 1.'
+                    )
+                else:
+                    virtual_count = max(1, min(int(stats['count'] * 0.5), 10))
+
                 self._counts[strategy] += virtual_count
-                self._rewards[strategy] += stats.get('mean_delta', 0.0) * virtual_count
+                self._rewards[strategy] += mean_delta * virtual_count
 
     def _pick_untried(self) -> Optional[str]:
         """Estratégia ainda não explorada, ou None se todas já tiverem pulls.

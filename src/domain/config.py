@@ -48,6 +48,8 @@ class MCTSConfig:
     iteration_timeout_s: int = 300
     iteration_llm_call_limit: int = 50
     composite_timeout_s: int = 45
+    prune_relative_margin: float = 0.15
+    min_time_for_gates_s: float = 10.0
 
     def __post_init__(self) -> None:
         _validate_selection_policy(self.selection_policy)
@@ -67,6 +69,8 @@ class MCTSConfig:
         _validate_iteration_timeout_s(self.iteration_timeout_s)
         _validate_iteration_llm_call_limit(self.iteration_llm_call_limit)
         _validate_composite_timeout_s(self.composite_timeout_s)
+        _validate_prune_relative_margin(self.prune_relative_margin)
+        _validate_min_time_for_gates_s(self.min_time_for_gates_s)
 
 
 def _validate_selection_policy(policy: str) -> None:
@@ -166,6 +170,18 @@ def _validate_composite_timeout_s(composite_timeout_s: int) -> None:
         raise ValueError("composite_timeout_s must be at least 20 seconds")
 
 
+def _validate_prune_relative_margin(prune_relative_margin: float) -> None:
+    if not (0.0 <= prune_relative_margin <= 1.0):
+        raise ValueError("prune_relative_margin must be in [0.0, 1.0]")
+
+
+def _validate_min_time_for_gates_s(min_time_for_gates_s: float) -> None:
+    if min_time_for_gates_s < 1.0 or min_time_for_gates_s > 60.0:
+        raise ValueError(
+            f"min_time_for_gates_s must be in [1.0, 60.0], got {min_time_for_gates_s}"
+        )
+
+
 def load_mcts_config() -> MCTSConfig:
     load_dotenv()
     return MCTSConfig(
@@ -209,4 +225,6 @@ def load_mcts_config() -> MCTSConfig:
         iteration_timeout_s=int(os.environ.get("MCTS_ITERATION_TIMEOUT_S", "300")),
         iteration_llm_call_limit=int(os.environ.get("MCTS_ITERATION_LLM_CALL_LIMIT", "50")),
         composite_timeout_s=int(os.environ.get("MCTS_COMPOSITE_TIMEOUT_S", "45")),
+        prune_relative_margin=float(os.environ.get("MCTS_PRUNE_RELATIVE_MARGIN", "0.15")),
+        min_time_for_gates_s=float(os.environ.get("MCTS_MIN_TIME_FOR_GATES_S", "10.0")),
     )

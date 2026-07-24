@@ -303,5 +303,22 @@ def funcao_de_recompensa(avaliador_modo_b, skill_original: str, skill_otimizada:
             return score, feedback
 
         return score, resultado.feedback_detalhado
+    except ValueError as e:
+        msg = str(e)
+        # Erros de infraestrutura/contrato (tipo, configuração) NÃO são incerteza
+        # de avaliação — são bugs que invalidam toda a execução. Fail-fast.
+        if any(marker in msg for marker in [
+            "must be an instance of",
+            "LM must be",
+            "isinstance",
+            "BaseLM",
+        ]):
+            import logging
+            logging.critical(
+                f"[FAIL-FAST] Erro de infraestrutura na avaliação — "
+                f"abortando execução para evitar resultado inválido: {msg}"
+            )
+            raise  # re-levanta a exceção para abortar o pipeline
+        return 0.0, f'Erro de validação na avaliação: {msg}'
     except Exception as e:
         return 0.0, f'Erro interno na avaliação: {str(e)}'

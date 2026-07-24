@@ -183,6 +183,48 @@ class StrategyRegistry:
                 )
             )
 
+        TOM_KEY = 'variacao_tom'
+        if TOM_KEY not in self.strategies:
+            self.add_strategy(
+                key=TOM_KEY,
+                name='Variação de Tom e Registro',
+                prompt=(
+                    "Ajuste o tom e o registro linguístico do prompt sem alterar seu conteúdo semântico. "
+                    "Varie a formalidade (técnico vs. coloquial), a voz (ativa vs. passiva), e o nível "
+                    "de detalhe narrativo. Reformule as regras preservando exatamente o mesmo conjunto "
+                    "de instruções comportamentais, apenas mudando como são expressas. "
+                    "NÃO remova nenhuma regra; apenas reescreva o estilo."
+                )
+            )
+
+        FORMATO_KEY = 'reestruturacao_formato'
+        if FORMATO_KEY not in self.strategies:
+            self.add_strategy(
+                key=FORMATO_KEY,
+                name='Reestruturação de Formato',
+                prompt=(
+                    "Reestruture o formato do prompt sem alterar seu significado. Converta listas em "
+                    "prosa ou vice-versa, modularize em subseções com cabeçalhos, reorganize os blocos "
+                    "em unidades semanticamente coesas, e alterne entre estilos de apresentação "
+                    "(tabelas, bullets, parágrafos). Preserve todas as regras e restrições, apenas "
+                    "mude a estrutura de apresentação do texto."
+                )
+            )
+
+        CONTEXTO_KEY = 'especificacao_contexto'
+        if CONTEXTO_KEY not in self.strategies:
+            self.add_strategy(
+                key=CONTEXTO_KEY,
+                name='Especificação de Contexto de Uso',
+                prompt=(
+                    "Enriqueça o prompt explicitando o contexto de uso: pré-condições que devem ser "
+                    "verdadeiras antes de aplicar a skill, restrições de domínio (quando a skill NÃO "
+                    "se aplica), exceções e casos de borda que requerem tratamento especial. Adicione "
+                    "uma seção de contexto de uso sem remover regras existentes. Especifique quando e "
+                    "onde a skill deve ser invocada e sob quais hipóteses."
+                )
+            )
+
     def get_all_keys(self) -> List[str]:
         return list(self.strategies.keys())
 

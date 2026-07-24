@@ -20,6 +20,9 @@ class MCTSNode:
     prior: float
     virtual_losses: int
     lock: threading.Lock
+    gate_ab_score: float
+    gate_post_eval_score: float
+    had_technical_error: bool
 
     def __init__(
         self,
@@ -49,9 +52,13 @@ class MCTSNode:
         self.virtual_losses = 0
         self.is_sufficient: bool = False
         self.tried_strategies: set = set()
+        self.reserved_strategies: set[str] = set()
         self.raw_reward: float = 0.0
         self.multiplied_reward: float = 0.0
         self.shaped_reward: float = 0.0
+        self.gate_ab_score: float = 0.0
+        self.gate_post_eval_score: float = 0.0
+        self.had_technical_error: bool = False
         self.lock = threading.Lock()
 
     def add_parent(self, parent: 'MCTSNode') -> None:
@@ -95,6 +102,12 @@ class MCTSNode:
                 self.sq_q_value += other.sq_q_value
                 if other.last_reward > self.last_reward:
                     self.last_reward = other.last_reward
+                if other.gate_ab_score > self.gate_ab_score:
+                    self.gate_ab_score = other.gate_ab_score
+                if other.gate_post_eval_score > self.gate_post_eval_score:
+                    self.gate_post_eval_score = other.gate_post_eval_score
+                if other.had_technical_error:
+                    self.had_technical_error = True
 
     def max_children_allowed(self, progressive_c: float, alpha: float) -> int:
         """
@@ -296,7 +309,6 @@ def _strip_markdown_fences(lines: list[str]) -> list[str]:
 def _collapse_blank_lines(text: str) -> str:
     """Normaliza múltiplas linhas em branco consecutivas em no máximo duas."""
     return re.sub(r'\n{3,}', '\n\n', text)
-
 
 
 
