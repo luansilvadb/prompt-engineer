@@ -2,6 +2,7 @@ import dspy
 from pathlib import Path
 from src.signatures import Avaliacao, AvaliacaoModoB
 from src.utils.unicode_sanitizer import _sanitize_unicode_for_api
+from src.infrastructure.judge_module import JudgeModule
 from src.domain.agent_interfaces import (
     DiscoveredStrategy,
     SelfReflectiveOutput,
@@ -109,6 +110,7 @@ class AvaliadorModoBSignature(dspy.Signature):
     nota_acionabilidade: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando se as instruções são claras o suficiente para um agente de IA executar sem ambiguidade.")
     nota_anti_fragilidade: float = dspy.OutputField(desc="Nota de 0 a 100 avaliando se a skill resiste a edge cases, inputs adversariais e contextos ambíguos.")
     feedback_detalhado: str = dspy.OutputField(desc="Explicação detalhada dos pontos fortes e fracos, justificando as notas.")
+
 
 
 # Adapters
@@ -246,7 +248,7 @@ class DSPyAvaliadorModoB(IAvaliadorModoB):
             feedback_detalhado=res.feedback_detalhado
         )
 
-avaliador_modo_b_module = dspy.ChainOfThought(AvaliadorModoBSignature)
+avaliador_modo_b_module = JudgeModule()
 
 def load_avaliador():
     model_path_b = Path('src/outputs/models/avaliador_modo_b_otimizado.json')

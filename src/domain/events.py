@@ -30,6 +30,7 @@ class CostEventPayload:
     llm_calls: int
     estimated_tokens: int
     job_id: str
+    latency_ms: float = 0.0
 
 
 class IJobEventEmitter:

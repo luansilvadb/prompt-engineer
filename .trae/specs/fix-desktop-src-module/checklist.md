@@ -1,0 +1,2 @@
+- [x] `pathex` no `SkillOptimizer.spec` contém `'.'` (raiz do projeto)
+- [x] `from src.api import app` em `desktop.py` é resolvido pelo PyInstaller no build

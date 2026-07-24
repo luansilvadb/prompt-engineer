@@ -3,7 +3,7 @@ import threading
 from pathlib import Path
 from src.domain.store_interfaces import IExperienceStore
 from src.experience_store_sqlite import create_experience_store
-from src.infrastructure.dspy_impl import AvaliadorModoBSignature
+from src.infrastructure.judge_module import JudgeModule
 from src.config import get_drift_thresholds
 from dspy.teleprompt import BootstrapFewShot
 from src.drift.gate import DriftGate
@@ -111,15 +111,31 @@ def _run_teleprompt(trainset: list, candidate_path: Path, optimizer_type: str = 
 
         return True
 
-    avaliador_module = dspy.Predict(AvaliadorModoBSignature)
+    avaliador_module = JudgeModule()
+    compilado = None
 
     if _try_compile_optimizer(optimizer_type, quality_metric, avaliador_module, trainset, candidate_path):
-        return
+        # Recarrega o módulo compilado para avaliação de sucesso
+        compilado = avaliador_module
+    else:
+        print("Iniciando compilação (Teleprompting) via BootstrapFewShot...")
+        teleprompter = BootstrapFewShot(metric=quality_metric, max_bootstrapped_demos=3, max_labeled_demos=0)
+        compilado = teleprompter.compile(avaliador_module, trainset=trainset)
+        compilado.save(str(candidate_path))
 
-    print("Iniciando compilação (Teleprompting) via BootstrapFewShot...")
-    teleprompter = BootstrapFewShot(metric=quality_metric, max_bootstrapped_demos=3, max_labeled_demos=0)
-    compilado = teleprompter.compile(avaliador_module, trainset=trainset)
-    compilado.save(str(candidate_path))
+    # Avalia taxa de sucesso da compilação sobre o trainset
+    if compilado is not None and trainset:
+        total = len(trainset)
+        passed = 0
+        for ex in trainset:
+            try:
+                pred = compilado(**ex.inputs())
+                if quality_metric(ex, pred):
+                    passed += 1
+            except Exception:
+                pass
+        rate = passed / total if total > 0 else 0.0
+        print(f"[*] Taxa de sucesso de compilação: {passed}/{total} ({rate:.1%})")
 
 def _measure_drift(candidate_path: Path, golden: GoldenSet, repetitions: int, thresholds: DriftThresholds) -> DriftReport:
     """RN-07: Mede o drift do candidato carregado a partir do candidate_path."""

@@ -11,13 +11,20 @@ class BanditStats:
     count: int
     mean_delta: float
     total_reward: float
+    total_llm_calls: int = 0
+    estimated_tokens: int = 0
+    successful_expansions: int = 0
 
 
 class IMutationBandit(ABC):
     """Interface para o Multi-Armed Bandit de seleção de estratégia."""
 
     @abstractmethod
-    def select(self) -> str:
+    def select(self) -> str | list[str]:
+        ...
+
+    @abstractmethod
+    def force_composition(self, n: int) -> list[str]:
         ...
 
     @abstractmethod
@@ -30,6 +37,10 @@ class IMutationBandit(ABC):
 
     @abstractmethod
     def get_stats(self) -> Dict[str, BanditStats]:
+        ...
+
+    @abstractmethod
+    def record_cost(self, strategy_key: str, llm_calls: int, estimated_tokens: int, success: bool) -> None:
         ...
 
 

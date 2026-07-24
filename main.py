@@ -7,7 +7,7 @@ import time as time_mod
 from pathlib import Path
 
 from src.config import setup
-from src.infrastructure.container import Container
+from src.infrastructure.container import get_container
 from src.infrastructure.events import JobEventEmitter
 from src.optimizer import Optimizer
 from src.store import save_optimized_skill
@@ -24,7 +24,7 @@ def _load_skill(path_str: str) -> tuple[Path, str]:
     return skill_file, skill_file.read_text(encoding="utf-8")
 
 
-def _build_optimizer(skill_text: str, container: Container, emitter: JobEventEmitter) -> Optimizer:
+def _build_optimizer(skill_text: str, container, emitter: JobEventEmitter) -> Optimizer:
     return Optimizer(
         skill_original=skill_text,
         config=container.get_config(),
@@ -88,7 +88,7 @@ def _run_check(skill_file: Path, skill_text: str) -> None:
     print(f"[*] Carregando skill de: {skill_file}")
     try:
         setup()
-        container = Container()
+        container = get_container()
         emitter = JobEventEmitter(on_log=print, on_error=lambda msg: print(msg, file=sys.stderr))
         melhor_instrucao = _build_optimizer(skill_text, container, emitter).optimize()
         _display_diff_and_prompt(skill_text, melhor_instrucao, skill_file)
@@ -104,7 +104,7 @@ def _run_watch(skill_file: Path, skill_text: str) -> None:
     print(f"{'=' * 60}")
 
     setup()
-    container = Container()
+    container = get_container()
 
     state = {
         "iteration": 0, "max_iterations": container.get_config().max_iterations,

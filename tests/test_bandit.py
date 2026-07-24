@@ -100,16 +100,14 @@ def test_ucb_score_matches_formula_exactly():
     assert bandit._ucb_score('mutador_cognitivo', total_pulls) == pytest.approx(expected)
 
 
-def test_ucb_score_requires_pulled_arm_exploration_term_divides_by_n():
-    # Contrato: o bônus de exploração é c_param*sqrt(ln(total)/n) e divide por
-    # n diretamente (apenas mean_reward tem o guarda max(1, n)). Logo,
-    # _ucb_score só é válido para braços já puxados (n>=1) — o que select()
-    # sempre garante via _pick_untried antes de computar UCB.
+def test_ucb_score_untried_arm_returns_infinity():
+    # Contrato: _ucb_score retorna inf para braços nunca puxados (n=0),
+    # garantindo que sejam priorizados caso a fase untried deixe escapar
+    # algum braço (ex.: __DISCOVER__ após exclusão seletiva).
     bandit = MutationBandit(c_param=1.41)
     bandit._counts['mutador_cognitivo'] = 0
     bandit._rewards['mutador_cognitivo'] = 0.0
-    with pytest.raises(ZeroDivisionError):
-        bandit._ucb_score('mutador_cognitivo', total_pulls=5)
+    assert bandit._ucb_score('mutador_cognitivo', total_pulls=5) == float('inf')
 
 
 def test_ucb_score_mean_reward_guarded_for_single_pull():
@@ -260,3 +258,92 @@ def test_discover_arm_always_present():
     bandit = MutationBandit()
     assert '__DISCOVER__' in bandit._counts
     assert '__DISCOVER__' in bandit._rewards
+
+
+# ── SubTask 6.2: Composição de estratégias via bandit ──────────────────────────
+
+class TestBanditComposition:
+    def test_bandit_returns_composition(self):
+        """Com composition_probability=1.0, select() retorna lista de 2+ estratégias distintas."""
+        bandit = MutationBandit(composition_probability=1.0, composition_max_strategies=3)
+
+        # Avança o round-robin (consome todas as estratégias conhecidas uma vez)
+        known = sorted([k for k in bandit._counts.keys() if k != '__DISCOVER__'])
+        for _ in known:
+            _ = bandit.select()  # consome fase round-robin
+
+        # Agora select() deve entrar na fase UCB com composição
+        chosen = bandit.select()
+        assert isinstance(chosen, list), f"select() deveria retornar lista, mas retornou {type(chosen)}"
+        assert len(chosen) >= 2, f"Composição deveria ter pelo menos 2 estratégias, mas tem {len(chosen)}"
+        # Todas as estratégias devem ser distintas
+        assert len(set(chosen)) == len(chosen), "Estratégias na composição deveriam ser distintas"
+        # Nenhuma deve ser __DISCOVER__
+        assert '__DISCOVER__' not in chosen, "Composição não deveria incluir __DISCOVER__"
+
+    def test_bandit_returns_single_with_zero_prob(self):
+        """Com composition_probability=0.0, select() nunca retorna lista."""
+        bandit = MutationBandit(composition_probability=0.0)
+
+        # Dá alguns pulls para todas as estratégias nativas
+        for key in list(bandit._counts.keys()):
+            if key != '__DISCOVER__':
+                bandit._counts[key] = 1
+                bandit._rewards[key] = 0.5
+
+        # Múltiplas seleções: sempre deve ser string, nunca lista
+        for _ in range(20):
+            chosen = bandit.select()
+            assert isinstance(chosen, str), (
+                f"Com composition_probability=0.0, select() deveria sempre retornar str, "
+                f"mas retornou {type(chosen)}"
+            )
+
+    def test_composite_key_registered_in_counts(self):
+        """Após select() retornar lista, a chave composta está em _counts."""
+        bandit = MutationBandit(composition_probability=1.0, composition_max_strategies=3)
+
+        # Avança o round-robin antes
+        known = sorted([k for k in bandit._counts.keys() if k != '__DISCOVER__'])
+        for _ in known:
+            _ = bandit.select()
+
+        chosen = bandit.select()
+        composite_key = f"composite:{'+'.join(chosen)}"
+
+        assert composite_key in bandit._counts, (
+            f"Chave composta '{composite_key}' deveria estar em _counts"
+        )
+        assert composite_key in bandit._rewards, (
+            f"Chave composta '{composite_key}' deveria estar em _rewards"
+        )
+
+    def test_composite_key_updated_with_reward(self):
+        """update() na chave composta incrementa _counts e _rewards."""
+        bandit = MutationBandit(composition_probability=1.0, composition_max_strategies=3)
+
+        # Avança o round-robin antes
+        known = sorted([k for k in bandit._counts.keys() if k != '__DISCOVER__'])
+        for _ in known:
+            _ = bandit.select()
+
+        chosen = bandit.select()
+        composite_key = f"composite:{'+'.join(chosen)}"
+
+        # Atualiza a chave composta
+        bandit.update(composite_key, 0.8)
+        bandit.update(composite_key, 0.6)
+
+        assert bandit._counts[composite_key] == 2, (
+            f"Esperado count=2, obtido {bandit._counts[composite_key]}"
+        )
+        assert bandit._rewards[composite_key] == pytest.approx(1.4), (
+            f"Esperado rewards=1.4, obtido {bandit._rewards[composite_key]}"
+        )
+
+        # Verifica via get_stats também
+        stats = bandit.get_stats()
+        assert composite_key in stats
+        assert stats[composite_key].count == 2
+        assert stats[composite_key].mean_delta == pytest.approx(0.7)
+        assert stats[composite_key].total_reward == pytest.approx(1.4)

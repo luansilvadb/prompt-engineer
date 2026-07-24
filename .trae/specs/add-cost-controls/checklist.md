@@ -1,0 +1,22 @@
+# Checklist
+
+- [x] `MCTSConfig` possui campos `iteration_timeout_s=300`, `iteration_llm_call_limit=50`, `composite_timeout_s=45` com validação bounds
+- [x] `load_mcts_config()` lê `MCTS_ITERATION_TIMEOUT_S`, `MCTS_ITERATION_LLM_CALL_LIMIT`, `MCTS_COMPOSITE_TIMEOUT_S` do ambiente
+- [x] `_run_single_iteration` aborta quando tempo excede `iteration_timeout_s` (log "[Circuit Breaker] Iteração excedeu teto de {N}s")
+- [x] `_run_single_iteration` aborta quando `_llm_call_count` excede `iteration_llm_call_limit` (log "[Circuit Breaker] Iteração excedeu teto de {N} chamadas LLM")
+- [x] Abort por circuit breaker não incrementa `consecutive_zeros`
+- [x] `_try_generate_mutation` aceita `timeout_override`; chamadas de composição usam `composite_timeout_s` (45s)
+- [x] `_expand_node` aplica progressão gradativa: tentativa 0 = bandit natural; tentativa 1 = composição de 2 (se isolada falhou); tentativa 2 = composição de 3
+- [x] Progressão gradativa não reduz composição que o bandit selecionou naturalmente na tentativa 0
+- [x] Logs de tentativa indicam: "Tentativa 1/3: estratégia isolada", "Tentativa 2/3: composição (2 eixos)", "Tentativa 3/3: composição (3 eixos)"
+- [x] `MutationBandit` possui campos `_total_llm_calls`, `_estimated_tokens`, `_successful_expansions` por chave
+- [x] `IMutationBandit.record_cost(strategy_key, llm_calls, estimated_tokens, success)` implementado
+- [x] `_commit_iteration` chama `record_cost` após cada expansão
+- [x] `_log_final_stats` exibe custo médio por aprovação por estratégia
+- [x] Penalidade UCB aplicada para estratégias com `custo_por_aprov > mediana * 1.5`
+- [x] `_commit_iteration` grava `outputs/strategies/checkpoint_{job_id}.json` quando `reward > best_reward_so_far`
+- [x] Arquivo de checkpoint contém: instruction, score, strategy, depth, timestamp, iteration
+- [x] Log "[Checkpoint] Melhor nó salvo: score={reward:.3f}" emitido ao gravar checkpoint
+- [x] `_apply_density_multiplier` loga `child_len/parent_len` e raw multiplier antes do clamp
+- [x] WARNING "[Density Audit]" emitido quando >80% das últimas 10 penalidades estão no piso
+- [x] Testes unitários passam para todos os cenários da spec

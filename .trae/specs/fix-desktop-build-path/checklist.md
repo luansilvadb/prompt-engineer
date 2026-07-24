@@ -1,0 +1,4 @@
+- [x] `SkillOptimizer.spec` está na raiz do projeto (`d:\good\`)
+- [x] `build_desktop.ps1` referencia `SkillOptimizer.spec` (sem prefixo `scripts/`)
+- [x] Caminho `scripts/desktop.py` no `.spec` resolve corretamente a partir da raiz
+- [x] Caminhos `frontend` e `src/outputs` no `.spec` resolvem corretamente a partir da raiz

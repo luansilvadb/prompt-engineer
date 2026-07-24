@@ -47,6 +47,11 @@ class MCTSNode:
         self.last_reward = 0.0
         self.prior = prior
         self.virtual_losses = 0
+        self.is_sufficient: bool = False
+        self.tried_strategies: set = set()
+        self.raw_reward: float = 0.0
+        self.multiplied_reward: float = 0.0
+        self.shaped_reward: float = 0.0
         self.lock = threading.Lock()
 
     def add_parent(self, parent: 'MCTSNode') -> None:
@@ -97,10 +102,12 @@ class MCTSNode:
         Nós mais visitados (promissores) ganham mais filhos.
         Nós com poucas visitas ficam com poucos filhos (poda natural).
         """
-        if self.visits == 0:
+        effective_visits = max(0, self.visits + self.virtual_losses)
+        if effective_visits == 0:
             return 1
-        return max(1, math.ceil(progressive_c * (self.visits ** alpha)))
+        return max(1, math.ceil(progressive_c * (effective_visits ** alpha)))
 
+    # DEPRECATED: Use src.domain.selection_policies.UCB1Policy instead.
     def best_child_ucb(self, c_param: float) -> Optional['MCTSNode']:
         """Seleção UCB1 padrão para a fase de seleção."""
         if not self.children:
@@ -115,6 +122,7 @@ class MCTSNode:
 
         return max(self.children, key=ucb_score)
 
+    # DEPRECATED: Use src.domain.selection_policies.UCB1TunedPolicy instead.
     def best_child_ucb_tuned(
         self,
         c_param: float = 1.0,
@@ -147,6 +155,7 @@ class MCTSNode:
 
         return max(self.children, key=ucb_tuned_score)
 
+    # DEPRECATED: Use src.domain.selection_policies.PUCTPolicy instead.
     def best_child_puct(
         self,
         c_param: float,

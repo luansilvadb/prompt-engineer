@@ -1,6 +1,8 @@
 import asyncio
+import logging
 import threading
-from src.state import jobs
+import time
+from src.state import get_job
 from src.config import setup
 from src.optimizer import Optimizer
 from src.store import save_optimized_skill
@@ -12,18 +14,22 @@ from src.mutation_strategies.bandit import MutationBandit
 from src.domain.bandit_interfaces import IMutationBandit, IStrategyRegistry
 from src.mutation_strategies.registry import StrategyRegistry
 
+logger = logging.getLogger(__name__)
+
+
 def _create_callbacks(job_id: str, job, loop, store: IJobStore):
-    def log_progress(msg: str):
+    def _emit_log(msg: str):
+        """Callback unificado para log_progress e log_error."""
+        job.last_activity_time = time.time()
         job.logs.append(msg)
         asyncio.run_coroutine_threadsafe(job.events_queue.put({'type': 'log', 'data': {'text': msg}}), loop)
         store.save_job_state(job_id, job)
 
-    def log_error(msg: str):
-        job.logs.append(msg)
-        asyncio.run_coroutine_threadsafe(job.events_queue.put({'type': 'log', 'data': {'text': msg}}), loop)
-        store.save_job_state(job_id, job)
+    log_progress = _emit_log
+    log_error = _emit_log
 
     def handle_node(node_data: dict):
+        job.last_activity_time = time.time()
         for idx, existing in enumerate(job.mcts_nodes):
             if existing['id'] == node_data['id']:
                 job.mcts_nodes[idx] = node_data
@@ -35,6 +41,7 @@ def _create_callbacks(job_id: str, job, loop, store: IJobStore):
         store.save_job_state(job_id, job)
 
     def handle_cost(cost_data: dict):
+        job.last_activity_time = time.time()
         asyncio.run_coroutine_threadsafe(job.events_queue.put({'type': 'cost', 'data': cost_data}), loop)
 
     return log_progress, log_error, handle_node, handle_cost
@@ -44,6 +51,16 @@ def _run_bg_compiler(lm, compiler: IAvaliadorCompiler):
         compiler.compilar_avaliador(lm=lm)
     except Exception as e:
         print(f"[!] Erro ao rodar compilação em background: {e}")
+
+
+def _job_heartbeat(job, stop_event: threading.Event):
+    """Atualiza last_activity_time do job a cada 30s enquanto estiver rodando.
+    Isso previne que o detector de órfãos do SSE mate jobs legítimos
+    durante chamadas LLM longas que não geram eventos."""
+    while not stop_event.is_set():
+        stop_event.wait(30.0)
+        if not stop_event.is_set():
+            job.last_activity_time = time.time()
 
 class OptimizationService:
     def __init__(
@@ -73,12 +90,13 @@ class OptimizationService:
         self._strategy_registry = strategy_registry if strategy_registry is not None else StrategyRegistry()
 
     def execute(self, job_id: str, loop) -> None:
-        job = jobs[job_id]
+        job = get_job(job_id)
         if job.status == 'cancelled':
             return
         job.status = 'running'
         self.job_store.save_job_state(job_id, job)
 
+        start_time = time.time()
         log_progress, log_error, handle_node, handle_cost = _create_callbacks(job_id, job, loop, self.job_store)
         emitter = JobEventEmitter(
             on_log=log_progress,
@@ -87,6 +105,13 @@ class OptimizationService:
             on_cost=handle_cost,
             is_cancelled=lambda: job.status == 'cancelled',
         )
+
+        # Heartbeat thread: previne detecção de órfão durante chamadas LLM longas
+        heartbeat_stop = threading.Event()
+        heartbeat_thread = threading.Thread(
+            target=_job_heartbeat, args=(job, heartbeat_stop), daemon=True
+        )
+        heartbeat_thread.start()
 
         try:
             log_progress('[*] Configurando o provedor e modelo de IA...')
@@ -114,15 +139,19 @@ class OptimizationService:
             with self.ai_framework.context(lm=lm):
                 melhor_instrucao = optimizer.optimize()
 
+            elapsed = time.time() - start_time
+
             if job.status == 'cancelled':
                 if not job.is_deleted and melhor_instrucao and melhor_instrucao.strip() != job.original_skill.strip():
                     output_file = save_optimized_skill(melhor_instrucao)
                     job.result = melhor_instrucao
                     self.job_store.save_job_state(job_id, job)
                     log_progress(f"\n[+] Resultado parcial preservado em '{output_file}'")
+                logger.info("Job {} cancelado após {:.1f}s | model={}", job_id, elapsed, job.model_name)
                 return
 
             if job.is_deleted:
+                logger.info("Job {} descartado (marcado como deletado) após {:.1f}s", job_id, elapsed)
                 return
 
             output_file = save_optimized_skill(melhor_instrucao)
@@ -130,13 +159,24 @@ class OptimizationService:
             job.status = 'completed'
             self.job_store.save_job_state(job_id, job)
             log_progress(f"\n[+] Skill otimizada preservada no histórico em '{output_file}'")
+            logger.info(
+                "Job {} concluído com sucesso | duração={:.1f}s | model={} | nodes={} | result_file={}",
+                job_id, elapsed, job.model_name, len(job.mcts_nodes), output_file,
+            )
 
             threading.Thread(target=_run_bg_compiler, args=(lm, self.compiler), daemon=True).start()
 
         except Exception as e:
+            elapsed = time.time() - start_time
             if job.status != 'cancelled':
                 log_error(f'\n[!] Erro fatal durante a execução: {e}')
                 job.status = 'error'
                 self.job_store.save_job_state(job_id, job)
+                logger.error(
+                    "Job {} falhou | duração={:.1f}s | model={} | erro={}",
+                    job_id, elapsed, job.model_name, e,
+                )
+        finally:
+            heartbeat_stop.set()
 
 

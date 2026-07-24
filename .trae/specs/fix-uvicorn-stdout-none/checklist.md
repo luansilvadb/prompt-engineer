@@ -1,0 +1,3 @@
+- [x] Guarda `sys.stdout` está no topo de `desktop.py`, ao lado da guarda `sys.stderr`
+- [x] Com `sys.stdout = None` e `sys.stderr = None` simulados, imports não lançam `AttributeError`
+- [x] Execução normal mantém `sys.stdout` e `sys.stderr` originais intactos

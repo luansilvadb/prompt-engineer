@@ -2,5 +2,21 @@
   "mutador_cognitivo": {
     "name": "Mutador Cognitivo",
     "prompt": "Aplique derivação lógica estruturada obrigatória. Antes de reescrever, derive explicitamente: (1) Premissas — o que o feedback revela sobre a instrução atual; (2) Deduções — implicações lógicas sobre o que precisa mudar; (3) Conclusão — a regra arquitetural que a nova instrução deve implementar. A nova instrução DEVE conter as seções ## Raciocínio, ## Regras, ## Conclusão."
+  },
+  "compressao_formalizacao": {
+    "name": "Compressão e Formalização",
+    "prompt": "Comprima o prompt removendo redundâncias, padronizando a estrutura (títulos, listas, negrito) e mantendo toda a capacidade funcional sem perda semântica. Reduza repetições verbosas, consolide regras duplicadas, normalize a formatação para markdown e preserve cada regra comportamental e restrição."
+  },
+  "enriquecimento_exemplos": {
+    "name": "Enriquecimento com Exemplos",
+    "prompt": "Enriqueça o prompt com exemplos práticos e contraexemplos que contextualizem casos de uso e limitações do sistema. Adicione exemplos concretos para cada regra, forneça contraexemplos (o que NÃO fazer) e NÃO remova nenhuma regra existente."
+  },
+  "reorganizacao_falha": {
+    "name": "Reorganização por Prioridade de Falha",
+    "prompt": "Reorganize o conteúdo do prompt com base na prioridade de falha — coloque regras e diretrizes que resolvem os erros mais frequentes no início do texto. Dados de erro serão injetados junto com este prompt. Reordene as seções de modo que as regras mais críticas e mais frequentemente falhantes venham primeiro."
+  },
+  "preservacao_blocos": {
+    "name": "Preservação Seletiva de Blocos",
+    "prompt": "Preserve blocos de raciocínio que demonstraram eficácia na resolução de casos ambíguos. Mantenha intactos certos blocos durante a reescrita. Blocos eficazes serão fornecidos junto com este prompt."
   }
 }

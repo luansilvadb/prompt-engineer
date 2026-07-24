@@ -1,0 +1,4 @@
+- [x] `setup_logging()` não chama `logger.add(sys.stderr, ...)` quando `sys.stderr` é `None`
+- [x] Handler de arquivo rotativo é configurado em todos os cenários
+- [x] Aviso informativo é emitido quando handler de console é omitido
+- [x] Execução normal (com console) mantém ambos os handlers funcionando

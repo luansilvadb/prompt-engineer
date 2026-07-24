@@ -1,0 +1,25 @@
+# Checklist
+
+- [x] O `Optimizer` tem método `_run_post_eval` que avalia original vs mutada contra casos de teste baseados em feedback, usando métrica comportamental independente da função de simulação MCTS
+- [x] A avaliação pós-implementação mede aderência às regras, ausência de defeitos e preservação de regras críticas (não apenas formato textual)
+- [x] O `_expand_node` integra `_run_post_eval` após `_run_ab_gate` — se reprovado, a estratégia/composição é marcada como failed e o ciclo continua
+- [x] Mutações que passam no gate A/B mas falham na avaliação pós-implementação NÃO geram nó filho
+- [x] O critério estrutural ("formato do texto foi modificado") sozinho NÃO é suficiente para aceitação de mutação
+- [x] O `MCTSConfig` tem `post_eval_margin_min` (padrão 0.05) e `post_eval_sample_size` (padrão 5), configuráveis via variáveis de ambiente
+- [x] O `MCTSConfig` tem `composition_max_strategies` (padrão 3) e `composition_probability` (padrão 0.3), configuráveis via variáveis de ambiente
+- [x] O `MCTSConfig` valida que `composition_max_strategies >= 2` e `0.0 <= composition_probability <= 1.0`
+- [x] O `IMutationBandit.select()` pode retornar `list[str]` (composição ordenada) além de `str` (estratégia isolada)
+- [x] O `MutationBandit.select()` retorna composição com probabilidade `composition_probability`, selecionando 2 a `composition_max_strategies` estratégias distintas
+- [x] O bandit registra chaves compostas (`composite:estrat1+estrat2`) em `_counts`/`_rewards` para rastreamento de reward
+- [x] O `_expand_node` aplica estratégias compostas sequencialmente: saída de uma é entrada da próxima, produzindo uma única candidata
+- [x] O nó filho de composição tem `mutation_strategy` registrada como `composite:estrat1+estrat2+...`
+- [x] O `_inject_dynamic_data` é aplicado para cada estratégia da composição individualmente
+- [x] Estratégias compostas bem-sucedidas são persistidas no `StrategyRegistry` para reaproveitamento
+- [x] O experience store registra `mutation_strategy` como `composite:...` para composições aceitas
+- [x] O `StrategyRegistry` tem método `build_composite_prompt` que concatena prompts das estratégias componentes
+- [x] Teste unitário valida aprovação e rejeição da avaliação pós-implementação
+- [x] Teste unitário valida composição do bandit com probabilidade configurável e estratégias distintas
+- [x] Teste unitário valida aplicação sequencial de composição no `_expand_node` e registro de `mutation_strategy` como `composite:...`
+- [x] Teste unitário valida rejeição de mutação que passa no gate A/B mas falha na avaliação pós-implementação
+- [x] Teste unitário valida rejeição de valores inválidos para os novos parâmetros do `MCTSConfig`
+- [x] Teste unitário valida `build_composite_prompt` no registry gerando prompt concatenado correto

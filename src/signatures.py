@@ -266,9 +266,31 @@ def funcao_de_recompensa(avaliador_modo_b, skill_original: str, skill_otimizada:
         )
 
         if not resultado.manteve_regras_criticas:
-            return 0.0, resultado.feedback_detalhado
+            import logging
+            # Calcula score composto normalmente (para ter baseline)
+            score = calcular_composite(resultado)
+            # Penalidade gradual proporcional ao número de defeitos
+            num_defeitos = len(resultado.defeitos_encontrados) if resultado.defeitos_encontrados else 1
+            penalty = min(num_defeitos * 0.20, 0.80)
+            score = max(0.05, score - penalty)
+            logging.warning(
+                f"[Validação] Regras críticas violadas ({num_defeitos} violações). "
+                f"Score com penalidade gradual: {score:.3f} (penalty={penalty:.2f}). "
+                f"Feedback: {resultado.feedback_detalhado[:200]}"
+            )
+            
+            # Feedback enriquecido com contagem de violações
+            feedback = f"{num_defeitos} violações críticas detectadas. {resultado.feedback_detalhado}"
+            return score, feedback
 
         score = calcular_composite(resultado)
+
+        # Validação de intervalo [0, 1]
+        original_score = score
+        score = max(0.0, min(1.0, score))
+        if score != original_score:
+            import logging
+            logging.warning(f"[Validação] Score clampado de {original_score:.3f} para {score:.3f} (fora do intervalo [0,1])")
 
         if resultado.defeitos_encontrados:
             # BUG-4 fix: teto de 0.5 evita colapso catastrófico por defeitos cosméticos.

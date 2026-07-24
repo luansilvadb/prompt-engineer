@@ -1,0 +1,3 @@
+- [x] Guarda `sys.stderr` está no topo de `desktop.py`, antes de `import uvicorn` e `from src.api import app`
+- [x] Com `sys.stderr = None` simulado, `desktop.py` não lança `AttributeError` ao iniciar
+- [x] Execução normal mantém `sys.stderr` original intacto

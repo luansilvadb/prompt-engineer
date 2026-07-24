@@ -4,11 +4,21 @@ Inicia um servidor FastAPI em thread separada e o exibe em uma janela nativa.
 Inclui tratamento de erros robusto, retry de porta e graceful shutdown.
 """
 
+import os
 import socket
 import sys
 import threading
 import time
 import traceback
+
+# Em builds PyInstaller com console=False, sys.stdout e sys.stderr são None.
+# Bibliotecas externas (dspy, uvicorn) assumem streams válidos e chamam
+# .flush() / .isatty() sem verificação, causando AttributeError.
+# Redirecionamos para os.devnull como fallback seguro.
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, 'w')
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, 'w')
 
 import uvicorn
 

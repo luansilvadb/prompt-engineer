@@ -236,3 +236,103 @@ def setup_dspy_mocks(configure_side_effect=None):
             'lm_instance': lm_instance,
             'configure': configure,
         }
+
+
+# ── SubTask 6.5: MCTSConfig rejeitando valores inválidos ──────────────────────
+
+from src.domain.config import MCTSConfig
+import pytest
+
+
+class TestMCTSConfigValidation:
+    """Testes de validação para os novos campos do MCTSConfig."""
+
+    def _make_config(self, **overrides):
+        """Cria um MCTSConfig com defaults válidos, permitindo sobrescrever campos."""
+        defaults = dict(
+            gamma=0.95, c_param=1.41, progressive_alpha=0.5, progressive_c=2.0,
+            value_threshold=0.3, max_iterations=100, value_lr=0.1,
+            bandit_c_param=1.41, bandit_temperature=2.0, bandit_temperature_decay=0.95,
+            semantic_sim_threshold=0.92, lexical_density_min=0.35,
+            verbosity_penalty_factor=0.7, buzzword_threshold=3,
+            cognitivo_prior_count=2, cognitivo_prior_mean_delta=0.05,
+            density_multiplier_min=0.8, density_multiplier_max=1.2,
+            density_threshold=0.9, density_structured_bonus=0.05, reward_floor=0.30,
+        )
+        defaults.update(overrides)
+        return MCTSConfig(**defaults)
+
+    def test_config_rejects_invalid_ab_margin_min_negative(self):
+        """ab_margin_min < 0 deve levantar ValueError."""
+        with pytest.raises(ValueError, match="ab_margin_min must be in"):
+            self._make_config(ab_margin_min=-0.1)
+
+    def test_config_rejects_invalid_ab_margin_min_over_one(self):
+        """ab_margin_min > 1 deve levantar ValueError."""
+        with pytest.raises(ValueError, match="ab_margin_min must be in"):
+            self._make_config(ab_margin_min=1.5)
+
+    def test_config_rejects_invalid_post_eval_margin_min_negative(self):
+        """post_eval_margin_min < 0 deve levantar ValueError."""
+        with pytest.raises(ValueError, match="post_eval_margin_min must be in"):
+            self._make_config(post_eval_margin_min=-0.1)
+
+    def test_config_rejects_invalid_post_eval_margin_min_over_one(self):
+        """post_eval_margin_min > 1 deve levantar ValueError."""
+        with pytest.raises(ValueError, match="post_eval_margin_min must be in"):
+            self._make_config(post_eval_margin_min=1.5)
+
+    def test_config_rejects_invalid_post_eval_sample_size(self):
+        """post_eval_sample_size < 1 deve levantar ValueError."""
+        with pytest.raises(ValueError, match="post_eval_sample_size must be at least 1"):
+            self._make_config(post_eval_sample_size=0)
+
+    def test_config_rejects_invalid_post_eval_sample_size_negative(self):
+        """post_eval_sample_size negativo deve levantar ValueError."""
+        with pytest.raises(ValueError, match="post_eval_sample_size must be at least 1"):
+            self._make_config(post_eval_sample_size=-5)
+
+    def test_config_rejects_invalid_composition_max_strategies(self):
+        """composition_max_strategies < 2 deve levantar ValueError."""
+        with pytest.raises(ValueError, match="composition_max_strategies must be at least 2"):
+            self._make_config(composition_max_strategies=1)
+
+    def test_config_rejects_invalid_composition_max_strategies_zero(self):
+        """composition_max_strategies = 0 deve levantar ValueError."""
+        with pytest.raises(ValueError, match="composition_max_strategies must be at least 2"):
+            self._make_config(composition_max_strategies=0)
+
+    def test_config_rejects_invalid_composition_probability_negative(self):
+        """composition_probability < 0 deve levantar ValueError."""
+        with pytest.raises(ValueError, match="composition_probability must be in"):
+            self._make_config(composition_probability=-0.1)
+
+    def test_config_rejects_invalid_composition_probability_over_one(self):
+        """composition_probability > 1 deve levantar ValueError."""
+        with pytest.raises(ValueError, match="composition_probability must be in"):
+            self._make_config(composition_probability=1.5)
+
+    def test_config_accepts_valid_boundary_values(self):
+        """Valores válidos nos limites devem ser aceitos."""
+        # Testa valores extremos válidos individualmente
+        cfg = self._make_config(
+            ab_margin_min=0.0,
+            post_eval_margin_min=1.0,
+            post_eval_sample_size=1,
+            composition_max_strategies=2,
+            composition_probability=0.0,
+        )
+        assert cfg is not None
+        assert cfg.ab_margin_min == 0.0
+        assert cfg.post_eval_margin_min == 1.0
+        assert cfg.post_eval_sample_size == 1
+        assert cfg.composition_max_strategies == 2
+        assert cfg.composition_probability == 0.0
+
+        # Testa defaults
+        cfg2 = self._make_config()
+        assert cfg2.ab_margin_min == 0.05
+        assert cfg2.post_eval_margin_min == 0.05
+        assert cfg2.post_eval_sample_size == 5
+        assert cfg2.composition_max_strategies == 3
+        assert cfg2.composition_probability == 0.3

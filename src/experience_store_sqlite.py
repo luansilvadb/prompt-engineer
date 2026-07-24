@@ -236,6 +236,96 @@ class SqliteExperienceStore:
             }
         return stats
 
+    def get_feedback_frequency(self, top_k: int = 5) -> list[dict]:
+        """
+        Retorna os feedbacks mais impactantes ordenados pelo menor delta_reward
+        (piores resultados primeiro).
+
+        Cada dicionário retornado contém as chaves: feedback, delta_reward,
+        count, mutation_strategy.
+
+        Args:
+            top_k: Número máximo de registros a retornar.
+
+        Returns:
+            Lista de dicionários com os feedbacks mais impactantes.
+        """
+        rows = self._conn.execute(
+            """SELECT feedback, delta_reward, mutation_strategy, COUNT(*) as count
+               FROM experiences
+               WHERE feedback != ''
+               GROUP BY feedback
+               ORDER BY delta_reward ASC
+               LIMIT ?""",
+            (top_k,),
+        ).fetchall()
+
+        return [
+            {
+                "feedback": r["feedback"],
+                "delta_reward": r["delta_reward"],
+                "count": r["count"],
+                "mutation_strategy": r["mutation_strategy"],
+            }
+            for r in rows
+        ]
+
+    def get_effective_blocks(self, top_k: int = 5) -> list[dict]:
+        """
+        Retorna blocos de instrução de experiências com delta_reward > 0,
+        ordenados pelo maior delta_reward primeiro.
+
+        Cada dicionário retornado contém as chaves: instruction (truncada em
+        500 caracteres), delta_reward, mutation_strategy.
+
+        Args:
+            top_k: Número máximo de registros a retornar.
+
+        Returns:
+            Lista de dicionários com os blocos de instrução mais eficazes.
+        """
+        rows = self._conn.execute(
+            """SELECT instruction, delta_reward, mutation_strategy
+               FROM experiences
+               WHERE delta_reward > 0 AND instruction != ''
+               ORDER BY delta_reward DESC
+               LIMIT ?""",
+            (top_k,),
+        ).fetchall()
+
+        return [
+            {
+                "instruction": (r["instruction"] or "")[:500],
+                "delta_reward": r["delta_reward"],
+                "mutation_strategy": r["mutation_strategy"],
+            }
+            for r in rows
+        ]
+
+    def get_ab_test_cases(self, skill_hash: str, top_k: int = 10) -> list[Experience]:
+        """
+        Retorna os casos de feedback mais relevantes para um dado skill_hash,
+        para uso como casos de teste A/B. Ordenados pelos mais recentes
+        (timestamp DESC).
+
+        Args:
+            skill_hash: Hash da skill para filtrar as experiências.
+            top_k: Número máximo de registros a retornar.
+
+        Returns:
+            Lista de objetos Experience correspondentes ao skill_hash informado.
+        """
+        rows = self._conn.execute(
+            """SELECT *
+               FROM experiences
+               WHERE skill_hash = ? AND feedback != ''
+               ORDER BY timestamp DESC
+               LIMIT ?""",
+            (skill_hash, top_k),
+        ).fetchall()
+
+        return [Experience.from_dict(dict(r)) for r in rows]
+
     def close(self) -> None:
         """Fecha a conexão SQLite gracefulmente."""
         try:

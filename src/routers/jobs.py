@@ -13,7 +13,7 @@ from sse_starlette.sse import EventSourceResponse
 import src.store as job_store
 from src.config import _get_env_path
 from src.schemas import AuditRequestDTO, CompileRequestDTO, ConfigRequestDTO, ConfigResponseDTO, OtimizacaoRequestDTO
-from src.state import JobState, jobs
+from src.state import JobState, get_all_jobs, set_job, get_job, remove_job, cancel_job, cancel_all_active_jobs
 
 # ── Router ────────────────────────────────────────────────────────────────────
 router = APIRouter(prefix="/api", tags=["Jobs"])
@@ -73,13 +73,7 @@ async def start_optimization(request: Request, body: OtimizacaoRequestDTO, backg
         len(body.skillOriginal),
     )
 
-    for j_state in jobs.values():
-        if j_state.status in ("running", "idle"):
-            j_state.status = "cancelled"
-            j_state.events_queue.put_nowait({
-                "type": "log",
-                "data": {"text": "\n[!] OTIMIZAÇÃO CANCELADA POR NOVA REQUISIÇÃO."},
-            })
+    cancel_all_active_jobs()
 
     job_id = str(uuid.uuid4())
     job_state = JobState()
@@ -90,15 +84,15 @@ async def start_optimization(request: Request, body: OtimizacaoRequestDTO, backg
     job_state.api_key = body.apiKey
     job_state.regras_adicionais = "\n".join(body.regrasAdicionais) if body.regrasAdicionais else ""
 
-    jobs[job_id] = job_state
+    set_job(job_id, job_state)
     job_store.save_job_state(job_id, job_state)
 
     loop = asyncio.get_running_loop()
 
-    from src.infrastructure.container import Container
+    from src.infrastructure.container import get_container
     from src.services import OptimizationService
 
-    container = Container()
+    container = get_container()
     service = OptimizationService(
         strategy_discoverer=container.get_strategy_discoverer(),
         agent=container.get_agent(),
@@ -121,21 +115,23 @@ async def start_optimization(request: Request, body: OtimizacaoRequestDTO, backg
 # ── Stop ──────────────────────────────────────────────────────────────────────
 @router.post("/stop/{job_id}")
 async def stop_optimization(job_id: str):
-    job = jobs.get(job_id)
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
+    try:
+        job = get_job(job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
 
-    if job.status == "running":
-        job.status = "cancelled"
-        job_store.save_job_state(job_id, job)
-        job.events_queue.put_nowait({
-            "type": "log",
-            "data": {"text": "\n[!] OTIMIZAÇÃO INTERROMPIDA PELO USUÁRIO."},
-        })
-        logger.info("Job {} cancelado pelo usuário", job_id)
-        return {"status": "success", "message": "Sinal de interrupção enviado."}
+        if job.status == "running":
+            cancel_job(job_id)
+            job_store.save_job_state(job_id, job)
+            logger.info("Job {} cancelado pelo usuário", job_id)
+            return {"status": "success", "message": "Sinal de interrupção enviado."}
 
-    return {"status": "ignored", "message": "Job não está rodando."}
+        return {"status": "ignored", "message": "Job não está rodando."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Erro inesperado ao parar job {}", job_id)
+        raise HTTPException(status_code=500, detail="Erro interno ao processar a solicitação")
 
 
 # ── List / Delete / Get ───────────────────────────────────────────────────────
@@ -146,25 +142,30 @@ async def get_all_jobs(skip: int = 0, limit: int = 50, status: str | None = None
 
 @router.delete("/jobs/{job_id}")
 async def delete_job_endpoint(job_id: str):
-    job_in_memory = jobs.get(job_id)
-    if job_in_memory:
-        job_in_memory.is_deleted = True
-        if job_in_memory.status == "running":
-            job_in_memory.status = "cancelled"
+    try:
+        job_in_memory = get_job(job_id)
+        if job_in_memory:
+            job_in_memory.is_deleted = True
+            if job_in_memory.status == "running":
+                cancel_job(job_id)
 
-    success = job_store.delete_job(job_id)
-    if not success and not job_in_memory:
-        raise HTTPException(status_code=404, detail="Job not found or could not be deleted")
+        success = job_store.delete_job(job_id)
+        if not success and not job_in_memory:
+            raise HTTPException(status_code=404, detail="Job not found or could not be deleted")
 
-    if job_id in jobs:
-        del jobs[job_id]
+        remove_job(job_id)
 
-    logger.info("Job {} deletado", job_id)
-    return {"status": "success", "message": "Job deletado com sucesso."}
+        logger.info("Job {} deletado", job_id)
+        return {"status": "success", "message": "Job deletado com sucesso."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Erro inesperado ao deletar job {}", job_id)
+        raise HTTPException(status_code=500, detail="Erro interno ao processar a solicitação")
 
 
 @router.get("/jobs/{job_id}")
-async def get_job(job_id: str):
+async def get_job_status(job_id: str):
     job = job_store.load_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -211,20 +212,30 @@ def _format_result_event(job) -> dict:
 
 def _should_terminate_sse(job, elapsed: float, now: float, last_event_time: float,
                           first_event_received: bool) -> dict | None:
-    """Verifica condições de término do SSE. Retorna evento 'end' ou None para continuar."""
-    ORPHAN_TIMEOUT = 120.0
-    ORPHAN_GRACE_PERIOD = 120.0
+    """Verifica condições de término do SSE. Retorna evento 'end' ou None para continuar.
+    
+    A detecção de órfão usa job.last_activity_time (atualizado pelo background task e 
+    pelo heartbeat thread a cada 30s) em vez de last_event_time (atualizado apenas 
+    quando eventos SSE são consumidos). Isso evita falsos positivos durante chamadas 
+    LLM longas (até 60s) que não geram eventos na fila.
+    """
+    ORPHAN_TIMEOUT = 300.0       # 5 min sem atividade do job → órfão
+    ORPHAN_GRACE_PERIOD = 120.0  # 2 min de carência inicial antes de verificar órfão
+    
+    # Atividade do job: timestamp da última ação real (evento emitido ou heartbeat)
+    last_job_activity = getattr(job, 'last_activity_time', 0.0)
 
     if elapsed > MAX_JOB_DURATION_SECONDS:
-        logger.warning("Job {} excedeu timeout máximo de {}s — encerrando SSE", job, MAX_JOB_DURATION_SECONDS)
+        logger.warning("Job {} excedeu timeout máximo de {}s — encerrando SSE", id(job), MAX_JOB_DURATION_SECONDS)
         return {"event": "end", "data": "timeout"}
 
     if (job.status == "running" and first_event_received
             and elapsed > ORPHAN_GRACE_PERIOD
-            and (now - last_event_time) > ORPHAN_TIMEOUT):
+            and (now - last_job_activity) > ORPHAN_TIMEOUT):
         logger.warning(
-            "Job {} parece órfão: status=running mas {}s sem eventos — encerrando SSE",
-            id(job), int(now - last_event_time),
+            "Job {} parece órfão: status=running mas {:.0f}s sem atividade "
+            "(último evento SSE há {:.0f}s) — encerrando SSE",
+            id(job), now - last_job_activity, now - last_event_time,
         )
         job.status = "error"
         return {"event": "end", "data": "error"}
@@ -267,7 +278,7 @@ async def _try_consume_event(job):
     except TimeoutError:
         return None, False
     except asyncio.CancelledError:
-        logger.info("SSE stream do job {} cancelado (CancelledError)", id(job))
+        logger.debug("SSE stream do job {} cancelado (CancelledError)", id(job))
         return {"event": "end", "data": "cancelled"}, True
 
 
@@ -322,7 +333,7 @@ async def _live_event_generator(job):
 # ── Stream ────────────────────────────────────────────────────────────────────
 @router.get("/stream/{job_id}")
 async def stream_progress(job_id: str):
-    job = jobs.get(job_id)
+    job = get_job(job_id)
     if not job:
         disk_job = job_store.load_job(job_id)
         if not disk_job:

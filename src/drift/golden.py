@@ -96,14 +96,23 @@ class GoldenSet:
             return
         try:
             with open(path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
+                raw = f.read()
+            data = json.loads(raw)
             self.version = data.get('version', '')
             self.curated_at = data.get('curated_at', '')
             self.probes = self._parse_golden_json(data)
             logger.info("[*] Golden set v{} carregado: {} probes.", self.version, len(self.probes))
             self._validate_circular_contamination()
+        except json.JSONDecodeError as e:
+            logger.warning(
+                "[!] Golden set com JSON inválido em {}: {} (linha {}, coluna {}). "
+                "Verifique se o arquivo usa aspas duplas e não contém caracteres inválidos. "
+                "Operando sem âncora.",
+                path, e.msg, e.lineno, e.colno,
+            )
+            self.probes = []
         except Exception as e:
-            logger.error("[!] Erro ao carregar golden set ({}). Operando sem âncora.", e)
+            logger.error("[!] Erro ao carregar golden set em {}: {}. Operando sem âncora.", path, e)
             self.probes = []
 
     def is_empty(self) -> bool:

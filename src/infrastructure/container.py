@@ -196,3 +196,36 @@ class Container:
 
         return True, None
 
+
+# ── Singleton do Container ──────────────────────────────────────────────────
+
+_container_instance: Container | None = None
+_container_lock = __import__('threading').Lock()
+
+
+def get_container() -> Container:
+    """Retorna a instância singleton do Container (thread-safe, lazy init).
+    
+    Usa double-checked locking para evitar criação concorrente.
+    Executa health check na primeira inicialização e loga warnings.
+    """
+    global _container_instance
+    if _container_instance is None:
+        with _container_lock:
+            if _container_instance is None:
+                _container_instance = Container()
+                ok, err = _container_instance.health_check()
+                if not ok:
+                    import sys
+                    print(f"[Container] Health check FAILED: {err}", file=sys.stderr)
+                else:
+                    print("[Container] Health check OK — todas as dependências validadas.")
+    return _container_instance
+
+
+def reset_container() -> None:
+    """Reseta o singleton do container (uso em testes)."""
+    global _container_instance
+    with _container_lock:
+        _container_instance = None
+

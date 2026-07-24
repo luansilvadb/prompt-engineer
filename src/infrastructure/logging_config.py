@@ -1,6 +1,7 @@
 """Logging estruturado com loguru — substitui print() por logger."""
 
 import sys
+import warnings
 from pathlib import Path
 from loguru import logger
 
@@ -15,17 +16,25 @@ def setup_logging():
     logger.remove()
 
     # Console: formato compacto para desenvolvimento
-    logger.add(
-        sys.stderr,
-        format=(
-            "<green>{time:HH:mm:ss}</green> | "
-            "<level>{level: <8}</level> | "
-            "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - "
-            "<level>{message}</level>"
-        ),
-        level="DEBUG",
-        colorize=True,
-    )
+    # Em builds PyInstaller com console=False, sys.stderr pode ser None
+    if sys.stderr is not None:
+        logger.add(
+            sys.stderr,
+            format=(
+                "<green>{time:HH:mm:ss}</green> | "
+                "<level>{level: <8}</level> | "
+                "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - "
+                "<level>{message}</level>"
+            ),
+            level="DEBUG",
+            colorize=True,
+        )
+    else:
+        warnings.warn(
+            "sys.stderr não está disponível (ambiente congelado sem console). "
+            "Handler de console omitido — logs disponíveis apenas no arquivo rotativo.",
+            RuntimeWarning,
+        )
 
     # Arquivo rotativo: registro persistente com rotação diária, retenção 7 dias
     logger.add(

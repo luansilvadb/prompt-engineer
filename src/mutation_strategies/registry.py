@@ -83,12 +83,39 @@ class StrategyRegistry:
     def get_prompt(self, key: str) -> str:
         if key == '__DISCOVER__':
             return ''
+        if key.startswith('composite:') and key not in self.strategies:
+            parts_key = key[len('composite:'):]
+            constituent_keys = parts_key.split('+')
+            return self.build_composite_prompt(constituent_keys)[2]
         return self.strategies.get(key, {}).get('prompt', '')
 
     def get_name(self, key: str) -> str:
         if key == '__DISCOVER__':
             return 'Descoberta Autônoma de Reflexo (Tabula Rasa)'
+        if key.startswith('composite:') and key not in self.strategies:
+            parts = key[len('composite:'):].split('+')
+            names = [self.get_name(p) for p in parts]
+            return "Composição: " + " + ".join(names)
         return self.strategies.get(key, {}).get('name', key)
+
+    def build_composite_prompt(self, strategy_keys: list[str]) -> tuple[str, str, str]:
+        parts: list[str] = []
+        for k in strategy_keys:
+            p = self.strategies.get(k, {}).get('prompt', '')
+            if p:
+                parts.append(p)
+        composite_key = self.get_composite_key(strategy_keys)
+        composite_name = self.composite_name(strategy_keys)
+        composite_prompt = "\n\n--- PRÓXIMA ESTRATÉGIA ---\n\n".join(parts)
+        return (composite_key, composite_name, composite_prompt)
+
+    def composite_name(self, strategy_keys: list[str]) -> str:
+        names = [self.get_name(k) for k in strategy_keys]
+        return "Composição: " + " + ".join(names)
+
+    @staticmethod
+    def get_composite_key(strategy_keys: list[str]) -> str:
+        return "composite:" + "+".join(strategy_keys)
 
     def _seed_hardcoded_strategies(self):
         COGNITIVO_KEY = 'mutador_cognitivo'
@@ -103,6 +130,56 @@ class StrategyRegistry:
                     "(2) Deduções — implicações lógicas sobre o que precisa mudar; "
                     "(3) Conclusão — a regra arquitetural que a nova instrução deve implementar. "
                     "A nova instrução DEVE conter as seções ## Raciocínio, ## Regras, ## Conclusão."
+                )
+            )
+
+        COMPRESSAO_KEY = 'compressao_formalizacao'
+        if COMPRESSAO_KEY not in self.strategies:
+            self.add_strategy(
+                key=COMPRESSAO_KEY,
+                name='Compressão e Formalização',
+                prompt=(
+                    "Comprima o prompt removendo redundâncias, padronizando a estrutura "
+                    "(títulos, listas, negrito) e mantendo toda a capacidade funcional sem perda semântica. "
+                    "Reduza repetições verbosas, consolide regras duplicadas, normalize a formatação "
+                    "para markdown e preserve cada regra comportamental e restrição."
+                )
+            )
+
+        EXEMPLOS_KEY = 'enriquecimento_exemplos'
+        if EXEMPLOS_KEY not in self.strategies:
+            self.add_strategy(
+                key=EXEMPLOS_KEY,
+                name='Enriquecimento com Exemplos',
+                prompt=(
+                    "Enriqueça o prompt com exemplos práticos e contraexemplos que contextualizem "
+                    "casos de uso e limitações do sistema. Adicione exemplos concretos para cada regra, "
+                    "forneça contraexemplos (o que NÃO fazer) e NÃO remova nenhuma regra existente."
+                )
+            )
+
+        FALHA_KEY = 'reorganizacao_falha'
+        if FALHA_KEY not in self.strategies:
+            self.add_strategy(
+                key=FALHA_KEY,
+                name='Reorganização por Prioridade de Falha',
+                prompt=(
+                    "Reorganize o conteúdo do prompt com base na prioridade de falha — coloque "
+                    "regras e diretrizes que resolvem os erros mais frequentes no início do texto. "
+                    "Dados de erro serão injetados junto com este prompt. Reordene as seções de modo "
+                    "que as regras mais críticas e mais frequentemente falhantes venham primeiro."
+                )
+            )
+
+        BLOCOS_KEY = 'preservacao_blocos'
+        if BLOCOS_KEY not in self.strategies:
+            self.add_strategy(
+                key=BLOCOS_KEY,
+                name='Preservação Seletiva de Blocos',
+                prompt=(
+                    "Preserve blocos de raciocínio que demonstraram eficácia na resolução de casos "
+                    "ambíguos. Mantenha intactos certos blocos durante a reescrita. Blocos eficazes "
+                    "serão fornecidos junto com este prompt."
                 )
             )
 
